@@ -12,9 +12,23 @@ import TopReaders from "./pages/TopReaders";
 import Users from "./pages/Users";
 import Login from "../auth/pages/Login";
 import Register from "../auth/pages/Register";
+import { getRoleLandingPath } from "../auth/roleRoutes";
+import AuthorLayout from "../author/components/Layout";
+import AuthorDashboard from "../author/pages/Dashboard";
+import AuthorBooks from "../author/pages/MyBooks";
+import AuthorUpload from "../author/pages/UploadBook";
+import AuthorProfile from "../author/pages/Profile";
+import AuthorSettings from "../author/pages/Setting";
+import AuthorFeedback from "../author/pages/Feedback";
+import AuthorEditBook from "../author/pages/EditBookPage";
+import ReaderDashboard from "../reader/pages/Dashboard";
 
 export default function AdminRoutes() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, isInitializing, user } = useAuth();
+
+  if (isInitializing) {
+    return null;
+  }
 
   return (
     <Routes>
@@ -24,7 +38,7 @@ export default function AdminRoutes() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute role="Admin">
             <AdminLayout />
           </ProtectedRoute>
         }
@@ -39,8 +53,37 @@ export default function AdminRoutes() {
         <Route path="monitor" element={<SystemMonitor />} />
         <Route path="settings" element={<Settings />} />
       </Route>
-      <Route path="/" element={<Navigate to={isAuthenticated ? "/admin/dashboard" : "/login"} replace />} />
-      <Route path="*" element={<Navigate to={isAuthenticated ? "/admin/dashboard" : "/login"} replace />} />
+
+      <Route
+        path="/author"
+        element={
+          <ProtectedRoute role="Author">
+            <AuthorLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<Navigate to="/author/dashboard" replace />} />
+        <Route path="dashboard" element={<AuthorDashboard />} />
+        <Route path="my-books" element={<AuthorBooks />} />
+        <Route path="upload" element={<AuthorUpload />} />
+        <Route path="profile" element={<AuthorProfile />} />
+        <Route path="settings" element={<AuthorSettings />} />
+        <Route path="feedback" element={<AuthorFeedback />} />
+        <Route path="analytics" element={<AuthorDashboard />} />
+        <Route path="edit-book" element={<AuthorEditBook />} />
+      </Route>
+
+      <Route
+        path="/reader/dashboard"
+        element={
+          <ProtectedRoute role="Reader">
+            <ReaderDashboard />
+          </ProtectedRoute>
+        }
+      />
+
+      <Route path="/" element={<Navigate to="/login" replace />} />
+      <Route path="*" element={<Navigate to={isAuthenticated ? getRoleLandingPath(user?.role) : "/login"} replace />} />
     </Routes>
   );
 }

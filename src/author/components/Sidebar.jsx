@@ -14,13 +14,13 @@ import {
 
 const Sidebar = () => {
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: BookOpen, label: 'My Books', path: '/my-books' },
-    { icon: PlusSquare, label: 'Upload New', path: '/upload' },
-    { icon: BarChart3, label: 'Analytics', path: '/analytics' },
-    { icon: MessageSquare, label: 'Feedback', path: '/feedback' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
-    { icon: User, label: 'Profile', path: '/profile' },
+    { icon: LayoutDashboard, label: 'Dashboard', path: '/author/dashboard' },
+    { icon: BookOpen, label: 'My Books', path: '/author/my-books' },
+    { icon: PlusSquare, label: 'Upload New', path: '/author/upload' },
+    { icon: BarChart3, label: 'Analytics', path: '/author/analytics' },
+    { icon: MessageSquare, label: 'Feedback', path: '/author/feedback' },
+    { icon: Settings, label: 'Settings', path: '/author/settings' },
+    { icon: User, label: 'Profile', path: '/author/profile' },
   ];
 
   return (

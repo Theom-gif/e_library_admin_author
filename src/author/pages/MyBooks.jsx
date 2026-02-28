@@ -109,7 +109,7 @@ const MyBooks = () => {
           <p className="text-slate-400 mt-1">Manage and track your published works and drafts.</p>
         </div>
         <button
-          onClick={() => navigate('/upload')}
+          onClick={() => navigate('/author/upload')}
           className="flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl font-bold shadow-glow hover:opacity-90 transition-all"
         >
           <Plus className="size-5" />
@@ -185,7 +185,7 @@ const MyBooks = () => {
                     <span>View</span>
                   </button>
                   <button
-                    onClick={() => navigate('/edit-book', { state: { book: toEditableBook(book) } })}
+                    onClick={() => navigate('/author/edit-book', { state: { book: toEditableBook(book) } })}
                     className="flex-1 flex items-center justify-center gap-2 py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/80 transition-colors"
                   >
                     <Edit3 className="size-3.5" />

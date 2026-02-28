@@ -330,7 +330,7 @@ const Profile = () => {
             <div className="flex justify-between items-center mb-8">
               <h2 className="text-lg font-bold">Latest Works</h2>
               <button
-                onClick={() => navigate('/my-books')}
+                onClick={() => navigate('/author/my-books')}
                 className="text-sm font-bold text-accent hover:text-white transition-colors"
               >
                 View All

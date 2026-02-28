@@ -23,17 +23,17 @@ const EditBookPage = () => {
   const initialBook = state?.book ?? fallbackBook;
 
   const handleSave = (updatedBook) => {
-    navigate('/my-books', { state: { updatedBook } });
+    navigate('/author/my-books', { state: { updatedBook } });
   };
 
   const handleCancel = () => {
-    navigate('/my-books');
+    navigate('/author/my-books');
   };
 
   const handleDelete = () => {
     const confirmed = window.confirm(`Delete "${initialBook.title}"? This cannot be undone.`);
     if (!confirmed) return;
-    navigate('/my-books', { state: { deletedBookId: initialBook.id } });
+    navigate('/author/my-books', { state: { deletedBookId: initialBook.id } });
   };
 
   return (

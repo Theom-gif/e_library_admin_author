@@ -3,6 +3,7 @@ import { DEMO_AUTH_USERS } from "../admin/data/mockData";
 
 const USERS_KEY = "bookhub_users";
 const SESSION_KEY = "bookhub_session";
+const REQUIRE_LOGIN_ON_APP_START = true;
 
 const AuthContext = createContext(null);
 
@@ -66,17 +67,53 @@ function clearSession() {
   localStorage.removeItem(SESSION_KEY);
 }
 
+function hydrateSession() {
+  const session = getSession();
+  if (!session) {
+    return null;
+  }
+
+  const users = getUsers();
+  const normalizedSessionEmail = String(session.email || "").trim().toLowerCase();
+  const matchedUser = users.find(
+    (candidate) =>
+      candidate.id === session.id &&
+      candidate.email.toLowerCase() === normalizedSessionEmail &&
+      normalizeRole(candidate.role) === normalizeRole(session.role),
+  );
+
+  if (!matchedUser) {
+    clearSession();
+    return null;
+  }
+
+  return {
+    id: matchedUser.id,
+    name: matchedUser.name,
+    email: matchedUser.email,
+    role: matchedUser.role,
+  };
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
     seedUsers();
-    setUser(getSession());
+    if (REQUIRE_LOGIN_ON_APP_START) {
+      clearSession();
+      setUser(null);
+    } else {
+      setUser(hydrateSession());
+    }
+    setIsInitializing(false);
   }, []);
 
   const value = useMemo(
     () => ({
       user,
+      isInitializing,
       isAuthenticated: Boolean(user),
       login: ({ email, password, role }) => {
         const normalizedEmail = String(email || "").trim().toLowerCase();
@@ -138,7 +175,7 @@ export function AuthProvider({ children }) {
         setUser(null);
       },
     }),
-    [user],
+    [isInitializing, user],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

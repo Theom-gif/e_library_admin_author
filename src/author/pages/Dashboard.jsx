@@ -191,7 +191,7 @@ const Dashboard = () => {
             ))}
           </div>
           <button
-            onClick={() => navigate('/my-books')}
+            onClick={() => navigate('/author/my-books')}
             className="w-full mt-8 py-2 text-sm font-medium text-accent hover:text-white transition-colors"
           >
             View All Books

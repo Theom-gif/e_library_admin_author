@@ -94,7 +94,7 @@ const UploadBook = () => {
     }
 
     window.localStorage.setItem(BOOKS_STORAGE_KEY, JSON.stringify([newBook, ...existingBooks]));
-    navigate('/my-books');
+    navigate('/author/my-books');
   };
 
   const manuscriptSize = manuscriptFile

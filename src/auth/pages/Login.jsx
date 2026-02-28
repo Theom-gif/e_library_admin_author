@@ -1,15 +1,16 @@
-import { BookOpen, Eye, EyeOff, Sparkles } from "lucide-react";
+import { Eye, EyeOff, Sparkles } from "lucide-react";
 import { useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
+import { getRoleLandingPath } from "../roleRoutes";
 
 const ROLES = ["Reader", "Author", "Admin"];
 
 export default function Login() {
-  const { isAuthenticated, login, loginDemo } = useAuth();
+  const { isAuthenticated, isInitializing, login, loginDemo, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const from = location.state?.from?.pathname || "/admin/dashboard";
+  const from = location.state?.from?.pathname;
 
   const [form, setForm] = useState({
     email: "",
@@ -19,8 +20,12 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
 
+  if (isInitializing) {
+    return null;
+  }
+
   if (isAuthenticated) {
-    return <Navigate to="/admin/dashboard" replace />;
+    return <Navigate to={getRoleLandingPath(user?.role)} replace />;
   }
 
   const onChange = (key, value) => {
@@ -35,7 +40,7 @@ export default function Login() {
       setError(result.error);
       return;
     }
-    navigate(from, { replace: true });
+    navigate(from || getRoleLandingPath(result.user?.role), { replace: true });
   };
 
   const loginAsDemo = (role) => {
@@ -44,19 +49,12 @@ export default function Login() {
       setError(result.error);
       return;
     }
-    navigate("/admin/dashboard", { replace: true });
+    navigate(getRoleLandingPath(result.user?.role), { replace: true });
   };
 
   return (
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,#132b59_0%,#081b42_40%,#03122f_100%)] px-4 py-12 text-white">
       <div className="mx-auto w-full max-w-[450px]">
-        {/* <div className="mb-8 text-center">
-          <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-[#a855f7] via-[#ec4899] to-[#3b82f6]">
-            <BookOpen size={27} />
-          </div>
-          <p className="mt-2 text-2xl text-slate-400">Sign in to your account</p>
-        </div> */}
-
         <div className="rounded-[30px] border border-[#294267] bg-[linear-gradient(180deg,#18294a_0%,#162344_100%)] p-8 shadow-[0_22px_70px_rgba(8,10,35,0.5)]">
           <form className="space-y-5" onSubmit={onSubmit}>
             <div>
@@ -67,11 +65,10 @@ export default function Login() {
                     key={role}
                     type="button"
                     onClick={() => onChange("role", role)}
-                    className={`rounded-xl px-4 py-2.5 text-md font-semibold transition-all ${
-                      form.role === role
-                        ? "bg-gradient-to-r from-[#9f53f4] to-[#ec4899] text-white shadow-[0_8px_24px_rgba(180,69,228,0.4)]"
-                        : "bg-[#263758] text-slate-400 hover:text-white"
-                    }`}
+                    className={`rounded-xl px-4 py-2.5 text-md font-semibold transition-all ${form.role === role
+                      ? "bg-gradient-to-r from-[#9f53f4] to-[#ec4899] text-white shadow-[0_8px_24px_rgba(180,69,228,0.4)]"
+                      : "bg-[#263758] text-slate-400 hover:text-white"
+                      }`}
                   >
                     {role}
                   </button>
@@ -165,3 +162,4 @@ export default function Login() {
     </main>
   );
 }
+

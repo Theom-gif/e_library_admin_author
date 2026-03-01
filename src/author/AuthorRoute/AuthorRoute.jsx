@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import Layout from '../components/Layout';
 import Dashboard from '../pages/Dashboard';
 import MyBooks from '../pages/MyBooks';
@@ -16,19 +16,17 @@ import EditBookPage from '../pages/EditBookPage';
 
 export default function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="my-books" element={<MyBooks />} />
-          <Route path="upload" element={<UploadBook />} />
-          <Route path="profile" element={<Profile />} />
-          <Route path="settings" element={<Settings />} />
-          <Route path="feedback" element={<Feedback />} />
-          <Route path="analytics" element={<Dashboard />} />
-          <Route path="edit-book" element={<EditBookPage />} />
-        </Route>
-      </Routes>
-    </Router>
+    <Routes>
+      <Route path="/" element={<Layout />}>
+        <Route index element={<Dashboard />} />
+        <Route path="my-books" element={<MyBooks />} />
+        <Route path="upload" element={<UploadBook />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="settings" element={<Settings />} />
+        <Route path="feedback" element={<Feedback />} />
+        <Route path="analytics" element={<Dashboard />} />
+        <Route path="edit-book" element={<EditBookPage />} />
+      </Route>
+    </Routes>
   );
 }

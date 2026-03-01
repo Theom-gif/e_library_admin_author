@@ -101,3 +101,28 @@ a:focus-visible {
 .border-white\/10 {
   border-color: var(--border) !important;
 }
+
+.glass-card {
+  @apply bg-bg-card border border-white/5 rounded-2xl shadow-xl;
+}
+
+.sidebar-item {
+  @apply flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 text-text-muted hover:text-white hover:bg-white/5;
+}
+
+.sidebar-item.active {
+  @apply text-white bg-accent-purple/10 border-l-4 border-accent-purple;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-bg-dark;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-white/10 rounded-full hover:bg-white/20;
+}

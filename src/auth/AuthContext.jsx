@@ -1,49 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { DEMO_AUTH_USERS } from "../admin/data/mockData";
+import { loginRequest, registerRequest } from "./services/authService";
 
-const USERS_KEY = "bookhub_users";
 const SESSION_KEY = "bookhub_session";
+const TOKEN_KEY = "bookhub_token";
 
 const AuthContext = createContext(null);
 
 function normalizeRole(role) {
   return String(role || "").toLowerCase();
-}
-
-function seedUsers() {
-  const raw = localStorage.getItem(USERS_KEY);
-  if (!raw) {
-    localStorage.setItem(USERS_KEY, JSON.stringify(DEMO_AUTH_USERS));
-    return;
-  }
-
-  let existingUsers = [];
-  try {
-    existingUsers = JSON.parse(raw);
-  } catch {
-    existingUsers = [];
-  }
-
-  const demoIds = new Set(DEMO_AUTH_USERS.map((user) => user.id));
-  const nonDemoUsers = existingUsers.filter((user) => !demoIds.has(user.id));
-  const mergedUsers = [...nonDemoUsers, ...DEMO_AUTH_USERS];
-  localStorage.setItem(USERS_KEY, JSON.stringify(mergedUsers));
-}
-
-function getUsers() {
-  const raw = localStorage.getItem(USERS_KEY);
-  if (!raw) {
-    return [];
-  }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
 }
 
 function getSession() {
@@ -62,15 +27,30 @@ function saveSession(user) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
 }
 
+function saveToken(token) {
+  if (!token) {
+    return;
+  }
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
+}
+
+function toErrorMessage(error, fallbackMessage) {
+  const message = error?.response?.data?.message || error?.message;
+  return message || fallbackMessage;
 }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
 
   useEffect(() => {
-    seedUsers();
     setUser(getSession());
   }, []);
 
@@ -78,24 +58,35 @@ export function AuthProvider({ children }) {
     () => ({
       user,
       isAuthenticated: Boolean(user),
-      login: ({ email, password, role }) => {
-        const normalizedEmail = String(email || "").trim().toLowerCase();
-        const users = getUsers();
-        const found = users.find(
-          (candidate) =>
-            candidate.email.toLowerCase() === normalizedEmail &&
-            candidate.password === password &&
-            normalizeRole(candidate.role) === normalizeRole(role),
-        );
+      login: async ({ email, password, role }) => {
+        try {
+          const response = await loginRequest({
+            email: String(email || "").trim().toLowerCase(),
+            password,
+            role,
+          });
+          const data = response?.data || {};
+          const backendUser = data.user || data.data?.user || data;
+          const backendRole = backendUser?.role || role;
+          if (role && normalizeRole(backendRole) !== normalizeRole(role)) {
+            return { ok: false, error: "Your account role does not match the selected role." };
+          }
 
-        if (!found) {
-          return { ok: false, error: "Invalid email, password, or role." };
+          const sessionUser = {
+            id: backendUser?.id || backendUser?._id || backendUser?.userId || `u_${Date.now()}`,
+            name: backendUser?.name || backendUser?.fullName || backendUser?.username || "User",
+            email: backendUser?.email || String(email || "").trim().toLowerCase(),
+            role: backendRole || "Reader",
+          };
+
+          const token = data.token || data.accessToken || data.access_token;
+          saveSession(sessionUser);
+          saveToken(token);
+          setUser(sessionUser);
+          return { ok: true, user: sessionUser };
+        } catch (error) {
+          return { ok: false, error: toErrorMessage(error, "Login failed. Please try again.") };
         }
-
-        const sessionUser = { id: found.id, name: found.name, email: found.email, role: found.role };
-        saveSession(sessionUser);
-        setUser(sessionUser);
-        return { ok: true, user: sessionUser };
       },
       loginDemo: (role) => {
         const demoUser = DEMO_AUTH_USERS.find(
@@ -115,26 +106,22 @@ export function AuthProvider({ children }) {
         setUser(sessionUser);
         return { ok: true, user: sessionUser };
       },
-      register: ({ name, email, password, role }) => {
-        const users = getUsers();
-        const normalizedEmail = String(email || "").trim().toLowerCase();
-        const exists = users.some((candidate) => candidate.email.toLowerCase() === normalizedEmail);
-        if (exists) {
-          return { ok: false, error: "Email is already registered." };
+      register: async ({ name, email, password, role }) => {
+        try {
+          await registerRequest({
+            name,
+            email: String(email || "").trim().toLowerCase(),
+            password,
+            role,
+          });
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, error: toErrorMessage(error, "Registration failed. Please try again.") };
         }
-
-        const newUser = {
-          id: `u_${Date.now()}`,
-          name,
-          email: normalizedEmail,
-          password,
-          role,
-        };
-        saveUsers([...users, newUser]);
-        return { ok: true };
       },
       logout: () => {
         clearSession();
+        clearToken();
         setUser(null);
       },
     }),

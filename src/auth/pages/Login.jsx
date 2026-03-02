@@ -38,9 +38,9 @@ export default function Login() {
     setError("");
   };
 
-  const onSubmit = (event) => {
+  const onSubmit = async (event) => {
     event.preventDefault();
-    const result = login(form);
+    const result = await login(form);
     if (!result.ok) {
       setError(result.error);
       return;

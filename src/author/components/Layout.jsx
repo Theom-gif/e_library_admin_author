@@ -3,9 +3,11 @@ import { Outlet } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import { Bell, Moon, Search, Sun } from 'lucide-react';
 
+const AUTHOR_THEME_KEY = 'author-theme';
+
 const Layout = () => {
   const [theme, setTheme] = useState(() => {
-    const savedTheme = localStorage.getItem('theme');
+    const savedTheme = localStorage.getItem(AUTHOR_THEME_KEY);
     if (savedTheme === 'dark' || savedTheme === 'light') {
       return savedTheme;
     }
@@ -15,7 +17,12 @@ const Layout = () => {
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
-    localStorage.setItem('theme', theme);
+    localStorage.setItem(AUTHOR_THEME_KEY, theme);
+
+    // Keep light/dark mode scoped to author pages only.
+    return () => {
+      document.documentElement.removeAttribute('data-theme');
+    };
   }, [theme]);
 
   return (

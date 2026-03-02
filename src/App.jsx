@@ -4,6 +4,7 @@ import AdminRoutes from "./admin/AdminRoutes";
 import AuthorRoute from './author/AuthorRoute/AuthorRoute'
 import { AuthProvider } from "./auth/AuthContext";
 
+
 function App() {
   return (
     <AuthProvider>

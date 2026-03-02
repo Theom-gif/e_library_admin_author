@@ -210,7 +210,7 @@ export const EditBookForm = ({ book, onSave, onCancel, onDelete }) => {
             <button
               type="button"
               onClick={addTag}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary text-white text-xs font-medium hover:brightness-110"
+              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary text-on-primary text-xs font-medium hover:brightness-110"
             >
               <Plus size={12} /> Add Tag
             </button>
@@ -246,7 +246,7 @@ export const EditBookForm = ({ book, onSave, onCancel, onDelete }) => {
           </button>
           <button 
             type="submit"
-            className="px-8 py-2.5 rounded-lg bg-primary text-white font-bold shadow-lg shadow-primary/20 hover:brightness-110 transition-all"
+            className="px-8 py-2.5 rounded-lg bg-primary text-on-primary font-bold shadow-lg shadow-primary/20 hover:brightness-110 transition-all"
           >
             Save Book
           </button>

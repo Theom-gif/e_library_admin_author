@@ -313,7 +313,7 @@ const UploadBook = () => {
             onClick={() => setStep(Math.max(1, step - 1))}
             disabled={step === 1}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              step === 1 ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-white hover:bg-white/5'
+              step === 1 ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-[color:var(--text)] hover:bg-white/5'
             }`}
           >
             <ChevronLeft className="size-4" />

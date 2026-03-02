@@ -209,7 +209,7 @@ const MyBooks = () => {
             </div>
             <div className="p-5">
               <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-slate-100 truncate pr-2">{book.title}</h3>
+                <h3 className="font-bold text-[color:var(--text)] truncate pr-2">{book.title}</h3>
                 <div className="flex items-center gap-1">
                   <Star className="size-3 text-yellow-500 fill-yellow-500" />
                   <span className="text-xs font-bold">{book.rating || 'N/A'}</span>

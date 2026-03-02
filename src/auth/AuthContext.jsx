@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { DEMO_AUTH_USERS } from "../admin/data/mockData";
+import { loginRequest, registerRequest } from "./services/authService";
 
-const USERS_KEY = "bookhub_users";
 const SESSION_KEY = "bookhub_session";
+const TOKEN_KEY = "bookhub_token";
+const USERS_KEY = "bookhub_users";
 const REQUIRE_LOGIN_ON_APP_START = true;
 
 const AuthContext = createContext(null);
@@ -11,40 +13,13 @@ function normalizeRole(role) {
   return String(role || "").toLowerCase();
 }
 
-function seedUsers() {
-  const raw = localStorage.getItem(USERS_KEY);
-  if (!raw) {
-    localStorage.setItem(USERS_KEY, JSON.stringify(DEMO_AUTH_USERS));
-    return;
-  }
-
-  let existingUsers = [];
-  try {
-    existingUsers = JSON.parse(raw);
-  } catch {
-    existingUsers = [];
-  }
-
-  const demoIds = new Set(DEMO_AUTH_USERS.map((user) => user.id));
-  const nonDemoUsers = existingUsers.filter((user) => !demoIds.has(user.id));
-  const mergedUsers = [...nonDemoUsers, ...DEMO_AUTH_USERS];
-  localStorage.setItem(USERS_KEY, JSON.stringify(mergedUsers));
-}
-
-function getUsers() {
-  const raw = localStorage.getItem(USERS_KEY);
-  if (!raw) {
-    return [];
-  }
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return [];
-  }
-}
-
-function saveUsers(users) {
-  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+function toErrorMessage(error, fallbackMessage) {
+  return (
+    error?.response?.data?.error ||
+    error?.response?.data?.message ||
+    error?.message ||
+    fallbackMessage
+  );
 }
 
 function getSession() {
@@ -61,6 +36,41 @@ function getSession() {
 
 function saveSession(user) {
   localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+}
+
+function saveToken(token) {
+  if (!token) {
+    return;
+  }
+  localStorage.setItem(TOKEN_KEY, token);
+}
+
+function clearToken() {
+  localStorage.removeItem(TOKEN_KEY);
+}
+
+function getUsers() {
+  const raw = localStorage.getItem(USERS_KEY);
+  if (!raw) {
+    return [...DEMO_AUTH_USERS];
+  }
+
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [...DEMO_AUTH_USERS];
+  } catch {
+    return [...DEMO_AUTH_USERS];
+  }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(USERS_KEY, JSON.stringify(users));
+}
+
+function seedUsers() {
+  if (!localStorage.getItem(USERS_KEY)) {
+    saveUsers(DEMO_AUTH_USERS);
+  }
 }
 
 function clearSession() {
@@ -103,6 +113,7 @@ export function AuthProvider({ children }) {
     seedUsers();
     if (REQUIRE_LOGIN_ON_APP_START) {
       clearSession();
+      clearToken();
       setUser(null);
     } else {
       setUser(hydrateSession());
@@ -116,40 +127,36 @@ export function AuthProvider({ children }) {
       isInitializing,
       isAuthenticated: Boolean(user),
       login: async ({ email, password, role }) => {
-        // Try remote authentication first
+        const normalizedEmail = String(email || "").trim().toLowerCase();
+
         try {
-          const resp = await fetch("http://192.168.75.1:8000/api/auth/login", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password, role }),
+          const response = await loginRequest({
+            email: normalizedEmail,
+            password,
+            role,
           });
 
-          if (resp.ok) {
-            const data = await resp.json();
-            // Expecting either { user, token } or user object
-            const remoteUser = data.user || data;
-            const token = data.token || data.accessToken || null;
-            if (remoteUser && (remoteUser.email || remoteUser.id)) {
-              const sessionUser = {
-                id: remoteUser.id || remoteUser._id || String(remoteUser.email),
-                name: remoteUser.name || remoteUser.email,
-                email: remoteUser.email,
-                role: remoteUser.role || role,
-              };
-              if (token) sessionUser.token = token;
-              saveSession(sessionUser);
-              setUser(sessionUser);
-              return { ok: true, user: sessionUser };
-            }
+          const data = response?.data ?? {};
+          const remoteUser = data.user || data;
+          const token = data.token || data.accessToken || data.access_token;
 
-            return { ok: false, error: data.error || data.message || "Invalid credentials." };
+          if (remoteUser && (remoteUser.email || remoteUser.id)) {
+            const sessionUser = {
+              id: remoteUser.id || remoteUser._id || remoteUser.userId || String(remoteUser.email),
+              name: remoteUser.name || remoteUser.fullName || remoteUser.username || "User",
+              email: remoteUser.email || normalizedEmail,
+              role: remoteUser.role || role || "Reader",
+            };
+
+            saveSession(sessionUser);
+            saveToken(token);
+            setUser(sessionUser);
+            return { ok: true, user: sessionUser };
           }
-        } catch (err) {
-          // network or CORS error - fall back to local demo auth below
+        } catch {
+          // Fall back to local demo users below.
         }
 
-        // Fallback to local demo user store
-        const normalizedEmail = String(email || "").trim().toLowerCase();
         const users = getUsers();
         const found = users.find(
           (candidate) =>
@@ -162,7 +169,13 @@ export function AuthProvider({ children }) {
           return { ok: false, error: "Invalid email, password, or role." };
         }
 
-        const sessionUser = { id: found.id, name: found.name, email: found.email, role: found.role };
+        const sessionUser = {
+          id: found.id,
+          name: found.name,
+          email: found.email,
+          role: found.role,
+        };
+
         saveSession(sessionUser);
         setUser(sessionUser);
         return { ok: true, user: sessionUser };
@@ -185,26 +198,22 @@ export function AuthProvider({ children }) {
         setUser(sessionUser);
         return { ok: true, user: sessionUser };
       },
-      register: ({ name, email, password, role }) => {
-        const users = getUsers();
-        const normalizedEmail = String(email || "").trim().toLowerCase();
-        const exists = users.some((candidate) => candidate.email.toLowerCase() === normalizedEmail);
-        if (exists) {
-          return { ok: false, error: "Email is already registered." };
+      register: async ({ name, email, password, role }) => {
+        try {
+          await registerRequest({
+            name,
+            email: String(email || "").trim().toLowerCase(),
+            password,
+            role,
+          });
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, error: toErrorMessage(error, "Registration failed. Please try again.") };
         }
-
-        const newUser = {
-          id: `u_${Date.now()}`,
-          name,
-          email: normalizedEmail,
-          password,
-          role,
-        };
-        saveUsers([...users, newUser]);
-        return { ok: true };
       },
       logout: () => {
         clearSession();
+        clearToken();
         setUser(null);
       },
     }),

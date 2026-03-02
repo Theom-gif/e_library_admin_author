@@ -174,7 +174,7 @@ const Profile = () => {
             <>
               <button
                 onClick={cancelEdit}
-                className="px-6 py-2.5 bg-card-dark border border-white/10 rounded-xl text-sm font-bold text-slate-300 hover:text-white transition-all"
+                className="px-6 py-2.5 bg-card-dark border border-white/10 rounded-xl text-sm font-bold text-slate-300 hover:text-[color:var(--text)] transition-all"
               >
                 Cancel
               </button>
@@ -188,7 +188,7 @@ const Profile = () => {
           )}
           <button
             onClick={() => window.open(activeProfile.website || 'https://example.com', '_blank', 'noopener,noreferrer')}
-            className="p-2.5 bg-card-dark border border-white/5 rounded-xl text-slate-400 hover:text-white transition-colors"
+            className="p-2.5 bg-card-dark border border-white/5 rounded-xl text-slate-400 hover:text-[color:var(--text)] transition-colors"
           >
             <Globe className="size-5" />
           </button>
@@ -283,7 +283,7 @@ const Profile = () => {
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Open GitHub profile"
-                className="text-slate-500 hover:text-white transition-colors"
+                className="text-slate-500 hover:text-[color:var(--text)] transition-colors"
               >
                 <Github className="size-5" />
               </a>

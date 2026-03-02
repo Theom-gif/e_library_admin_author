@@ -33,7 +33,7 @@ export default function Register() {
     setSuccess("");
   };
 
-  const onSubmit = (event) => {
+  const onSubmit = async (event) => {
     event.preventDefault();
     const trimmedName = form.name.trim();
     if (trimmedName.length < 2) {
@@ -45,7 +45,7 @@ export default function Register() {
       return;
     }
 
-    const result = register({ ...form, name: trimmedName });
+    const result = await register({ ...form, name: trimmedName });
     if (!result.ok) {
       setError(result.error);
       return;

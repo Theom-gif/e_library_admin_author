@@ -234,7 +234,7 @@ const Dashboard = () => {
             <h2 className="text-lg font-bold">Reader Demographics</h2>
             <button
               onClick={() => window.alert('More demographic actions coming soon.')}
-              className="text-slate-400 hover:text-white transition-colors"
+              className="text-slate-400 hover:text-[color:var(--text)] transition-colors"
             >
               <MoreHorizontal className="size-5" />
             </button>

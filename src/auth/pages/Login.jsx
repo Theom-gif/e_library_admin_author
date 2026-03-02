@@ -6,6 +6,16 @@ import { getRoleLandingPath } from "../roleRoutes";
 
 const ROLES = ["Reader", "Author", "Admin"];
 
+function getHomePathByRole(role) {
+  if (role === "Admin") {
+    return "/admin/dashboard";
+  }
+  if (role === "Author") {
+    return "/author";
+  }
+  return "/author";
+}
+
 export default function Login() {
   const { isAuthenticated, isInitializing, login, loginDemo, user } = useAuth();
   const navigate = useNavigate();

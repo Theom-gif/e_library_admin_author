@@ -179,7 +179,7 @@ const Feedback = () => {
               <div className="flex-1">
                 <div className="flex justify-between items-start mb-2">
                   <div>
-                    <h3 className="font-bold text-slate-100">{item.user}</h3>
+                    <h3 className="font-bold text-[color:var(--text)]">{item.user}</h3>
                     <p className="text-xs text-slate-500">on <span className="text-accent font-medium">{item.book}</span></p>
                   </div>
                   <div className="flex flex-col items-end gap-2">
@@ -222,7 +222,7 @@ const Feedback = () => {
                     </span>
                     <button
                       onClick={() => setOpenReplyId((prev) => (prev === item.id ? null : item.id))}
-                      className="p-2 text-slate-500 hover:text-white transition-colors"
+                      className="p-2 text-slate-500 hover:text-[color:var(--text)] transition-colors"
                     >
                       <MoreHorizontal className="size-4" />
                     </button>
@@ -237,7 +237,7 @@ const Feedback = () => {
                 {item.authorReply && (
                   <div className="mt-4 px-4 py-3 bg-primary/10 border border-primary/20 rounded-lg">
                     <p className="text-[10px] uppercase font-bold tracking-wider text-accent mb-1">Your Reply</p>
-                    <p className="text-sm text-slate-200">{item.authorReply}</p>
+                    <p className="text-sm text-[color:var(--text)]">{item.authorReply}</p>
                   </div>
                 )}
                 {openReplyId === item.id && (
@@ -268,7 +268,7 @@ const Feedback = () => {
         {visibleCount < filteredFeedbacks.length ? (
           <button
             onClick={() => setVisibleCount((prev) => prev + 4)}
-            className="px-8 py-3 bg-card-dark border border-white/5 rounded-xl text-sm font-bold text-slate-400 hover:text-white hover:bg-white/5 transition-all"
+            className="px-8 py-3 bg-card-dark border border-white/5 rounded-xl text-sm font-bold text-slate-400 hover:text-[color:var(--text)] hover:bg-white/5 transition-all"
           >
             Load More Feedback
           </button>

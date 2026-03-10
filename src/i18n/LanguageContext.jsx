@@ -7,7 +7,7 @@ const DEFAULT_LANGUAGE = "en";
 
 const translations = {
   km: {
-    "Admin Portal": "វិបផតថលអ្នកគ្រប់គ្រង",
+    "Admin Portal": "អ្នកគ្រប់គ្រង",
     Dashboard: "ផ្ទាំងគ្រប់គ្រង",
     Users: "អ្នកប្រើប្រាស់",
     Approvals: "ការអនុម័ត",

@@ -59,6 +59,7 @@ const UploadBook = () => {
   const [description, setDescription] = useState('');
   const [coverFile, setCoverFile] = useState(null);
   const [coverPreviewUrl, setCoverPreviewUrl] = useState('');
+  const [coverError, setCoverError] = useState('');
   const [manuscriptFile, setManuscriptFile] = useState(null);
   const [submitError, setSubmitError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);

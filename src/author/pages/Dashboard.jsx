@@ -72,7 +72,7 @@ const Dashboard = () => {
           </button>
           <button
             onClick={() => window.alert('Report download started.')}
-            className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-bold shadow-glow hover:opacity-90 transition-all"
+            className="px-4 py-2 bg-accent text(--var(--accent)) rounded-lg text-sm font-bold shadow-glow hover:opacity-90 transition-all"
           >
             Download Report
           </button>

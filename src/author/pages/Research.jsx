@@ -182,6 +182,14 @@ export default function Research() {
     return scored.map(({ book }) => book).slice(0, 24);
   }, [bookCorpus, query, sortBy, subjectFilter]);
 
+  const selectBook = React.useCallback((book) => {
+    setSelectedBook({
+      ...book,
+      firstPublishDate: book.firstPublishYear || '',
+      description: book.description || 'No description available.',
+    });
+  }, []);
+
   const submitSearch = (event) => {
     event.preventDefault();
     const trimmed = query.trim();
@@ -278,7 +286,20 @@ export default function Research() {
             {results.map((book) => (
               <div
                 key={book.key || `${book.title}-${book.authorName}`}
-                className="bg-card-dark border border-white/5 rounded-2xl p-4 card-shadow"
+                role="button"
+                tabIndex={0}
+                onClick={() => selectBook(book)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' || event.key === ' ') {
+                    event.preventDefault();
+                    selectBook(book);
+                  }
+                }}
+                className={`bg-card-dark border rounded-2xl p-4 card-shadow cursor-pointer transition-colors ${
+                  selectedBook?.key === book.key
+                    ? 'border-accent/60'
+                    : 'border-white/5 hover:border-white/20'
+                }`}
               >
                 <div className="flex gap-4">
                   <img
@@ -304,13 +325,7 @@ export default function Research() {
                     </div>
                     <button
                       type="button"
-                      onClick={() =>
-                        setSelectedBook({
-                          ...book,
-                          firstPublishDate: book.firstPublishYear || '',
-                          description: book.description || 'No description available.',
-                        })
-                      }
+                      onClick={() => selectBook(book)}
                       className="mt-3 text-xs font-bold text-accent hover:text-[color:var(--text)] transition-colors"
                     >
                       Inspect details

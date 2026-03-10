@@ -6,7 +6,6 @@ import {
   PlusSquare, 
   BarChart3, 
   MessageSquare, 
-  Search,
   Settings, 
   User,
   LogOut
@@ -40,7 +39,6 @@ const Sidebar = () => {
     { icon: LayoutDashboard, label: 'Dashboard', path: '/author' },
     { icon: BookOpen, label: 'My Books', path: '/author/my-books' },
     { icon: PlusSquare, label: 'Upload New', path: '/author/upload' },
-    { icon: Search, label: 'Research', path: '/author/research' },
     { icon: BarChart3, label: 'Analytics', path: '/author/analytics' },
     { icon: MessageSquare, label: 'Feedback', path: '/author/feedback' },
     { icon: Settings, label: 'Settings', path: '/author/settings' },

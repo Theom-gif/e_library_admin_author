@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { searchAuthors, searchBooks } from '../services/openLibraryService';
 import { uploadBookRequest } from '../services/bookService';
+import { saveManuscriptFile } from '../services/manuscriptStorage';
+import { extractApiErrorMessage } from '../../lib/apiError';
 
 const PROFILE_STORAGE_KEY = 'author_studio_profile';
 const GENRE_OPTIONS = ['Fantasy', 'Sci-Fi', 'Mystery', 'Romance', 'Thriller'];
@@ -238,15 +240,29 @@ const UploadBook = () => {
         payload.append('cover_image_url', coverPreviewUrl);
       }
 
-      await uploadBookRequest(payload);
+      const response = await uploadBookRequest(payload);
+      const uploaded =
+        response?.data?.data ||
+        response?.data?.book ||
+        response?.data ||
+        null;
+      const uploadedId =
+        uploaded?.id ||
+        uploaded?.book_id ||
+        uploaded?.bookId ||
+        null;
+
+      if (uploadedId && manuscriptFile instanceof File) {
+        try {
+          await saveManuscriptFile(uploadedId, manuscriptFile);
+        } catch {
+          // Keep upload success even if IndexedDB storage fails.
+        }
+      }
       navigate('/author/my-books');
     } catch (error) {
-      const apiMessage =
-        error?.response?.data?.errors ||
-        error?.response?.data?.message ||
-        'Unable to upload book. Please try again.';
       setSubmitError(
-        typeof apiMessage === 'string' ? apiMessage : 'Unable to upload book. Please check your input.',
+        extractApiErrorMessage(error, 'Unable to upload book. Please try again.'),
       );
     } finally {
       setIsSubmitting(false);

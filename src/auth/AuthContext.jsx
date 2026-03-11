@@ -3,6 +3,7 @@ import { DEMO_AUTH_USERS } from "../admin/data/mockData";
 import { loginRequest, registerRequest } from "./services/authService";
 import { API_BASE_URL } from "../lib/apiClient";
 import { getRoleName } from "./roleUtils";
+import { AUTH_LOGOUT_EVENT } from "../lib/authEvents";
 
 const SESSION_KEY = "bookhub_session";
 const TOKEN_KEY = "bookhub_token";
@@ -324,6 +325,22 @@ export function AuthProvider({ children }) {
     }
 
     setIsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+
+    const handleForcedLogout = () => {
+      clearSession();
+      clearToken();
+      setRememberPreference(false);
+      setUser(null);
+    };
+
+    window.addEventListener(AUTH_LOGOUT_EVENT, handleForcedLogout);
+    return () => window.removeEventListener(AUTH_LOGOUT_EVENT, handleForcedLogout);
   }, []);
 
   const value = useMemo(

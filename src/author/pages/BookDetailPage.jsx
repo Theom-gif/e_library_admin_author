@@ -79,7 +79,7 @@ const BookDetailPage = () => {
       return undefined;
     }
 
-    if (book.source !== 'local' || !book.id) return undefined;
+    if (book.source === 'openlibrary' || !book.id) return undefined;
 
     let objectUrl = '';
     const loadPdf = async () => {

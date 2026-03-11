@@ -13,6 +13,7 @@ import {
 import { searchBooks } from '../services/openLibraryService';
 import { deleteManuscriptFile } from '../services/manuscriptStorage';
 import { getBooksRequest, importLocalBooksRequest } from '../services/bookService';
+import { extractApiErrorMessage } from '../../lib/apiError';
 
 const BOOKS_STORAGE_KEY = 'author_studio_books';
 const DEFAULT_COVER = 'https://picsum.photos/seed/new-book/300/450';
@@ -70,8 +71,10 @@ const MyBooks = () => {
       }
 
       setBooks(dbBooks);
-    } catch {
-      setBooksError('Unable to load books from database.');
+    } catch (error) {
+      setBooksError(
+        extractApiErrorMessage(error, 'Unable to load books from database.'),
+      );
       setBooks([]);
     } finally {
       setBooksLoading(false);
@@ -247,7 +250,7 @@ const MyBooks = () => {
           >
             <div className="relative aspect-[2/3] overflow-hidden">
               <img 
-                src={book.img || DEFAULT_COVER}
+                src={getSafeCoverUrl(book.img)}
                 alt={book.title} 
                 className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                 onError={(event) => {
@@ -300,7 +303,10 @@ const MyBooks = () => {
                   <span className="text-xs font-bold">{book.rating || 'N/A'}</span>
                 </div>
               </div>
-              <p className="text-xs text-slate-500 mb-4">{book.author}</p>
+              <p className={`text-xs text-slate-500 ${book.manuscriptName ? 'mb-2' : 'mb-4'}`}>{book.author}</p>
+              {book.manuscriptName && (
+                <p className="text-[11px] text-slate-400 mb-4">File: {book.manuscriptName}</p>
+              )}
               
               <div className="grid grid-cols-2 gap-4 pt-4 border-top border-white/5">
                 <div>

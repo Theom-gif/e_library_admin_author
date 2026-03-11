@@ -29,9 +29,20 @@ const inferFileType = (fileName = '') => {
 const isLoopbackHost = (host = '') =>
   host === '127.0.0.1' || host === 'localhost' || host === '::1';
 
+const isAbsoluteUrl = (value = '') => /^https?:\/\//i.test(String(value || '').trim());
+
+const joinUrl = (base, path) => {
+  const normalizedBase = String(base || '').replace(/\/+$/, '');
+  const normalizedPath = String(path || '').replace(/^\/+/, '');
+  return `${normalizedBase}/${normalizedPath}`;
+};
+
 const normalizeAssetUrl = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) return '';
+  if (raw.startsWith('/')) {
+    return joinUrl(API_BASE_URL, raw);
+  }
 
   try {
     const url = new URL(raw);
@@ -47,6 +58,30 @@ const normalizeAssetUrl = (value = '') => {
   }
 };
 
+const resolveStoragePath = (value = '') => {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (isAbsoluteUrl(raw)) return normalizeAssetUrl(raw);
+  if (raw.startsWith('/')) return joinUrl(API_BASE_URL, raw);
+  if (raw.startsWith('storage/') || raw.startsWith('uploads/')) {
+    return joinUrl(API_BASE_URL, raw);
+  }
+  return joinUrl(API_BASE_URL, `storage/${raw}`);
+};
+
+const pickFirst = (...values) => {
+  for (const value of values) {
+    const text = String(value || '').trim();
+    if (text) return text;
+  }
+  return '';
+};
+
+const toNumber = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export const mapApiBookToUiBook = (book) => ({
   bookId: toNumberId(book?.id),
   id: toNumberId(book?.id),
@@ -56,18 +91,49 @@ export const mapApiBookToUiBook = (book) => ({
   rating: 0,
   reads: '0',
   sales: '$0',
-  img:
-    (book?.cover_image_path ? `${API_BASE_URL}/storage/${book.cover_image_path}` : '') ||
-    normalizeAssetUrl(book?.cover_image_url) ||
+  img: pickFirst(
+    resolveStoragePath(book?.cover_image_path),
+    normalizeAssetUrl(book?.cover_image_url),
+    normalizeAssetUrl(book?.cover_image),
+    normalizeAssetUrl(book?.cover_url),
+    normalizeAssetUrl(book?.cover),
+    normalizeAssetUrl(book?.poster),
+    normalizeAssetUrl(book?.image),
+    normalizeAssetUrl(book?.img),
     'https://picsum.photos/seed/new-book/300/450',
+  ),
   description: book?.description || '',
   genre: book?.category || '',
-  manuscriptUrl:
-    (book?.book_file_path ? `${API_BASE_URL}/storage/${book.book_file_path}` : '') ||
+  manuscriptUrl: pickFirst(
+    resolveStoragePath(book?.book_file_path),
     normalizeAssetUrl(book?.book_file_url),
-  manuscriptName: getFileName(book?.book_file_url || book?.book_file_path || ''),
-  manuscriptType: inferFileType(getFileName(book?.book_file_url || book?.book_file_path || '')),
-  manuscriptSizeBytes: 0,
+    normalizeAssetUrl(book?.book_file),
+    normalizeAssetUrl(book?.manuscript_url),
+    normalizeAssetUrl(book?.file_url),
+  ),
+  manuscriptName: pickFirst(
+    book?.book_file_name,
+    book?.manuscript_name,
+    book?.file_name,
+    book?.filename,
+    getFileName(book?.book_file_url || book?.book_file_path || book?.book_file || book?.file_url || ''),
+  ),
+  manuscriptType: inferFileType(
+    pickFirst(
+      book?.book_file_name,
+      book?.manuscript_name,
+      book?.file_name,
+      book?.filename,
+      getFileName(book?.book_file_url || book?.book_file_path || book?.book_file || book?.file_url || ''),
+    ),
+  ),
+  manuscriptSizeBytes: toNumber(
+    book?.book_file_size ||
+      book?.manuscript_size ||
+      book?.file_size ||
+      book?.size ||
+      0,
+  ),
   source: 'database',
 });
 

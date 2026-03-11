@@ -1,4 +1,5 @@
 import axios from "axios";
+import { emitAuthLogout } from "./authEvents";
 
 const TOKEN_KEY = "bookhub_token";
 const resolveDefaultApiBaseUrl = () => {
@@ -64,5 +65,20 @@ apiClient.interceptors.request.use((config) => {
   }
   return config;
 });
+
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = Number(error?.response?.status || 0);
+    if (status === 401 || status === 403) {
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        "Invalid credentials. Please login again.";
+      emitAuthLogout(message);
+    }
+    return Promise.reject(error);
+  },
+);
 
 export const authApiClient = apiClient;

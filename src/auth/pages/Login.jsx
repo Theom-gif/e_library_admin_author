@@ -1,5 +1,5 @@
 import { Eye, EyeOff, BookOpen, ArrowRight, Mail, Lock, User as UserIcon, PenTool, Shield } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import {
@@ -9,6 +9,7 @@ import {
   isExternalUserPortal,
   USER_PORTAL_URL,
 } from "../roleUtils";
+import { consumeLogoutReason } from "../../lib/authEvents";
 
 const ROLE_OPTIONS = [
   { label: "User", icon: UserIcon },
@@ -26,6 +27,13 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const reason = consumeLogoutReason();
+    if (reason) {
+      setError(reason);
+    }
+  }, []);
 
   if (!isReady) {
     return null;

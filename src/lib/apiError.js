@@ -1,3 +1,5 @@
+import { API_BASE_URL } from "./apiClient";
+
 export const extractApiErrorMessage = (error, fallbackMessage) => {
   const fallback = fallbackMessage || "Something went wrong. Please try again.";
   if (!error) {
@@ -17,6 +19,15 @@ export const extractApiErrorMessage = (error, fallbackMessage) => {
     error?.message ||
     "";
   if (String(message || "").trim()) {
+    const lower = String(message || "").toLowerCase();
+    if (
+      lower === "network error" ||
+      lower.includes("failed to fetch") ||
+      lower.includes("err_network") ||
+      lower.includes("networkerror")
+    ) {
+      return `Network Error. Unable to reach the API server at ${API_BASE_URL}. Please check the backend, CORS, or HTTPS settings.`;
+    }
     return String(message).trim();
   }
 

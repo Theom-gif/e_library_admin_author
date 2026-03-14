@@ -4,12 +4,12 @@ import { emitAuthLogout } from "./authEvents";
 const TOKEN_KEY = "bookhub_token";
 const resolveDefaultApiBaseUrl = () => {
   if (typeof window === "undefined" || !window.location?.hostname) {
-    return "http://127.0.0.1:8001";
+    return "http://127.0.0.1:8000";
   }
 
   const protocol = window.location.protocol || "http:";
   const host = window.location.hostname;
-  return `${protocol}//${host}:8001`;
+  return `${protocol}//${host}:8000`;
 };
 
 const DEFAULT_API_BASE_URL = resolveDefaultApiBaseUrl();
@@ -34,7 +34,8 @@ const resolveApiBaseUrl = () => {
     const configuredUrl = new URL(configured);
     const currentHost = window.location.hostname;
     if (!isLoopbackHost(currentHost) && isLoopbackHost(configuredUrl.hostname)) {
-      return `${configuredUrl.protocol}//${currentHost}:${configuredUrl.port || "8001"}`;
+      const currentProtocol = window.location.protocol || configuredUrl.protocol;
+      return `${currentProtocol}//${currentHost}:${configuredUrl.port || "8000"}`;
     }
   } catch {
     return configured;

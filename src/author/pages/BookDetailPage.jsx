@@ -12,6 +12,14 @@ const fallbackBook = {
   source: 'local',
 };
 
+const statusBadgeClass = (status) => {
+  const key = String(status || '').toLowerCase();
+  if (key === 'approved') return 'bg-emerald-500/90 text-white';
+  if (key === 'pending') return 'bg-amber-500/90 text-white';
+  if (key === 'rejected') return 'bg-rose-500/90 text-white';
+  return 'bg-slate-500/90 text-white';
+};
+
 const getSafeCoverUrl = (value) => {
   const text = String(value || '').trim();
   if (text.startsWith('data:image/') || /^https?:\/\//i.test(text)) {
@@ -154,7 +162,7 @@ const BookDetailPage = () => {
               {book.source === 'openlibrary' ? 'Open Library' : 'My Library'}
             </span>
             {book.status && (
-              <span className="px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider bg-emerald-500/90 text-white">
+              <span className={`px-2 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider ${statusBadgeClass(book.status)}`}>
                 {book.status}
               </span>
             )}

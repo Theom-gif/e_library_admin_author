@@ -1,25 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, Check, Eye, Filter, Loader2, Search, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { API_BASE_URL } from "../../lib/apiClient";
 import { approveBook, fetchAdminBooks, rejectBook } from "../services/adminService";
 
 const statusStyles = {
   Pending: "bg-amber-500/10 text-amber-300 border border-amber-500/20",
   Approved: "bg-emerald-500/10 text-emerald-300 border border-emerald-500/20",
   Rejected: "bg-rose-500/10 text-rose-300 border border-rose-500/20",
-};
-
-const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
-const isAbsoluteUrl = (value) => /^https?:\/\//i.test(String(value || ""));
-
-const buildStorageUrl = (path) => {
-  if (!path) return "";
-  if (isAbsoluteUrl(path)) return path;
-  const base = trimTrailingSlash(API_BASE_URL);
-  const cleaned = String(path).replace(/^\/+/, "");
-  const normalized = cleaned.startsWith("storage/") ? cleaned.slice("storage/".length) : cleaned;
-  return `${base}/storage/${normalized}`;
 };
 
 const normalizeStatus = (value) => {
@@ -62,21 +49,8 @@ const formatDateLabel = (value) => {
 };
 
 const fallbackId = () => `book-${Math.random().toString(36).slice(2, 10)}`;
-
-const normalizeBook = (book = {}) => {
-  const coverPath =
-    book.cover_image_url ??
-    book.cover_image_path ??
-    book.cover ??
-    "";
-
-  const filePath =
-    book.book_file_url ??
-    book.book_file_path ??
-    book.file_url ??
-    book.file ??
-    "";
-
+const toUiBook = (book = {}) => {
+  const cover = book.coverUrl || book.cover || "https://via.placeholder.com/64x96?text=Book";
   return {
     id: book.id ?? book._id ?? book.bookId ?? book.slug ?? fallbackId(),
     title: book.title ?? book.name ?? "Untitled",
@@ -90,8 +64,8 @@ const normalizeBook = (book = {}) => {
         book.updated_at ??
         "",
     ),
-    cover: buildStorageUrl(coverPath) || "https://via.placeholder.com/64x96?text=Book",
-    fileUrl: filePath ? (isAbsoluteUrl(filePath) ? filePath : buildStorageUrl(filePath)) : "",
+    cover,
+    fileUrl: book.fileUrl || "",
   };
 };
 
@@ -140,16 +114,11 @@ const Approvals = () => {
       setIsLoading(true);
       setError("");
       try {
-        const response = await fetchAdminBooks(
+        const rows = await fetchAdminBooks(
           { status, search: searchTerm.trim() },
           { signal },
         );
-        const rows = Array.isArray(response?.data?.data)
-          ? response.data.data
-          : Array.isArray(response?.data)
-            ? response.data
-            : [];
-        setBooks(rows.map(normalizeBook));
+        setBooks(Array.isArray(rows) ? rows.map(toUiBook) : []);
       } catch (fetchError) {
         const isCanceled =
           fetchError?.name === "CanceledError" ||
@@ -201,15 +170,10 @@ const Approvals = () => {
     try {
       const apiCall = nextStatus === "Approved" ? approveBook : rejectBook;
       const response = await apiCall(book.id);
-      const updatedPayload =
-        response?.data?.data ||
-        response?.data ||
-        { ...book, status: nextStatus };
-      const normalized = normalizeBook({ ...book, ...updatedPayload, status: nextStatus });
+      const updatedPayload = response?.data?.data || response?.data || {};
+      const normalized = toUiBook({ ...book, ...updatedPayload, status: updatedPayload.status || nextStatus });
 
-      setBooks((prev) =>
-        prev.map((entry) => (entry.id === book.id ? normalized : entry)),
-      );
+      setBooks((prev) => prev.map((entry) => (entry.id === book.id ? normalized : entry)));
 
       setActionSuccess(
         nextStatus === "Approved" ? t("Book approved.") : t("Book rejected."),

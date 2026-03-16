@@ -18,6 +18,14 @@ const BOOKS_STORAGE_KEY = 'author_studio_books';
 const DEFAULT_COVER = 'https://picsum.photos/seed/new-book/300/450';
 const FALLBACK_COVER_URL = DEFAULT_COVER;
 
+const statusStyles = {
+  Approved: 'bg-emerald-500/90 text-white',
+  Pending: 'bg-amber-500/90 text-white',
+  Rejected: 'bg-rose-500/90 text-white',
+  Published: 'bg-emerald-500/90 text-white',
+  Draft: 'bg-slate-500/90 text-white',
+};
+
 const getSafeCoverUrl = (value) => {
   const text = String(value || '').trim();
   if (text.startsWith('data:image/') || /^https?:\/\//i.test(text)) {
@@ -147,7 +155,7 @@ const MyBooks = () => {
     id: book.id,
     title: book.title,
     author: book.author,
-    status: book.status === 'Published' ? 'Published' : 'Draft',
+    status: book.status || 'Pending',
     rating: book.rating,
     reads: book.reads,
     sales: book.sales,
@@ -233,7 +241,9 @@ const MyBooks = () => {
       {booksError && <p className="text-sm text-rose-400 mb-4">{booksError}</p>}
       {booksLoading && <p className="text-sm text-slate-400 mb-4">Loading books from database...</p>}
       {!booksLoading && filteredLocalBooks.length === 0 && (
-        <p className="text-sm text-slate-400 mb-8">No books in database yet. Upload one to get started.</p>
+        <p className="text-sm text-slate-400 mb-8">
+          No approved books yet. Upload a book and it will appear here after an admin approves it.
+        </p>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
@@ -257,12 +267,12 @@ const MyBooks = () => {
                 }}
               />
               <div className="absolute top-3 left-3">
-                <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                  book.status === 'Published' ? 'bg-emerald-500/90 text-white' : 
-                  book.status === 'Draft' ? 'bg-slate-500/90 text-white' : 
-                  'bg-amber-500/90 text-white'
-                }`}>
-                  {book.status}
+                <span
+                  className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                    statusStyles[book.status] || 'bg-slate-500/90 text-white'
+                  }`}
+                >
+                  {book.status || 'Pending'}
                 </span>
               </div>
               <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">

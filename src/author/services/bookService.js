@@ -29,6 +29,19 @@ const inferFileType = (fileName = '') => {
 const isLoopbackHost = (host = '') =>
   host === '127.0.0.1' || host === 'localhost' || host === '::1';
 
+const isAbsoluteUrl = (value = '') => /^https?:\/\//i.test(String(value));
+const isBlobLikeUrl = (value = '') => /^data:|^blob:/i.test(String(value));
+const trimSlash = (value = '') => String(value || '').replace(/\/+$/, '');
+
+const buildStorageUrl = (path = '') => {
+  if (!path) return '';
+  if (isBlobLikeUrl(path)) return path;
+  if (isAbsoluteUrl(path)) return path;
+  const clean = String(path).replace(/^\/+/, '');
+  const normalized = clean.startsWith('storage/') ? clean.slice('storage/'.length) : clean;
+  return `${trimSlash(API_BASE_URL)}/storage/${normalized}`;
+};
+
 const normalizeAssetUrl = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) return '';
@@ -47,32 +60,57 @@ const normalizeAssetUrl = (value = '') => {
   }
 };
 
+const normalizeStatus = (value) => {
+  const text = String(value || '').trim();
+  if (!text) return 'Pending';
+  const lower = text.toLowerCase();
+  if (lower === 'approved') return 'Approved';
+  if (lower === 'rejected') return 'Rejected';
+  if (lower === 'pending') return 'Pending';
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
 export const mapApiBookToUiBook = (book) => ({
   bookId: toNumberId(book?.id),
   id: toNumberId(book?.id),
   title: book?.title || 'Untitled',
   author: book?.author || 'Unknown Author',
-  status: 'Published',
+  status: normalizeStatus(book?.status),
   rating: 0,
   reads: '0',
   sales: '$0',
   img:
-    (book?.cover_image_path ? `${API_BASE_URL}/storage/${book.cover_image_path}` : '') ||
+    buildStorageUrl(book?.cover_image_path) ||
+    buildStorageUrl(book?.cover_image_url) ||
     normalizeAssetUrl(book?.cover_image_url) ||
     'https://picsum.photos/seed/new-book/300/450',
   description: book?.description || '',
   genre: book?.category || '',
   manuscriptUrl:
-    (book?.book_file_path ? `${API_BASE_URL}/storage/${book.book_file_path}` : '') ||
+    buildStorageUrl(book?.book_file_path) ||
+    buildStorageUrl(book?.book_file_url) ||
     normalizeAssetUrl(book?.book_file_url),
   manuscriptName: getFileName(book?.book_file_url || book?.book_file_path || ''),
-  manuscriptType: inferFileType(getFileName(book?.book_file_url || book?.book_file_path || '')),
-  manuscriptSizeBytes: 0,
+  manuscriptType: book?.manuscript_type || inferFileType(getFileName(book?.book_file_url || book?.book_file_path || '')),
+  manuscriptSizeBytes: book?.manuscript_size_bytes || 0,
   source: 'database',
 });
 
-export const getBooksRequest = async () => {
-  const response = await apiClient.get(BOOKS_ENDPOINT);
+const buildBooksQuery = (filters = {}) => {
+  const params = new URLSearchParams();
+  const status = String(filters.status || 'approved').trim();
+  if (status) {
+    params.set('status', status);
+  }
+  const search = String(filters.search || '').trim();
+  if (search) {
+    params.set('search', search);
+  }
+  return params.toString() ? `${BOOKS_ENDPOINT}?${params.toString()}` : BOOKS_ENDPOINT;
+};
+
+export const getBooksRequest = async (filters = {}) => {
+  const response = await apiClient.get(buildBooksQuery(filters));
   const payload = response?.data;
   const rows =
     (Array.isArray(payload?.data) && payload.data) ||

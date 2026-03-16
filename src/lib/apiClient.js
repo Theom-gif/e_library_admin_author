@@ -14,7 +14,6 @@ export const API_TIMEOUT_MS =
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: {
-    "Content-Type": "application/json",
     Accept: "application/json",
   },
   timeout: API_TIMEOUT_MS,

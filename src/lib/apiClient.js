@@ -1,50 +1,15 @@
 import axios from "axios";
 
 const TOKEN_KEY = "bookhub_token";
-const resolveDefaultApiBaseUrl = () => {
-  if (typeof window === "undefined" || !window.location?.hostname) {
-    return "http://127.0.0.1:8001";
-  }
-
-  const protocol = window.location.protocol || "http:";
-  const host = window.location.hostname;
-  return `${protocol}//${host}:8001`;
-};
-
-const DEFAULT_API_BASE_URL = resolveDefaultApiBaseUrl();
+export const DEFAULT_API_BASE_URL = "https://elibrary.pncproject.site";
 const DEFAULT_TIMEOUT_MS = 8000;
 
 const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
-const isLoopbackHost = (host = "") =>
-  host === "127.0.0.1" || host === "localhost" || host === "::1";
 
-const resolveApiBaseUrl = () => {
-  const configured = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || "");
-  if (typeof window === "undefined" || !window.location?.hostname) {
-    return configured || DEFAULT_API_BASE_URL;
-  }
-
-  if (!configured) {
-    return DEFAULT_API_BASE_URL;
-  }
-
-  // If app is opened via LAN IP but .env points to localhost, use current host.
-  try {
-    const configuredUrl = new URL(configured);
-    const currentHost = window.location.hostname;
-    if (!isLoopbackHost(currentHost) && isLoopbackHost(configuredUrl.hostname)) {
-      return `${configuredUrl.protocol}//${currentHost}:${configuredUrl.port || "8001"}`;
-    }
-  } catch {
-    return configured;
-  }
-
-  return configured;
-};
-
-export const API_BASE_URL = resolveApiBaseUrl();
-
-const API_TIMEOUT_MS = Number(import.meta.env.VITE_API_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
+const apiBaseFromEnv = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || "");
+export const API_BASE_URL = apiBaseFromEnv || DEFAULT_API_BASE_URL;
+export const API_TIMEOUT_MS =
+  Number(import.meta.env.VITE_API_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
 export const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -55,14 +20,18 @@ export const apiClient = axios.create({
   timeout: API_TIMEOUT_MS,
 });
 
+// Attach bearer token (from either storage) automatically
 apiClient.interceptors.request.use((config) => {
-  const token =
-    window.localStorage.getItem(TOKEN_KEY) ||
-    window.sessionStorage.getItem(TOKEN_KEY);
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+  if (typeof window !== "undefined") {
+    const token =
+      localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
   }
   return config;
 });
 
+// For clarity, authApiClient is the same axios instance
 export const authApiClient = apiClient;

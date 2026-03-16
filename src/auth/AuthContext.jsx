@@ -306,26 +306,22 @@ export function AuthProvider({ children }) {
 
   useEffect(() => {
     const shouldRemember = localStorage.getItem(REMEMBER_KEY) === "1";
-    if (!shouldRemember) {
-      localStorage.removeItem(SESSION_KEY);
-      localStorage.removeItem(TOKEN_KEY);
-    }
 
     const storedSession = getSession();
     const storedToken = getTokenFromStorage();
 
-    if (storedSession && !storedToken) {
+    if (!storedSession || !storedToken) {
       clearSession();
       clearToken();
-      setRememberPreference(false);
       setUser(null);
-    } else {
-      setUser(storedSession);
+      setIsReady(true);
+      return;
     }
 
+    // if session + token exist → restore login
+    setUser(storedSession);
     setIsReady(true);
   }, []);
-
   const value = useMemo(
     () => ({
       user,
@@ -412,7 +408,7 @@ export function AuthProvider({ children }) {
       logout: () => {
         clearSession();
         clearToken();
-        setRememberPreference(false);
+        localStorage.removeItem(REMEMBER_KEY);
         setUser(null);
       },
     }),

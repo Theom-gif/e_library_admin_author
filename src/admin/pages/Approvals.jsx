@@ -1,7 +1,8 @@
-import React, { useMemo, useState } from "react";
-import { Activity, Check, Eye, Filter, Search, X } from "lucide-react";
-import { BOOKS, CATEGORIES } from "../data/mockData";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Activity, Check, Eye, Filter, Loader2, Search, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { API_BASE_URL } from "../../lib/apiClient";
+import { approveBook, fetchAdminBooks, rejectBook } from "../services/adminService";
 
 const statusStyles = {
   Pending: "bg-amber-500/10 text-amber-300 border border-amber-500/20",
@@ -9,29 +10,180 @@ const statusStyles = {
   Rejected: "bg-rose-500/10 text-rose-300 border border-rose-500/20",
 };
 
+const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
+const isAbsoluteUrl = (value) => /^https?:\/\//i.test(String(value || ""));
+
+const buildStorageUrl = (path) => {
+  if (!path) return "";
+  if (isAbsoluteUrl(path)) return path;
+  const base = trimTrailingSlash(API_BASE_URL);
+  const cleaned = String(path).replace(/^\/+/, "");
+  const normalized = cleaned.startsWith("storage/") ? cleaned.slice("storage/".length) : cleaned;
+  return `${base}/storage/${normalized}`;
+};
+
+const normalizeStatus = (value) => {
+  const text = String(value || "").trim();
+  if (!text) return "Pending";
+  const lower = text.toLowerCase();
+  if (lower === "approved") return "Approved";
+  if (lower === "rejected") return "Rejected";
+  if (lower === "pending") return "Pending";
+  return text.charAt(0).toUpperCase() + text.slice(1);
+};
+
+const formatDateLabel = (value) => {
+  if (!value) return "";
+
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+  }
+
+  if (typeof value === "number") {
+    const parsed = new Date(value);
+    if (!Number.isNaN(parsed.getTime())) {
+      return parsed.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    }
+  }
+
+  if (typeof value === "string") {
+    const parsedMs = Date.parse(value);
+    if (!Number.isNaN(parsedMs)) {
+      return new Date(parsedMs).toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+    }
+    return value;
+  }
+
+  return "";
+};
+
+const fallbackId = () => `book-${Math.random().toString(36).slice(2, 10)}`;
+
+const normalizeBook = (book = {}) => {
+  const coverPath =
+    book.cover_image_url ??
+    book.cover_image_path ??
+    book.cover ??
+    "";
+
+  const filePath =
+    book.book_file_url ??
+    book.book_file_path ??
+    book.file_url ??
+    book.file ??
+    "";
+
+  return {
+    id: book.id ?? book._id ?? book.bookId ?? book.slug ?? fallbackId(),
+    title: book.title ?? book.name ?? "Untitled",
+    author: book.author ?? book.authorName ?? book.author_name ?? "Unknown",
+    category: book.category ?? book.genre ?? book.genre_name ?? "Uncategorized",
+    status: normalizeStatus(book.status),
+    date: formatDateLabel(
+      book.date ??
+        book.created_at ??
+        book.createdAt ??
+        book.updated_at ??
+        "",
+    ),
+    cover: buildStorageUrl(coverPath) || "https://via.placeholder.com/64x96?text=Book",
+    fileUrl: filePath ? (isAbsoluteUrl(filePath) ? filePath : buildStorageUrl(filePath)) : "",
+  };
+};
+
+const getErrorMessage = (error, fallback) =>
+  error?.response?.data?.message ||
+  error?.response?.data?.error ||
+  error?.message ||
+  fallback;
+
 const Approvals = () => {
   const { t } = useLanguage();
   const [searchTerm, setSearchTerm] = useState("");
   const [category, setCategory] = useState("All");
   const [status, setStatus] = useState("Pending");
+  const [books, setBooks] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [actionError, setActionError] = useState("");
+  const [actionSuccess, setActionSuccess] = useState("");
+  const [actionLoadingId, setActionLoadingId] = useState(null);
 
-  const categories = useMemo(
-    () => ["All", ...CATEGORIES.map((c) => c.name)],
-    []
-  );
   const statusFilters = ["Pending", "Approved", "Rejected", "All"];
+
+  const categories = useMemo(() => {
+    const unique = new Set(books.map((book) => book.category).filter(Boolean));
+    return ["All", ...Array.from(unique)];
+  }, [books]);
+
+  useEffect(() => {
+    if (category !== "All" && !categories.includes(category)) {
+      setCategory("All");
+    }
+  }, [categories, category]);
+
   const stats = useMemo(
     () => ({
-      pending: BOOKS.filter((b) => b.status === "Pending").length,
-      approved: BOOKS.filter((b) => b.status === "Approved").length,
-      rejected: BOOKS.filter((b) => b.status === "Rejected").length,
+      pending: books.filter((b) => b.status === "Pending").length,
+      approved: books.filter((b) => b.status === "Approved").length,
+      rejected: books.filter((b) => b.status === "Rejected").length,
     }),
-    []
+    [books],
   );
+
+  const loadBooks = useCallback(
+    async (signal) => {
+      setIsLoading(true);
+      setError("");
+      try {
+        const response = await fetchAdminBooks(
+          { status, search: searchTerm.trim() },
+          { signal },
+        );
+        const rows = Array.isArray(response?.data?.data)
+          ? response.data.data
+          : Array.isArray(response?.data)
+            ? response.data
+            : [];
+        setBooks(rows.map(normalizeBook));
+      } catch (fetchError) {
+        const isCanceled =
+          fetchError?.name === "CanceledError" ||
+          fetchError?.name === "AbortError" ||
+          fetchError?.code === "ERR_CANCELED";
+        if (isCanceled) {
+          return;
+        }
+        setBooks([]);
+        setError(getErrorMessage(fetchError, t("Failed to load submissions.")));
+      } finally {
+        if (!signal?.aborted) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [searchTerm, status, t],
+  );
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => {
+      loadBooks(controller.signal);
+    }, 250);
+
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [loadBooks]);
 
   const filteredBooks = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
-    return BOOKS.filter((book) => {
+    return books.filter((book) => {
       const matchesStatus = status === "All" ? true : book.status === status;
       const matchesCategory = category === "All" ? true : book.category === category;
       const matchesTerm =
@@ -39,7 +191,35 @@ const Approvals = () => {
         `${book.title} ${book.author} ${book.category}`.toLowerCase().includes(term);
       return matchesStatus && matchesCategory && matchesTerm;
     });
-  }, [searchTerm, category, status]);
+  }, [searchTerm, category, status, books]);
+
+  const handleModeration = async (book, nextStatus) => {
+    setActionLoadingId(book.id);
+    setActionError("");
+    setActionSuccess("");
+
+    try {
+      const apiCall = nextStatus === "Approved" ? approveBook : rejectBook;
+      const response = await apiCall(book.id);
+      const updatedPayload =
+        response?.data?.data ||
+        response?.data ||
+        { ...book, status: nextStatus };
+      const normalized = normalizeBook({ ...book, ...updatedPayload, status: nextStatus });
+
+      setBooks((prev) =>
+        prev.map((entry) => (entry.id === book.id ? normalized : entry)),
+      );
+
+      setActionSuccess(
+        nextStatus === "Approved" ? t("Book approved.") : t("Book rejected."),
+      );
+    } catch (actionErr) {
+      setActionError(getErrorMessage(actionErr, t("Action failed. Please try again.")));
+    } finally {
+      setActionLoadingId(null);
+    }
+  };
 
   return (
     <div className="space-y-6 text-slate-100">
@@ -64,7 +244,6 @@ const Approvals = () => {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="glass-card border border-white/10 p-4 flex flex-wrap items-center gap-3">
         <div className="relative w-full md:w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
@@ -112,7 +291,6 @@ const Approvals = () => {
         </div>
       </div>
 
-      {/* Pending Submissions Table */}
       <div className="bg-white/5 rounded-xl border border-white/5 shadow-sm overflow-hidden">
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/5">
           <div>
@@ -139,7 +317,34 @@ const Approvals = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredBooks.length === 0 && (
+              {(actionError || actionSuccess) && (
+                <tr>
+                  <td colSpan={6} className={`px-6 py-3 text-sm ${actionError ? "text-rose-400" : "text-emerald-400"}`}>
+                    {actionError || actionSuccess}
+                  </td>
+                </tr>
+              )}
+
+              {isLoading && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-6 text-center text-slate-400">
+                    <div className="inline-flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{t("Loading submissions...")}</span>
+                    </div>
+                  </td>
+                </tr>
+              )}
+
+              {!isLoading && error && (
+                <tr>
+                  <td colSpan={6} className="px-6 py-6 text-center text-rose-400">
+                    {error}
+                  </td>
+                </tr>
+              )}
+
+              {!isLoading && !error && filteredBooks.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-5 text-center text-slate-500">
                     {t("No submissions match your filters right now.")}
@@ -147,8 +352,9 @@ const Approvals = () => {
                 </tr>
               )}
 
-              {filteredBooks.map((book) => {
-                const disabled = book.status !== "Pending";
+              {!isLoading && !error && filteredBooks.map((book) => {
+                const disabled = book.status !== "Pending" || actionLoadingId === book.id;
+                const previewDisabled = !book.fileUrl;
                 return (
                   <tr key={book.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4">
@@ -156,7 +362,7 @@ const Approvals = () => {
                         <img
                           src={book.cover}
                           alt={book.title}
-                          className="h-12 w-9 rounded-md object-cover shadow-sm"
+                          className="h-12 w-9 rounded-md object-cover shadow-sm bg-white/5"
                         />
                         <div>
                           <p className="font-semibold leading-tight">{book.title}</p>
@@ -180,14 +386,24 @@ const Approvals = () => {
                     <td className="px-6 py-4">
                       <div className="flex justify-end items-center gap-2">
                         <button
-                          className="flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg bg-white/5 text-slate-100 border border-white/10 hover:bg-white/10 transition-colors"
-                          title={t("Preview")}
+                          disabled={previewDisabled}
+                          onClick={() => {
+                            if (previewDisabled) return;
+                            window.open(book.fileUrl, "_blank", "noopener,noreferrer");
+                          }}
+                          className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg border transition-colors ${
+                            previewDisabled
+                              ? "bg-white/5 text-slate-400 border-white/10 cursor-not-allowed"
+                              : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10"
+                          }`}
+                          title={previewDisabled ? t("No file to preview") : t("Preview")}
                         >
                           <Eye size={16} />
                           {t("Preview")}
                         </button>
                         <button
                           disabled={disabled}
+                          onClick={() => handleModeration(book, "Approved")}
                           className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors border ${
                             disabled
                               ? "bg-emerald-500/5 text-emerald-300/60 border-emerald-500/10 cursor-not-allowed"
@@ -199,6 +415,7 @@ const Approvals = () => {
                         </button>
                         <button
                           disabled={disabled}
+                          onClick={() => handleModeration(book, "Rejected")}
                           className={`flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg transition-colors border ${
                             disabled
                               ? "bg-rose-500/5 text-rose-300/60 border-rose-500/10 cursor-not-allowed"

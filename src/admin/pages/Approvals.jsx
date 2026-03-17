@@ -114,11 +114,19 @@ const Approvals = () => {
       setIsLoading(true);
       setError("");
       try {
+        // Backend currently exposes a pending-only listing; we merge it with any
+        // locally moderated rows so filters keep showing already approved/rejected items.
         const rows = await fetchAdminBooks(
-          { status, search: searchTerm.trim() },
+          { status: "Pending", search: searchTerm.trim() },
           { signal },
         );
-        setBooks(Array.isArray(rows) ? rows.map(toUiBook) : []);
+        const fresh = Array.isArray(rows) ? rows.map(toUiBook) : [];
+        setBooks((prev) => {
+          const moderated = prev.filter((b) => b.status !== "Pending");
+          const byId = new Map(moderated.map((b) => [String(b.id), b]));
+          fresh.forEach((entry) => byId.set(String(entry.id), entry));
+          return Array.from(byId.values());
+        });
       } catch (fetchError) {
         const isCanceled =
           fetchError?.name === "CanceledError" ||
@@ -127,7 +135,6 @@ const Approvals = () => {
         if (isCanceled) {
           return;
         }
-        setBooks([]);
         setError(getErrorMessage(fetchError, t("Failed to load submissions.")));
       } finally {
         if (!signal?.aborted) {
@@ -135,7 +142,7 @@ const Approvals = () => {
         }
       }
     },
-    [searchTerm, status, t],
+    [searchTerm, t],
   );
 
   useEffect(() => {

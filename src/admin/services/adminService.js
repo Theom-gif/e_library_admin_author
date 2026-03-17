@@ -4,7 +4,8 @@ const buildBooksPath = ({ status, search } = {}) => {
   const params = new URLSearchParams();
   const cleanStatus = String(status || "").trim();
   const cleanSearch = String(search || "").trim();
-  const isPendingRoute = !cleanStatus || cleanStatus.toLowerCase() === "pending";
+  const lowerStatus = cleanStatus.toLowerCase();
+  const isPendingRoute = lowerStatus === "pending";
 
   if (cleanSearch) {
     params.set("search", cleanSearch);
@@ -15,7 +16,7 @@ const buildBooksPath = ({ status, search } = {}) => {
     return `/api/admin/books/pending${query ? `?${query}` : ""}`;
   }
 
-  if (cleanStatus && cleanStatus.toLowerCase() !== "all") {
+  if (cleanStatus) {
     params.set("status", cleanStatus);
   }
 
@@ -33,6 +34,15 @@ const buildStorageUrl = (path = "") => {
   const normalized = clean.startsWith("storage/") ? clean.slice("storage/".length) : clean;
   return `${trimSlash(API_BASE_URL)}/storage/${normalized}`;
 };
+
+const DEFAULT_CATEGORY_ICON = "Tech";
+
+const normalizeCategory = (category = {}) => ({
+  id: category?.id ?? category?._id ?? "",
+  name: category?.name ?? category?.title ?? "",
+  count: Number(category?.count ?? category?.books_count ?? 0),
+  icon: category?.icon || DEFAULT_CATEGORY_ICON,
+});
 
 export const normalizeBook = (book = {}) => {
   const coverPath =
@@ -65,11 +75,13 @@ export const normalizeBook = (book = {}) => {
 
 export const fetchAdminBooks = async (filters = {}, config = {}) => {
   const response = await apiClient.get(buildBooksPath(filters), config);
-  const rows = Array.isArray(response?.data?.data)
-    ? response.data.data
-    : Array.isArray(response?.data)
-      ? response.data
-      : [];
+  const payload = response?.data;
+  const rows =
+    (Array.isArray(payload?.data) && payload.data) ||
+    (Array.isArray(payload?.books) && payload.books) ||
+    (Array.isArray(payload?.data?.data) && payload.data.data) ||
+    (Array.isArray(payload) && payload) ||
+    [];
   return rows.map(normalizeBook);
 };
 
@@ -79,16 +91,43 @@ export const approveBook = (id, config = {}) =>
 export const rejectBook = (id, config = {}) =>
   apiClient.post(`/api/admin/books/${id}/reject`, null, config);
 
+export const fetchAdminCategories = async (filters = {}, config = {}) => {
+  const response = await apiClient.get("/api/admin/categories", {
+    ...config,
+    params: { ...(config?.params || {}), ...(filters || {}) },
+  });
+
+  const payload = response?.data;
+  const rows =
+    (Array.isArray(payload?.data) && payload.data) ||
+    (Array.isArray(payload?.categories) && payload.categories) ||
+    (Array.isArray(payload) && payload) ||
+    [];
+
+  return rows.map(normalizeCategory);
+};
+
+export const createAdminCategory = async (payload = {}, config = {}) => {
+  const response = await apiClient.post("/api/admin/categories", payload, config);
+  const body = response?.data;
+  const created =
+    (body && typeof body === "object" && !Array.isArray(body) && body.data && !Array.isArray(body.data)
+      ? body.data
+      : body) || {};
+
+  return normalizeCategory(created);
+};
+
 export const fetchDashboard = (config = {}) =>
-  apiClient.get("/admin/dashboard", config).then((res) => res?.data || {});
+  apiClient.get("/api/admin/dashboard", config).then((res) => res?.data || {});
 
 export const fetchDashboardStats = (config = {}) =>
-  apiClient.get("/admin/dashboard/stats", config).then((res) => res?.data || {});
+  apiClient.get("/api/admin/dashboard/stats", config).then((res) => res?.data || {});
 
 export const fetchDashboardActivity = (range = "7d", config = {}) =>
   apiClient
-    .get(`/admin/dashboard/activity?range=${encodeURIComponent(range)}`, config)
+    .get(`/api/admin/dashboard/activity?range=${encodeURIComponent(range)}`, config)
     .then((res) => res?.data || {});
 
 export const fetchDashboardHealth = (config = {}) =>
-  apiClient.get("/admin/dashboard/health", config).then((res) => res?.data || {});
+  apiClient.get("/api/admin/dashboard/health", config).then((res) => res?.data || {});

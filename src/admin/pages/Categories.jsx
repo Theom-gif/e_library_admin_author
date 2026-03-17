@@ -4,12 +4,15 @@ import {
   Cpu,
   GraduationCap,
   Landmark,
+  Loader2,
   Plus,
+  Search,
   Sparkles,
 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { CATEGORIES } from "../data/mockData";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { createAdminCategory, fetchAdminCategories } from "../services/adminService";
 
 const ICON_MAP = {
   Tech: Cpu,
@@ -19,10 +22,29 @@ const ICON_MAP = {
   Landmark,
 };
 
+const getErrorMessage = (error, fallback) => {
+  const data = error?.response?.data;
+  const validation = data?.errors;
+  if (validation && typeof validation === "object") {
+    const details = Object.values(validation)
+      .flat()
+      .filter(Boolean)
+      .map((value) => String(value))
+      .join(" ");
+    if (details) return details;
+  }
+  if (data?.message) return data.message;
+  return error?.message || fallback;
+};
+
 const Categories = () => {
   const { t } = useLanguage();
   const nameInputRef = useRef(null);
   const [categories, setCategories] = useState(() => CATEGORIES);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState("");
   const [form, setForm] = useState({
     name: "",
   });
@@ -36,6 +58,40 @@ const Categories = () => {
     nameInputRef.current?.focus();
   };
 
+  useEffect(() => {
+    const controller = new AbortController();
+    const load = async () => {
+      setIsLoading(true);
+      setError("");
+      try {
+        const rows = await fetchAdminCategories(
+          searchTerm ? { search: searchTerm } : {},
+          { signal: controller.signal },
+        );
+        setCategories(rows);
+      } catch (fetchError) {
+        const isCanceled =
+          fetchError?.name === "CanceledError" ||
+          fetchError?.name === "AbortError";
+        if (isCanceled || controller.signal.aborted) {
+          return;
+        }
+        setError(getErrorMessage(fetchError, t("Failed to load categories.")));
+        setCategories(CATEGORIES);
+      } finally {
+        if (!controller.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    };
+
+    const timer = setTimeout(load, 200);
+    return () => {
+      clearTimeout(timer);
+      controller.abort();
+    };
+  }, [searchTerm, t]);
+
   const onSubmit = (event) => {
     event.preventDefault();
     const name = form.name.trim();
@@ -45,23 +101,29 @@ const Categories = () => {
       return;
     }
 
-    const nextId =
-      categories.reduce((maxId, current) => Math.max(maxId, Number(current.id) || 0), 0) + 1;
+    const payload = {
+      name,
+      icon: "Tech",
+    };
 
-    setCategories((current) => [
-      ...current,
-      {
-        id: nextId,
-        name,
-        count: 0,
-        icon: "Tech",
-      },
-    ]);
-    setSuccessMessage(t("Category added successfully."));
-    setTimeout(() => setSuccessMessage(""), 2200);
-    setForm({ name: "" });
+    setIsSubmitting(true);
     setFormError("");
-    focusCreateForm();
+    setSuccessMessage("");
+
+    createAdminCategory(payload)
+      .then((created) => {
+        setCategories((current) => [...current, created]);
+        setSuccessMessage(t("Category added successfully."));
+        setForm({ name: "" });
+        focusCreateForm();
+        setTimeout(() => setSuccessMessage(""), 2200);
+      })
+      .catch((createError) => {
+        setFormError(getErrorMessage(createError, t("Failed to create category.")));
+      })
+      .finally(() => {
+        setIsSubmitting(false);
+      });
   };
 
   return (
@@ -94,10 +156,35 @@ const Categories = () => {
         <div className="glass-card p-6">
           <div className="mb-5 flex items-center justify-between">
             <h3 className="text-xl font-bold">{t("Category List")}</h3>
-            <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
-              {categories.length} {t("Total")}
-            </span>
+            <div className="flex flex-col gap-2 md:flex-row md:items-center md:gap-3">
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+                <input
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                  type="text"
+                  placeholder={t("Search categories")}
+                  className="w-48 rounded-lg border border-white/10 bg-white/5 px-9 py-2 text-xs text-slate-100 focus:border-purple-400 focus:outline-none"
+                />
+              </div>
+              <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300 text-center">
+                {categories.length} {t("Total")}
+              </span>
+            </div>
           </div>
+
+          {error && (
+            <p className="mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-300">
+              {error}
+            </p>
+          )}
+
+          {isLoading && (
+            <div className="mb-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-slate-300 inline-flex items-center gap-2">
+              <Loader2 size={16} className="animate-spin" />
+              {t("Loading categories...")}
+            </div>
+          )}
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {categories.map((cat) => {
@@ -157,14 +244,15 @@ const Categories = () => {
 
           <button
             type="submit"
+            disabled={isSubmitting}
             className="mt-5 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#8f4cf6] to-[#e5459e] px-5 py-3 text-sm font-semibold text-white transition hover:brightness-110"
           >
-            <Plus size={16} />
-            {t("Save Category")}
+            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+            {isSubmitting ? t("Saving...") : t("Save Category")}
           </button>
         </form>
       </div>
-      {categories.length === 0 && (
+      {categories.length === 0 && !isLoading && (
         <div className="glass-card rounded-xl border border-white/10 bg-white/5 px-4 py-8 text-center text-sm text-slate-400">
           {t("No categories yet.")}
         </div>

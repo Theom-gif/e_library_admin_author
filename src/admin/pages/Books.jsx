@@ -11,7 +11,6 @@ const normalizeStatus = (value) => {
   const text = String(value || "").trim().toLowerCase();
 
   if (!text) return "Pending";
-
   if (text === "approved") return "Approved";
   if (text === "pending") return "Pending";
   if (text === "rejected") return "Rejected";
@@ -38,7 +37,7 @@ const Books = () => {
         const statusParam =
           statusFilter === "All" ? "all" : statusFilter.toLowerCase();
 
-        const res = await fetchAdminBooks(
+        const { data } = await fetchAdminBooks(
           {
             status: statusParam,
             search: searchTerm.trim(),
@@ -47,11 +46,11 @@ const Books = () => {
         );
 
         /* Support both API shapes */
-        const rows = Array.isArray(res)
-          ? res
-          : Array.isArray(res?.data)
-          ? res.data
-          : [];
+        const rows = Array.isArray(data)
+          ? data
+          : Array.isArray(data?.data)
+            ? data.data
+            : [];
 
         /* Only update if request not aborted */
         if (!signal?.aborted) {

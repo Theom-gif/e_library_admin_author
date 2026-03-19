@@ -1,549 +1,370 @@
+
+
+
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pencil, Save, Search, Trash2, X } from "lucide-react";
+import { Eye, Search, UserRound, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { API_BASE_URL } from "../../lib/apiClient";
 import { useLanguage } from "../../i18n/LanguageContext";
 
 const TOKEN_KEY = "bookhub_token";
-const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
+
+/* ---------------- API BASE ---------------- */
+const trimTrailingSlash = (v) => String(v || "").replace(/\/+$/, "");
 
 const getApiBaseCandidates = () => {
-  const candidates = [""];
+  const list = [""];
 
   if (typeof window !== "undefined") {
     const origin = trimTrailingSlash(window.location.origin);
-    if (origin) {
-      candidates.push(origin);
-    }
+    if (origin) list.push(origin);
 
-    const hostname = String(window.location.hostname || "").trim().toLowerCase();
-    if (hostname) {
-      const protocol = window.location.protocol === "https:" ? "https" : "http";
-      candidates.push(`${protocol}://${hostname}:8000`);
-    }
+    const host = window.location.hostname;
+    const protocol = window.location.protocol === "https:" ? "https" : "http";
+    list.push(`${protocol}://${host}:8000`);
   }
 
-  candidates.push(trimTrailingSlash(API_BASE_URL));
-  candidates.push("http://127.0.0.1:8000");
-  candidates.push("http://localhost:8000");
-  candidates.push("https://127.0.0.1:8000");
-  candidates.push("https://localhost:8000");
+  list.push(trimTrailingSlash(API_BASE_URL));
+  list.push("http://127.0.0.1:8000");
 
-  return Array.from(new Set(candidates.filter(Boolean)));
+  return [...new Set(list.filter(Boolean))];
 };
 
-const normalizeRole = (role) => {
-  const value = String(role ?? "").trim().toLowerCase();
-  if (value === "1") return "Admin";
-  if (value === "2") return "Author";
-  if (value === "3") return "User";
-  if (value === "admin") return "Admin";
-  if (value === "author") return "Author";
-  return "User";
-};
-
-const getRoleIdByWord = (role) => {
-  if (role === "Admin") return 1;
-  if (role === "Author") return 2;
-  return 3;
-};
-
-const normalizeUser = (user) => ({
-  id: user?.id ?? "",
-  role: normalizeRole(user?.role ?? user?.role_name),
-  first_name: user?.first_name ?? user?.firstname ?? "",
-  last_name: user?.last_name ?? user?.lastname ?? "",
-  email: user?.email ?? "",
-  created_at: user?.created_at ?? user?.createdAt ?? "",
+/* ---------------- NORMALIZE ---------------- */
+const normalizeUser = (u) => ({
+  id: u?.id ?? "",
+  role: u?.role ?? "User",
+  first_name: u?.first_name ?? "",
+  last_name: u?.last_name ?? "",
+  email: u?.email ?? "",
+  avatar_url:
+    u?.avatar_url ||
+    u?.profile_image ||
+    u?.avatar ||
+    "",
+  created_at: u?.created_at ?? "",
 });
 
-const toApiError = async (response, fallbackMessage) => {
-  let json = null;
-  try {
-    json = await response.json();
-  } catch {
-    json = null;
-  }
-  const validationErrors = json?.errors;
-  if (validationErrors && typeof validationErrors === "object") {
-    const details = Object.values(validationErrors)
-      .flatMap((value) => (Array.isArray(value) ? value : [value]))
-      .filter(Boolean)
-      .map((value) => String(value))
-      .join(" ");
-    if (details) {
-      return details;
-    }
-  }
-  return json?.message || fallbackMessage;
-};
-
+/* ---------------- COMPONENT ---------------- */
 const Users = () => {
   const { t } = useLanguage();
+
+  const [users, setUsers] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [roleFilter, setRoleFilter] = useState("All");
-  const [users, setUsers] = useState([]);
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [selectedUser, setSelectedUser] = useState(null);
+
+  const [actionLoadingId, setActionLoadingId] = useState(null);
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
-  const [editingId, setEditingId] = useState(null);
-  const [actionLoadingId, setActionLoadingId] = useState(null);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
   const [activeApiBase, setActiveApiBase] = useState("");
-  const apiBaseCandidates = useMemo(() => getApiBaseCandidates(), []);
-  const [editForm, setEditForm] = useState({
-    first_name: "",
-    last_name: "",
-    email: "",
-    role: "User",
-  });
+  const apiBases = useMemo(() => getApiBaseCandidates(), []);
 
-  const requestWithFallback = useCallback(
-    async ({ path, method = "GET", body, signal, fallbackMessage }) => {
-      const token =
-        window.localStorage.getItem(TOKEN_KEY) ||
-        window.sessionStorage.getItem(TOKEN_KEY);
-      if (!token) {
-        throw new Error(t("Missing login token. Please login again."));
+  /* ---------------- FETCH ---------------- */
+  const request = useCallback(async (path, { method = "GET", body } = {}) => {
+    const token = localStorage.getItem(TOKEN_KEY);
+    if (!token) throw new Error("No token");
+
+    for (const base of apiBases) {
+      try {
+        const res = await fetch(`${base}${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: "application/json",
+            ...(body ? { "Content-Type": "application/json" } : {}),
+          },
+          ...(body ? { body: JSON.stringify(body) } : {}),
+        });
+
+        if (!res.ok) continue;
+
+        setActiveApiBase(base);
+        return res.json();
+      } catch {
+        continue;
       }
+    }
 
-      const orderedBases = [
-        activeApiBase,
-        ...apiBaseCandidates.filter((baseUrl) => baseUrl !== activeApiBase),
-      ];
-      const checkedEndpoints = orderedBases.map((baseUrl) =>
-        baseUrl ? `${baseUrl}${path}` : path,
-      );
+    throw new Error("Cannot connect backend");
+  }, [apiBases]);
 
-      let lastNetworkError = null;
-      let lastApiError = null;
-      for (const baseUrl of orderedBases) {
-        try {
-          const response = await fetch(`${baseUrl}${path}`, {
-            method,
-            headers: {
-              Accept: "application/json",
-              ...(body ? { "Content-Type": "application/json" } : {}),
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            ...(body ? { body: JSON.stringify(body) } : {}),
-            signal,
-          });
-
-          if (!response.ok) {
-            const errorText = await toApiError(response, fallbackMessage);
-            const statusError = new Error(`${errorText} (HTTP ${response.status})`);
-
-            // If dev proxy is not active, same-origin /api can return 404.
-            // Continue with absolute URLs instead of failing immediately.
-            const isSameOriginCandidate =
-              baseUrl === "" ||
-              (typeof window !== "undefined" &&
-                trimTrailingSlash(baseUrl) === trimTrailingSlash(window.location.origin));
-
-            if (isSameOriginCandidate && response.status === 404) {
-              lastApiError = statusError;
-              continue;
-            }
-
-            // Some hosts can return 5xx while another candidate works.
-            if (response.status >= 500) {
-              lastApiError = statusError;
-              continue;
-            }
-
-            throw statusError;
-          }
-
-          setActiveApiBase(baseUrl);
-          return response;
-        } catch (requestError) {
-          if (requestError?.name === "AbortError") {
-            throw requestError;
-          }
-
-          // For HTTP/API errors, do not continue trying random hosts.
-          // Only retry on real network failures like "Failed to fetch".
-          const messageText = String(requestError?.message || "");
-          const lowerText = messageText.toLowerCase();
-          const isNetworkLike =
-            lowerText.includes("failed to fetch") ||
-            lowerText.includes("network") ||
-            lowerText.includes("load failed");
-
-          if (!isNetworkLike) {
-            throw requestError;
-          }
-
-          lastNetworkError = requestError;
-        }
-      }
-
-      throw (
-        lastApiError ||
-        (lastNetworkError
-          ? new Error(
-            `Cannot connect to backend. Checked endpoints: ${checkedEndpoints.join(", ")}`,
-          )
-          : null) ||
-        new Error("Cannot connect to backend. Start Laravel server on port 8000.")
-      );
-    },
-    [activeApiBase, apiBaseCandidates, t],
-  );
-
-  const fetchUsers = useCallback(async (signal) => {
-    setIsLoading(true);
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
     setError("");
 
     try {
-      const roleValue = roleFilter === "All" ? "" : roleFilter;
-      const searchPath = `/api/admin/users?search=${encodeURIComponent(searchQuery)}&role=${encodeURIComponent(roleValue)}`;
-      const response = await requestWithFallback({
-        path: searchPath,
-        method: "GET",
-        signal,
-        fallbackMessage: t("Failed to load users."),
-      });
+      const role = roleFilter === "All" ? "" : roleFilter;
+      const data = await request(
+        `/api/admin/users?search=${searchQuery}&role=${role}`
+      );
 
-      const json = await response.json();
-      const rows = Array.isArray(json?.data) ? json.data : [];
-      setUsers(rows.map(normalizeUser));
-    } catch (fetchError) {
-      if (fetchError?.name === "AbortError") {
-        return;
-      }
-      setUsers([]);
-      setError(fetchError?.message || t("Failed to load users."));
+      setUsers((data?.data || []).map(normalizeUser));
+    } catch (e) {
+      setError(e.message);
     } finally {
-      if (!signal?.aborted) {
-        setIsLoading(false);
-      }
+      setLoading(false);
     }
-  }, [requestWithFallback, roleFilter, searchQuery, t]);
+  }, [request, searchQuery, roleFilter]);
 
   useEffect(() => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => {
-      fetchUsers(controller.signal);
-    }, 250);
-
-    return () => {
-      clearTimeout(timer);
-      controller.abort();
-    };
+    fetchUsers();
   }, [fetchUsers]);
 
-  const startEdit = (user) => {
-    setEditingId(user.id);
-    setEditForm({
-      first_name: user.first_name,
-      last_name: user.last_name,
-      email: user.email,
-      role: normalizeRole(user.role),
-    });
+  const handleViewDetail = (user) => {
+    setSelectedUser(user);
     setActionError("");
     setActionSuccess("");
   };
 
-  const cancelEdit = () => {
-    setEditingId(null);
-    setActionError("");
-  };
+  const handleReport = async (user) => {
+    const confirmed = window.confirm(
+      t("Report user \"{name}\"? This will remove their account.", {
+        name: `${user.first_name} ${user.last_name}`,
+      }),
+    );
 
-  const handleSave = async (id) => {
-    const firstName = editForm.first_name.trim();
-    const lastName = editForm.last_name.trim();
-    const email = editForm.email.trim().toLowerCase();
-    const role = normalizeRole(editForm.role);
-
-    if (!firstName || !lastName || !email) {
-      setActionError(t("First name, last name, and email are required."));
-      return;
-    }
-
-    const token =
-      window.localStorage.getItem(TOKEN_KEY) ||
-      window.sessionStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setActionError(t("Missing login token. Please login again."));
-      return;
-    }
-
-    const payload = {
-      first_name: firstName,
-      last_name: lastName,
-      firstname: firstName,
-      lastname: lastName,
-      email,
-      role,
-      role_id: getRoleIdByWord(role),
-    };
-
-    setActionLoadingId(id);
-    setActionError("");
-    setActionSuccess("");
-    try {
-      let updated = false;
-      let lastErrorMessage = t("Failed to update user.");
-
-      for (const method of ["PUT", "PATCH"]) {
-        try {
-          await requestWithFallback({
-            path: `/api/admin/users/${id}`,
-            method,
-            body: payload,
-            fallbackMessage: t("Failed to update user."),
-          });
-          updated = true;
-          break;
-        } catch (attemptError) {
-          const text = String(attemptError?.message || t("Failed to update user."));
-          lastErrorMessage = text;
-          const isMethodMismatch =
-            text.includes("HTTP 405") ||
-            text.toLowerCase().includes("method not allowed") ||
-            text.toLowerCase().includes("not supported");
-          if (!isMethodMismatch) {
-            throw attemptError;
-          }
-        }
-      }
-
-      if (!updated) {
-        throw new Error(lastErrorMessage);
-      }
-
-      setEditingId(null);
-      setActionSuccess(t("User updated successfully."));
-      await fetchUsers();
-    } catch (saveError) {
-      setActionError(saveError?.message || t("Failed to update user."));
-    } finally {
-      setActionLoadingId(null);
-    }
-  };
-
-  const handleDelete = async (user) => {
-    const confirmed = window.confirm(t("Delete user \"{name}\"?", { name: `${user.first_name} ${user.last_name}` }));
     if (!confirmed) return;
-
-    const token =
-      window.localStorage.getItem(TOKEN_KEY) ||
-      window.sessionStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setActionError(t("Missing login token. Please login again."));
-      return;
-    }
 
     setActionLoadingId(user.id);
     setActionError("");
     setActionSuccess("");
-    try {
-      await requestWithFallback({
-        path: `/api/admin/users/${user.id}`,
-        method: "DELETE",
-        fallbackMessage: t("Failed to delete user."),
-      });
 
-      if (editingId === user.id) {
-        setEditingId(null);
+    try {
+      await request(`/api/admin/users/${user.id}`, { method: "DELETE" });
+
+      if (selectedUser?.id === user.id) {
+        setSelectedUser(null);
       }
 
-      setActionSuccess(t("User deleted successfully."));
+      setActionSuccess(t("User reported successfully."));
       await fetchUsers();
-    } catch (deleteError) {
-      setActionError(deleteError?.message || t("Failed to delete user."));
+    } catch (err) {
+      setActionError(err?.message || t("Failed to report user."));
     } finally {
       setActionLoadingId(null);
     }
   };
 
+  /* ---------------- AVATAR ---------------- */
+  const getAvatar = (user) => {
+    // DB image
+    if (user.avatar_url) {
+      if (user.avatar_url.startsWith("http")) {
+        return user.avatar_url;
+      }
+      return `${API_BASE_URL}/storage/${user.avatar_url}`;
+    }
+
+    // fallback (email avatar)
+    if (user.email) {
+      return `https://api.dicebear.com/7.x/initials/svg?seed=${user.email}`;
+    }
+
+    return null;
+  };
+
+  /* ---------------- UI ---------------- */
   return (
     <div className="glass-card overflow-hidden">
-      <div className="p-6 border-b border-white/5 flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={16} />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder={t("Search users...")}
-              className="bg-white/5 border border-white/10 rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:border-purple-500 w-64"
-            />
-          </div>
-          <select
-            value={roleFilter}
-            onChange={(event) => setRoleFilter(event.target.value)}
-            className="bg-gray-800 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none"
-          >
-            <option value="All">{t("All Roles")}</option>
-            <option value="User">{t("User")}</option>
-            <option value="Admin">{t("Admin")}</option>
-            <option value="Author">{t("Author")}</option>
-          </select>
+      {/* HEADER */}
+      <div className="p-6 flex gap-4">
+        <div className="relative">
+          <Search size={16} className="absolute left-3 top-2.5 text-slate-400" />
+          <input
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("Search users...")}
+            className="pl-8 pr-4 py-2 bg-white/5 rounded-lg"
+          />
         </div>
+
+        <select
+          value={roleFilter}
+          onChange={(e) => setRoleFilter(e.target.value)}
+          className="bg-gray-800 px-3 py-2 rounded-lg"
+        >
+          <option>All</option>
+          <option>Admin</option>
+          <option>Author</option>
+          <option>User</option>
+        </select>
       </div>
+
+      {/* TABLE */}
+      <div className={cn("transition duration-200", selectedUser ? "blur-[1px] pointer-events-none select-none" : "") }>
       <table className="w-full text-left">
         <thead>
-          <tr className="bg-white/2 text-slate-500 text-xs font-bold uppercase tracking-wider">
-            <th className="px-6 py-4">{t("ID")}</th>
-            <th className="px-6 py-4">{t("Role")}</th>
-            <th className="px-6 py-4">{t("First Name")}</th>
-            <th className="px-6 py-4">{t("Last Name")}</th>
-            <th className="px-6 py-4">{t("Email")}</th>
-            <th className="px-6 py-4">{t("Created At")}</th>
-            <th className="px-6 py-4 text-right">{t("Actions")}</th>
+          <tr className="text-xs text-slate-400">
+            <th className="px-6 py-4">Profile</th>
+            <th className="px-6 py-4">Role</th>
+            <th className="px-6 py-4">Email</th>
+            <th className="px-6 py-4 text-right">Action</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-white/5">
+
+        <tbody>
           {(actionError || actionSuccess) && (
             <tr>
-              <td colSpan={7} className={cn("px-6 py-3 text-sm", actionError ? "text-red-400" : "text-emerald-400")}>
+              <td colSpan="5" className={cn("px-6 py-3 text-sm", actionError ? "text-red-400" : "text-emerald-400") }>
                 {actionError || actionSuccess}
               </td>
             </tr>
           )}
-
-          {isLoading && (
+          {loading && (
             <tr>
-              <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-400">
-                {t("Loading users...")}
+              <td colSpan="5" className="text-center py-6">
+                Loading...
               </td>
             </tr>
           )}
 
-          {!isLoading && error && (
+          {error && (
             <tr>
-              <td colSpan={7} className="px-6 py-8 text-center text-sm text-red-400">
+              <td colSpan="5" className="text-center text-red-400">
                 {error}
               </td>
             </tr>
           )}
 
-          {!isLoading && !error && users.map((user) => (
-            <tr key={user.id} className="hover:bg-white/2 transition-colors">
-              <td className="px-6 py-4 text-sm font-medium">{user.id}</td>
-              <td className="px-6 py-4">
-                {editingId === user.id ? (
-                  <select
-                    value={editForm.role}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, role: event.target.value }))}
-                    className="bg-gray-800 border border-white/10 rounded-lg px-2 py-1 text-sm focus:outline-none"
-                  >
-                    <option value="User">{t("User")}</option>
-                    <option value="Author">{t("Author")}</option>
-                    <option value="Admin">{t("Admin")}</option>
-                  </select>
-                ) : (
-                  <span
-                    className={cn(
-                      "text-xs font-bold px-2 py-1 rounded-lg",
-                      user.role === "Admin"
-                        ? "text-purple-400 bg-purple-400/10"
-                        : user.role === "Author"
-                          ? "text-pink-400 bg-pink-400/10"
-                          : "text-blue-400 bg-blue-400/10",
+          {users.map((user) => {
+            const avatar = getAvatar(user);
+
+            return (
+              <tr key={user.id} className="hover:bg-white/5">
+                {/* PROFILE */}
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    {avatar ? (
+                      <img
+                        src={avatar}
+                        className="w-10 h-10 rounded-full object-cover"
+                        onError={(e) => (e.target.style.display = "none")}
+                      />
+                    ) : (
+                      <UserRound />
                     )}
-                  >
-                    {t(user.role)}
-                  </span>
-                )}
-              </td>
-              <td className="px-6 py-4 text-slate-300 text-sm">
-                {editingId === user.id ? (
-                  <input
-                    type="text"
-                    value={editForm.first_name}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, first_name: event.target.value }))}
-                    className="w-full min-w-24 bg-white/5 border border-white/10 rounded-md px-2 py-1 text-sm focus:outline-none"
-                  />
-                ) : (
-                  user.first_name
-                )}
-              </td>
-              <td className="px-6 py-4 text-slate-300 text-sm">
-                {editingId === user.id ? (
-                  <input
-                    type="text"
-                    value={editForm.last_name}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, last_name: event.target.value }))}
-                    className="w-full min-w-24 bg-white/5 border border-white/10 rounded-md px-2 py-1 text-sm focus:outline-none"
-                  />
-                ) : (
-                  user.last_name
-                )}
-              </td>
-              <td className="px-6 py-4 text-slate-300 text-sm">
-                {editingId === user.id ? (
-                  <input
-                    type="email"
-                    value={editForm.email}
-                    onChange={(event) => setEditForm((prev) => ({ ...prev, email: event.target.value }))}
-                    className="w-full min-w-40 bg-white/5 border border-white/10 rounded-md px-2 py-1 text-sm focus:outline-none"
-                  />
-                ) : (
-                  user.email
-                )}
-              </td>
-              <td className="px-6 py-4 text-slate-300 text-sm">{user.created_at}</td>
-              <td className="px-6 py-4">
-                <div className="flex items-center justify-end gap-2">
-                  {editingId === user.id ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleSave(user.id)}
-                        disabled={actionLoadingId === user.id}
-                        className="inline-flex items-center gap-1 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-3 py-1.5 text-xs font-semibold text-emerald-300 transition hover:bg-emerald-500/20 disabled:opacity-50"
-                      >
-                        <Save size={14} />
-                        {t("Save")}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={cancelEdit}
-                        disabled={actionLoadingId === user.id}
-                        className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-3 py-1.5 text-xs font-semibold text-slate-200 transition hover:bg-white/10 disabled:opacity-50"
-                      >
-                        <X size={14} />
-                        {t("Cancel")}
-                      </button>
-                    </>
-                  ) : (
+
+                    <div>
+                      <div className="text-white font-semibold">
+                        {user.first_name} {user.last_name}
+                      </div>
+                      <div className="text-xs text-slate-400">
+                        {user.email}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+
+                {/* ROLE */}
+                <td className="px-6">{user.role}</td>
+
+                {/* EMAIL */}
+                <td className="px-6">{user.email}</td>
+
+                {/* ACTION */}
+                <td className="px-6 text-right">
+                  <div className="flex items-center justify-end gap-2">
                     <button
                       type="button"
-                      onClick={() => startEdit(user)}
+                      onClick={() => handleViewDetail(user)}
                       disabled={actionLoadingId === user.id}
                       className="inline-flex items-center gap-1 rounded-lg border border-blue-500/40 bg-blue-500/10 px-3 py-1.5 text-xs font-semibold text-blue-300 transition hover:bg-blue-500/20 disabled:opacity-50"
                     >
-                      <Pencil size={14} />
-                      {t("Edit")}
+                      <Eye size={14} />
+                      {t("View")}
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(user)}
-                    disabled={actionLoadingId === user.id}
-                    className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/20 disabled:opacity-50"
-                  >
-                    <Trash2 size={14} />
-                    {t("Delete")}
-                  </button>
-                </div>
-              </td>
-            </tr>
-          ))}
-          {!isLoading && !error && users.length === 0 && (
-            <tr>
-              <td colSpan={7} className="px-6 py-8 text-center text-sm text-slate-400">
-                {t("No users found.")}
-              </td>
-            </tr>
-          )}
+                    <button
+                      type="button"
+                      onClick={() => handleReport(user)}
+                      disabled={actionLoadingId === user.id}
+                      className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 bg-red-500/10 px-3 py-1.5 text-xs font-semibold text-red-300 transition hover:bg-red-500/20 disabled:opacity-50"
+                    >
+                      {/* <Trash2 size={14} /> */}
+                      {t("Report")}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
+      </div>
+
+      {/* MODAL */}
+      {selectedUser && (
+        <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-sm flex items-center justify-center z-20 px-4">
+          <div className="bg-slate-900/90 p-6 rounded-xl w-full max-w-lg relative border border-white/10 shadow-2xl">
+            <button
+              className="absolute top-3 right-3 rounded-full border border-white/10 bg-white/5 p-2 text-slate-200 transition hover:bg-white/10"
+              onClick={() => setSelectedUser(null)}
+            >
+              <X />
+            </button>
+
+            <div className="flex items-center gap-4 mb-4">
+              {getAvatar(selectedUser) ? (
+                <img
+                  src={getAvatar(selectedUser)}
+                  className="w-12 h-12 rounded-full border border-white/10"
+                />
+              ) : (
+                <UserRound />
+              )}
+
+              <div>
+                <div className="text-xl text-white">
+                  {selectedUser.first_name} {selectedUser.last_name}
+                </div>
+                <div className="text-sm text-slate-400">
+                  {selectedUser.email}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 text-sm text-slate-200">
+              <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                <div className="text-xs text-slate-500">{t("Email")}</div>
+                <div className="font-medium break-all">{selectedUser.email}</div>
+              </div>
+              <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                <div className="text-xs text-slate-500">{t("Role")}</div>
+                <span className="mt-1 inline-flex items-center gap-2 text-xs font-bold px-2 py-1 rounded-lg bg-blue-500/10 text-blue-200">
+                  {t(selectedUser.role)}
+                </span>
+              </div>
+              <div className="rounded-xl border border-white/5 bg-white/5 p-3">
+                <div className="text-xs text-slate-500">{t("Created At")}</div>
+                <div className="font-medium">{selectedUser.created_at}</div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setSelectedUser(null)}
+                className="inline-flex items-center gap-1 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-slate-200 transition hover:bg-white/10"
+              >
+                {t("Close")}
+              </button>
+              <button
+                type="button"
+                onClick={() => handleReport(selectedUser)}
+                disabled={actionLoadingId === selectedUser.id}
+                className="inline-flex items-center gap-2 rounded-lg border border-red-500/40 bg-red-500/10 px-4 py-2 text-sm font-semibold text-red-300 transition hover:bg-red-500/20 disabled:opacity-50"
+              >
+                {/* <Trash2 size={14} /> */}
+                {t("Report")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

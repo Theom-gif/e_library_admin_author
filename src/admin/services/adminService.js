@@ -1,14 +1,25 @@
 import { apiClient, API_BASE_URL } from "../../lib/apiClient";
 
-const buildBooksPath = ({ status, search } = {}) => {
+const buildBooksPath = ({ status, search, page, perPage } = {}) => {
   const params = new URLSearchParams();
   const cleanStatus = String(status || "").trim();
   const cleanSearch = String(search || "").trim();
   const lowerStatus = cleanStatus.toLowerCase();
   const isPendingRoute = lowerStatus === "pending";
 
+  const cleanPage = Number(page);
+  const cleanPerPage = Number(perPage);
+
   if (cleanSearch) {
     params.set("search", cleanSearch);
+  }
+
+  if (Number.isFinite(cleanPage) && cleanPage > 0) {
+    params.set("page", String(cleanPage));
+  }
+
+  if (Number.isFinite(cleanPerPage) && cleanPerPage > 0) {
+    params.set("per_page", String(cleanPerPage));
   }
 
   if (isPendingRoute) {
@@ -16,7 +27,7 @@ const buildBooksPath = ({ status, search } = {}) => {
     return `/api/admin/books/pending${query ? `?${query}` : ""}`;
   }
 
-  if (cleanStatus) {
+  if (cleanStatus && lowerStatus !== "all") {
     params.set("status", cleanStatus);
   }
 
@@ -73,6 +84,20 @@ export const normalizeBook = (book = {}) => {
   };
 };
 
+const toNumberOr = (value, fallback) => {
+  const num = Number(value);
+  return Number.isFinite(num) && num >= 0 ? num : fallback;
+};
+
+const normalizePagination = (meta = {}, fallbackLength = 0) => ({
+  page: toNumberOr(meta.page ?? meta.current_page ?? meta.currentPage, 1),
+  perPage: toNumberOr(
+    meta.perPage ?? meta.per_page ?? meta.limit ?? meta.pageSize,
+    fallbackLength || 10,
+  ),
+  total: toNumberOr(meta.total ?? meta.total_items ?? meta.totalItems ?? meta.count, fallbackLength),
+});
+
 export const fetchAdminBooks = async (filters = {}, config = {}) => {
   const response = await apiClient.get(buildBooksPath(filters), config);
   const payload = response?.data;
@@ -82,7 +107,17 @@ export const fetchAdminBooks = async (filters = {}, config = {}) => {
     (Array.isArray(payload?.data?.data) && payload.data.data) ||
     (Array.isArray(payload) && payload) ||
     [];
-  return rows.map(normalizeBook);
+
+  const paginationSource =
+    payload?.meta ||
+    payload?.data?.meta ||
+    payload?.pagination ||
+    payload?.data?.pagination ||
+    {};
+
+  const meta = normalizePagination(paginationSource, rows.length);
+
+  return { data: rows.map(normalizeBook), meta };
 };
 
 export const approveBook = (id, config = {}) =>

@@ -13,11 +13,11 @@ const normalizeStatus = (value) => {
   const text = String(value || "").trim();
   if (!text) return "Pending";
   const lower = text.toLowerCase();
-  if (lower === "approved") return "Approved";
-  if (lower === "rejected") return "Rejected";
   if (lower === "pending") return "Pending";
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
+
+const statusFilters = ["Pending"];
 
 const formatDateLabel = (value) => {
   if (!value) return "";
@@ -81,13 +81,12 @@ const Approvals = () => {
   const [category, setCategory] = useState("All");
   const [status, setStatus] = useState("Pending");
   const [books, setBooks] = useState([]);
+  const [pagination, setPagination] = useState({ page: 1, perPage: 10, total: 0 });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [actionError, setActionError] = useState("");
   const [actionSuccess, setActionSuccess] = useState("");
   const [actionLoadingId, setActionLoadingId] = useState(null);
-
-  const statusFilters = ["Pending", "Approved", "Rejected", "All"];
 
   const categories = useMemo(() => {
     const unique = new Set(books.map((book) => book.category).filter(Boolean));
@@ -99,6 +98,10 @@ const Approvals = () => {
       setCategory("All");
     }
   }, [categories, category]);
+
+  useEffect(() => {
+    setPagination((prev) => ({ ...prev, page: 1 }));
+  }, [status]);
 
   const stats = useMemo(
     () => ({
@@ -113,36 +116,56 @@ const Approvals = () => {
     async (signal) => {
       setIsLoading(true);
       setError("");
+
       try {
-        // Backend currently exposes a pending-only listing; we merge it with any
-        // locally moderated rows so filters keep showing already approved/rejected items.
-        const rows = await fetchAdminBooks(
-          { status: "Pending", search: searchTerm.trim() },
+        const { data, meta } = await fetchAdminBooks(
+          {
+            status: status === "All" ? "all" : status,
+            search: searchTerm.trim(),
+            page: pagination.page,
+            perPage: pagination.perPage,
+          },
           { signal },
         );
-        const fresh = Array.isArray(rows) ? rows.map(toUiBook) : [];
-        setBooks((prev) => {
-          const moderated = prev.filter((b) => b.status !== "Pending");
-          const byId = new Map(moderated.map((b) => [String(b.id), b]));
-          fresh.forEach((entry) => byId.set(String(entry.id), entry));
-          return Array.from(byId.values());
+
+        if (signal?.aborted) return;
+
+        const normalized = Array.isArray(data) ? data.map(toUiBook) : [];
+        setBooks(normalized);
+        setPagination((prev) => {
+          const next = {
+            page: meta?.page ?? prev.page,
+            perPage: meta?.perPage ?? prev.perPage,
+            total: meta?.total ?? prev.total ?? normalized.length,
+          };
+
+          if (
+            next.page === prev.page &&
+            next.perPage === prev.perPage &&
+            next.total === prev.total
+          ) {
+            return prev;
+          }
+
+          return next;
         });
       } catch (fetchError) {
         const isCanceled =
           fetchError?.name === "CanceledError" ||
           fetchError?.name === "AbortError" ||
           fetchError?.code === "ERR_CANCELED";
-        if (isCanceled) {
-          return;
+
+        if (!isCanceled) {
+          setError(getErrorMessage(fetchError, t("Failed to load submissions.")));
+          setBooks([]);
         }
-        setError(getErrorMessage(fetchError, t("Failed to load submissions.")));
       } finally {
         if (!signal?.aborted) {
           setIsLoading(false);
         }
       }
     },
-    [searchTerm, t],
+    [pagination.page, pagination.perPage, searchTerm, status, t],
   );
 
   useEffect(() => {
@@ -168,6 +191,25 @@ const Approvals = () => {
       return matchesStatus && matchesCategory && matchesTerm;
     });
   }, [searchTerm, category, status, books]);
+
+  const totalRecords = pagination.total || filteredBooks.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pagination.perPage));
+  const pageStart = totalRecords === 0 ? 0 : (pagination.page - 1) * pagination.perPage + 1;
+  const pageEnd = totalRecords === 0
+    ? 0
+    : Math.min(pagination.page * pagination.perPage, totalRecords);
+
+  const goToPage = (nextPage) => {
+    setPagination((prev) => {
+      const safePage = Math.min(Math.max(1, nextPage), totalPages);
+      if (safePage === prev.page) return prev;
+      return { ...prev, page: safePage };
+    });
+  };
+
+  const handlePerPageChange = (value) => {
+    setPagination((prev) => ({ ...prev, perPage: value, page: 1 }));
+  };
 
   const handleModeration = async (book, nextStatus) => {
     setActionLoadingId(book.id);
@@ -271,7 +313,7 @@ const Approvals = () => {
             <h4 className="font-bold">{t("Review and moderate incoming books")}</h4>
           </div>
           <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white/5 border border-white/10 text-slate-300">
-            {t("{count} results", { count: filteredBooks.length })}
+            {t("{count} results", { count: totalRecords })}
           </span>
         </div>
 
@@ -403,6 +445,59 @@ const Approvals = () => {
               })}
             </tbody>
           </table>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-t border-white/5 bg-white/5">
+          <div className="text-xs text-slate-400 font-semibold">
+            {t("Showing {start}-{end} of {total} results", {
+              start: pageStart,
+              end: pageEnd,
+              total: totalRecords,
+            })}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <label className="text-xs text-slate-400 font-semibold flex items-center gap-2">
+              {t("Per page")}
+              <select
+                value={pagination.perPage}
+                onChange={(e) => handlePerPageChange(Number(e.target.value))}
+                className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary/40"
+              >
+                {[5, 10, 20, 50].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => goToPage(pagination.page - 1)}
+                disabled={pagination.page <= 1}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                  pagination.page <= 1
+                    ? "bg-white/5 text-slate-500 border-white/10 cursor-not-allowed"
+                    : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                {t("Previous")}
+              </button>
+              <span className="text-xs text-slate-400 font-semibold">
+                {t("Page {page} of {total}", { page: pagination.page, total: totalPages })}
+              </span>
+              <button
+                onClick={() => goToPage(pagination.page + 1)}
+                disabled={pagination.page >= totalPages}
+                className={`px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors ${
+                  pagination.page >= totalPages
+                    ? "bg-white/5 text-slate-500 border-white/10 cursor-not-allowed"
+                    : "bg-white/5 text-slate-100 border-white/10 hover:bg-white/10"
+                }`}
+              >
+                {t("Next")}
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     </div>

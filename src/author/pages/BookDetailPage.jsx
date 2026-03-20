@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpenText, CalendarDays, UserRound } from 'lucide-react';
 import { getWorkDetails } from '../services/openLibraryService';
 import { getManuscriptFile } from '../services/manuscriptStorage';
+import { API_BASE_URL } from '../../lib/apiClient';
 
 const fallbackBook = {
   title: 'Unknown Book',
@@ -20,12 +21,26 @@ const statusBadgeClass = (status) => {
   return 'bg-slate-500/90 text-white';
 };
 
+const isAbsoluteUrl = (value = '') => /^https?:\/\//i.test(String(value));
+
+// Covers are served from the site root (e.g., https://elibrary.pncproject.site/storage/...)
+// while API calls use /api. Strip any /api suffix from the base to build correct asset URLs.
+const stripApiSuffix = (value = '') => String(value || '').replace(/\/api(?:\/.*)?$/i, '');
+const assetBaseUrl = stripApiSuffix(API_BASE_URL).replace(/\/+$/, '');
+
+const buildStorageUrl = (path = '') => {
+  if (!path) return '';
+  if (isAbsoluteUrl(path) || path.startsWith('data:image/')) return path;
+  const clean = String(path).replace(/^\/+/, '');
+  const normalized = clean.startsWith('storage/')
+    ? clean.slice('storage/'.length)
+    : clean;
+  return `${assetBaseUrl}/storage/${normalized}`;
+};
+
 const getSafeCoverUrl = (value) => {
   const text = String(value || '').trim();
-  if (text.startsWith('data:image/') || /^https?:\/\//i.test(text)) {
-    return text;
-  }
-  return fallbackBook.coverUrl;
+  return buildStorageUrl(text) || fallbackBook.coverUrl;
 };
 
 const formatFileSize = (bytes) => {
@@ -75,14 +90,15 @@ const BookDetailPage = () => {
       setLoadingPdf(true);
       setPdfError('');
       setPdfUrl('');
-      const isPdfUrl = /\.pdf(\?|$)/i.test(manuscriptUrl);
+      const resolvedUrl = buildStorageUrl(manuscriptUrl);
+      const isPdfUrl = /\.pdf(\?|$)/i.test(resolvedUrl);
       if (!isPdfUrl) {
         setPdfError('Uploaded manuscript is not a PDF. Preview is available for PDF only.');
         setLoadingPdf(false);
         return undefined;
       }
 
-      setPdfUrl(manuscriptUrl);
+      setPdfUrl(resolvedUrl);
       setLoadingPdf(false);
       return undefined;
     }
@@ -145,7 +161,15 @@ const BookDetailPage = () => {
       <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-8">
         <div className="bg-card-dark rounded-2xl border border-white/5 p-4">
           <img
-            src={getSafeCoverUrl(book.coverUrl || book.img)}
+            src={getSafeCoverUrl(
+              book.cover_view_url ||
+                book.cover_api_url ||
+                book.coverUrl ||
+                book.cover ||
+                book.cover_image_url ||
+                book.cover_image_path ||
+                book.img
+            )}
             alt={book.title}
             className="w-full aspect-[2/3] object-cover rounded-xl border border-white/10"
             onError={(event) => {

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const TOKEN_KEY = "bookhub_token";
-export const DEFAULT_API_BASE_URL = "https://elibrary.pncproject.site";
+export const DEFAULT_API_BASE_URL = "https://elibrary.pncproject.site/api";
 const DEFAULT_TIMEOUT_MS = 8000;
 
 const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");

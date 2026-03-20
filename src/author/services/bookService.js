@@ -33,13 +33,17 @@ const isAbsoluteUrl = (value = '') => /^https?:\/\//i.test(String(value));
 const isBlobLikeUrl = (value = '') => /^data:|^blob:/i.test(String(value));
 const trimSlash = (value = '') => String(value || '').replace(/\/+$/, '');
 
+// Assets live at the site root (e.g., https://example.com/storage/...), not under /api.
+const stripApiSuffix = (value = '') => String(value || '').replace(/\/api(?:\/.*)?$/i, '');
+const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
+
 const buildStorageUrl = (path = '') => {
   if (!path) return '';
   if (isBlobLikeUrl(path)) return path;
   if (isAbsoluteUrl(path)) return path;
   const clean = String(path).replace(/^\/+/, '');
   const normalized = clean.startsWith('storage/') ? clean.slice('storage/'.length) : clean;
-  return `${trimSlash(API_BASE_URL)}/storage/${normalized}`;
+  return `${ASSET_BASE_URL}/storage/${normalized}`;
 };
 
 const normalizeAssetUrl = (value = '') => {
@@ -80,8 +84,11 @@ export const mapApiBookToUiBook = (book) => ({
   reads: '0',
   sales: '$0',
   img:
-    buildStorageUrl(book?.cover_image_path) ||
+    normalizeAssetUrl(book?.cover_view_url) ||
+    buildStorageUrl(book?.cover_view_url) ||
+    buildStorageUrl(book?.cover_api_url) ||
     buildStorageUrl(book?.cover_image_url) ||
+    buildStorageUrl(book?.cover_image_path) ||
     normalizeAssetUrl(book?.cover_image_url) ||
     'https://picsum.photos/seed/new-book/300/450',
   description: book?.description || '',

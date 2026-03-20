@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Activity, Check, Eye, Filter, Loader2, Search, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { API_BASE_URL } from "../../lib/apiClient";
 import { approveBook, fetchAdminBooks, rejectBook } from "../services/adminService";
 
 const statusStyles = {
@@ -48,9 +49,39 @@ const formatDateLabel = (value) => {
   return "";
 };
 
+const isAbsoluteUrl = (value = "") => /^https?:\/\//i.test(String(value));
+
+// Keep cover/file URLs pointing to the site root, not the /api prefix.
+const stripApiSuffix = (value = "") =>
+  String(value || "").replace(/\/api(?:\/.*)?$/i, "");
+const assetBaseUrl = stripApiSuffix(API_BASE_URL).replace(/\/+$/, "");
+
+const buildStorageUrl = (path = "") => {
+  if (!path) return "";
+  if (isAbsoluteUrl(path)) return path;
+  const clean = String(path).replace(/^\/+/, "");
+  const normalized = clean.startsWith("storage/") ? clean.slice("storage/".length) : clean;
+  return `${assetBaseUrl}/storage/${normalized}`;
+};
+
 const fallbackId = () => `book-${Math.random().toString(36).slice(2, 10)}`;
 const toUiBook = (book = {}) => {
-  const cover = book.coverUrl || book.cover || "https://via.placeholder.com/64x96?text=Book";
+  const coverPath =
+    book.coverUrl ||
+    book.cover ||
+    book.cover_image_url ||
+    book.cover_image_path ||
+    "";
+  const filePath =
+    book.fileUrl ||
+    book.book_file_url ||
+    book.book_file_path ||
+    book.file ||
+    "";
+
+  const cover = buildStorageUrl(coverPath) || "https://via.placeholder.com/64x96?text=Book";
+  const fileUrl = buildStorageUrl(filePath);
+
   return {
     id: book.id ?? book._id ?? book.bookId ?? book.slug ?? fallbackId(),
     title: book.title ?? book.name ?? "Untitled",
@@ -65,7 +96,7 @@ const toUiBook = (book = {}) => {
         "",
     ),
     cover,
-    fileUrl: book.fileUrl || "",
+    fileUrl,
   };
 };
 

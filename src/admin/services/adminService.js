@@ -38,13 +38,39 @@ const buildBooksPath = ({ status, search, page, perPage } = {}) => {
 const isAbsoluteUrl = (value = "") => /^https?:\/\//i.test(String(value));
 const trimSlash = (value = "") => String(value || "").replace(/\/+$/, "");
 
+// Asset URLs should point to the web root, not the /api prefix used for JSON routes.
+// The default API_BASE_URL is https://elibrary.pncproject.site/api, but covers live at
+// https://elibrary.pncproject.site/storage/<file>. Strip any trailing /api* before joining.
+const stripApiSuffix = (value = "") =>
+  String(value || "").replace(/\/api(?:\/.*)?$/i, "");
+
+const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
+
+// const buildStorageUrl = (path = "") => {
+//   if (!path) return "";
+//   if (isAbsoluteUrl(path)) return path;
+//   const clean = String(path).replace(/^\/+/, "");
+//   const normalized = clean.startsWith("storage/") ? clean.slice("storage/".length) : clean;
+//   return `${ASSET_BASE_URL}/storage/${normalized}`;
+// };
+
 const buildStorageUrl = (path = "") => {
   if (!path) return "";
   if (isAbsoluteUrl(path)) return path;
-  const clean = String(path).replace(/^\/+/, "");
-  const normalized = clean.startsWith("storage/") ? clean.slice("storage/".length) : clean;
-  return `${trimSlash(API_BASE_URL)}/storage/${normalized}`;
+
+  let clean = String(path).replace(/^\/+/, "");
+
+  // 🔥 FIX: remove wrong prefixes from backend
+  clean = clean.replace(/^storage\/app\/public\//, "");
+  clean = clean.replace(/^public\//, "");
+
+  if (clean.startsWith("storage/")) {
+    clean = clean.slice("storage/".length);
+  }
+
+  return `${ASSET_BASE_URL}/storage/${clean}`;
 };
+
 
 const DEFAULT_CATEGORY_ICON = "Tech";
 

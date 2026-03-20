@@ -43,7 +43,11 @@ const EditBookPage = () => {
 
       if (updatedBook.coverFile instanceof File) {
         payload.append('cover_image', updatedBook.coverFile);
-      } else if (updatedBook.coverUrl && /^https?:\/\//i.test(updatedBook.coverUrl)) {
+        payload.append('cover', updatedBook.coverFile);
+        payload.append('image', updatedBook.coverFile);
+      }
+
+      if (updatedBook.coverUrl && /^https?:\/\//i.test(updatedBook.coverUrl)) {
         payload.append('cover_image_url', updatedBook.coverUrl);
       }
 

@@ -15,17 +15,20 @@ import { searchAuthors, searchBooks } from '../services/openLibraryService';
 import { uploadBookRequest } from '../services/bookService';
 
 const PROFILE_STORAGE_KEY = 'author_studio_profile';
-const GENRE_OPTIONS = ['Fantasy', 'Sci-Fi', 'Mystery', 'Romance', 'Thriller'];
+const GENRE_OPTIONS = ['Technology', 'Novel', 'Education', 'Business', 'History'];
 const NATIVE_OPTION_STYLE = { color: '#0f172a', backgroundColor: '#ffffff' };
 const FALLBACK_COVER_URL = 'https://picsum.photos/seed/new-book/300/450';
+const MAX_COVER_MB = Number(import.meta.env.VITE_MAX_COVER_MB) || 5;
+const MAX_COVER_BYTES = MAX_COVER_MB * 1024 * 1024;
+const COVER_FETCH_ERROR = 'COVER_FETCH_ERROR';
 
 const mapOpenLibrarySubjectToGenre = (subject = '') => {
   const normalized = subject.toLowerCase();
-  if (normalized.includes('science') || normalized.includes('sci-fi')) return 'Sci-Fi';
-  if (normalized.includes('fantasy')) return 'Fantasy';
-  if (normalized.includes('mystery') || normalized.includes('crime')) return 'Mystery';
-  if (normalized.includes('romance') || normalized.includes('love')) return 'Romance';
-  if (normalized.includes('thriller') || normalized.includes('suspense')) return 'Thriller';
+  if (normalized.includes('Technology') || normalized.includes('sci-fi')) return 'Sci-Fi';
+  if (normalized.includes('Novel')) return 'Novel';
+  if (normalized.includes('Education') || normalized.includes('crime')) return 'Education';
+  if (normalized.includes('Business') || normalized.includes('love')) return 'Business';
+  if (normalized.includes('History') || normalized.includes('suspense')) return 'History';
   return '';
 };
 
@@ -33,6 +36,46 @@ const isValidCoverUrl = (value) => {
   if (typeof value !== 'string' || !value.trim()) return false;
   const trimmed = value.trim();
   return trimmed.startsWith('data:image/') || /^https?:\/\//i.test(trimmed);
+};
+
+const inferImageExtension = (mimeType = '') => {
+  const normalized = String(mimeType || '').toLowerCase();
+  if (normalized.includes('png')) return 'png';
+  if (normalized.includes('webp')) return 'webp';
+  if (normalized.includes('gif')) return 'gif';
+  return 'jpg';
+};
+
+const fetchCoverFile = async (url) => {
+  if (!isValidCoverUrl(url)) {
+    throw new Error(COVER_FETCH_ERROR);
+  }
+  const response = await fetch(url, { mode: 'cors' });
+  if (!response.ok) {
+    throw new Error(COVER_FETCH_ERROR);
+  }
+  const blob = await response.blob();
+  if (!blob?.type?.startsWith('image/')) {
+    throw new Error(COVER_FETCH_ERROR);
+  }
+  if (blob.size > MAX_COVER_BYTES) {
+    throw new Error(COVER_FETCH_ERROR);
+  }
+  const extension = inferImageExtension(blob.type);
+  return new File([blob], `cover.${extension}`, { type: blob.type });
+};
+const getApiErrorMessage = (error, fallback) => {
+  const status = Number(error?.response?.status || 0);
+  const apiMessage =
+    error?.response?.data?.errors ||
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message;
+  const message = typeof apiMessage === 'string' ? apiMessage : '';
+  if (status === 401 || status === 403) {
+    return `${message || 'Unauthenticated.'} Please login again.`;
+  }
+  return message || fallback;
 };
 
 const UploadBook = () => {
@@ -166,6 +209,11 @@ const UploadBook = () => {
       e.target.value = '';
       return;
     }
+    if (file.size > MAX_COVER_BYTES) {
+      setCoverError(`Cover image is too large. Max ${MAX_COVER_MB} MB.`);
+      e.target.value = '';
+      return;
+    }
     setCoverError('');
     setCoverFile(file);
     const reader = new FileReader();
@@ -181,6 +229,7 @@ const UploadBook = () => {
   const handleManuscriptSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSubmitError('');
     setManuscriptFile(file);
     e.target.value = '';
   };
@@ -202,7 +251,6 @@ const UploadBook = () => {
     if (step === 2 && !manuscriptFile) {
       return 'Please upload a manuscript file before continuing.';
     }
-
     return '';
   };
 
@@ -232,22 +280,29 @@ const UploadBook = () => {
         payload.append('book_file', manuscriptFile);
       }
 
-      if (coverFile instanceof File) {
-        payload.append('cover_image', coverFile);
-      } else if (coverPreviewUrl) {
+      let resolvedCoverFile = coverFile instanceof File ? coverFile : null;
+      if (!resolvedCoverFile && coverPreviewUrl) {
+        resolvedCoverFile = await fetchCoverFile(coverPreviewUrl);
+      }
+
+      if (resolvedCoverFile) {
+        payload.append('cover_image', resolvedCoverFile);
+        payload.append('cover', resolvedCoverFile);
+        payload.append('image', resolvedCoverFile);
+      }
+
+      if (coverPreviewUrl) {
         payload.append('cover_image_url', coverPreviewUrl);
       }
 
       await uploadBookRequest(payload);
       navigate('/author/my-books');
     } catch (error) {
-      const apiMessage =
-        error?.response?.data?.errors ||
-        error?.response?.data?.message ||
-        'Unable to upload book. Please try again.';
-      setSubmitError(
-        typeof apiMessage === 'string' ? apiMessage : 'Unable to upload book. Please check your input.',
-      );
+      if (error?.message === COVER_FETCH_ERROR) {
+        setSubmitError('Unable to download the cover image. Please upload a cover image file so it can be stored in the database.');
+      } else {
+        setSubmitError(getApiErrorMessage(error, 'Unable to upload book. Please try again.'));
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -347,9 +402,7 @@ const UploadBook = () => {
                               }
                               if (book.coverUrl) {
                                 setCoverPreviewUrl(book.coverUrl);
-                                setCoverFile({
-                                  name: 'Open Library cover',
-                                });
+                                setCoverFile(null);
                                 setCoverError('');
                               }
                               setShowBookResults(false);
@@ -478,9 +531,9 @@ const UploadBook = () => {
                       </div>
                       <div className="text-center px-6">
                         <p className="text-sm font-bold">Upload Cover</p>
-                        <p className="text-[10px] text-slate-500 mt-1">
-                          {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. JPG, PNG (Max 5MB)'}
-                        </p>
+                <p className="text-[10px] text-slate-500 mt-1">
+                  {coverFile ? `Selected: ${coverFile.name}` : `Drag/drop or click. JPG, PNG (Max ${MAX_COVER_MB}MB)`}
+                </p>
                       </div>
                     </>
                   )}
@@ -522,7 +575,9 @@ const UploadBook = () => {
               </div>
               <div className="text-center px-6">
                 <p className="text-lg font-bold">Upload Manuscript</p>
-                <p className="text-sm text-slate-500 mt-1">Support for PDF, EPUB, DOCX (Max 50MB)</p>
+                <p className="text-sm text-slate-500 mt-1">
+                  Support for PDF, EPUB, DOCX
+                </p>
               </div>
             </div>
             <input

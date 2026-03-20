@@ -1,8 +1,75 @@
 import { apiClient, API_BASE_URL } from '../../lib/apiClient';
 
-const BOOKS_ENDPOINT = '/api/auth/books';
-const UPLOAD_BOOK_ENDPOINT = '/api/auth/book';
-const IMPORT_BOOKS_ENDPOINT = '/api/auth/books/import-local';
+const BOOKS_ENDPOINTS = ['/api/auth/books'];
+const UPLOAD_BOOK_ENDPOINTS = ['/api/auth/book'];
+const IMPORT_BOOKS_ENDPOINTS = ['/api/auth/books/import-local'];
+const TOKEN_KEY = 'bookhub_token';
+const UPLOAD_TIMEOUT_MS = Number(import.meta.env.VITE_UPLOAD_TIMEOUT_MS) || 120000;
+const UPLOAD_RETRY_LIMIT = 1;
+
+const getAuthHeaders = () => {
+  if (typeof window === 'undefined') return {};
+  const token =
+    window.localStorage.getItem(TOKEN_KEY) ||
+    window.sessionStorage.getItem(TOKEN_KEY);
+  return token ? { Authorization: `Bearer ${token}` } : {};
+};
+
+const withAuth = (config = {}) => ({
+  ...config,
+  headers: {
+    ...(config.headers || {}),
+    ...getAuthHeaders(),
+  },
+});
+
+const shouldTryFallback = (error) => {
+  const status = Number(error?.response?.status || 0);
+  return status === 401 || status === 403 || status === 404 || status === 405;
+};
+
+const requestWithFallback = async (endpoints, requestFn) => {
+  let lastError = null;
+  for (const endpoint of endpoints) {
+    try {
+      return await requestFn(endpoint);
+    } catch (error) {
+      lastError = error;
+      if (!shouldTryFallback(error)) {
+        throw error;
+      }
+    }
+  }
+  throw lastError || new Error('Unable to reach the book service.');
+};
+
+const isTimeoutError = (error) =>
+  error?.code === 'ECONNABORTED' || String(error?.message || '').toLowerCase().includes('timeout');
+
+const postWithRetry = async (endpoint, formData) => {
+  let attempt = 0;
+  // Retry on timeout only, once by default.
+  while (attempt <= UPLOAD_RETRY_LIMIT) {
+    try {
+      return await apiClient.post(
+        endpoint,
+        formData,
+        withAuth({
+          timeout: UPLOAD_TIMEOUT_MS,
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+        }),
+      );
+    } catch (error) {
+      if (!isTimeoutError(error) || attempt >= UPLOAD_RETRY_LIMIT) {
+        throw error;
+      }
+      attempt += 1;
+    }
+  }
+  throw new Error('Upload failed after retry.');
+};
 
 const toNumberId = (value, fallback = Date.now()) => {
   const parsed = Number(value);
@@ -70,7 +137,19 @@ const normalizeStatus = (value) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
-export const mapApiBookToUiBook = (book) => ({
+const pickCoverValue = (book) =>
+  book?.cover_image_path ??
+  book?.cover_image_url ??
+  book?.cover_image ??
+  book?.cover ??
+  book?.cover_path ??
+  book?.coverUrl ??
+  book?.image ??
+  '';
+
+export const mapApiBookToUiBook = (book) => {
+  const coverValue = pickCoverValue(book);
+  return {
   bookId: toNumberId(book?.id),
   id: toNumberId(book?.id),
   title: book?.title || 'Untitled',
@@ -80,9 +159,8 @@ export const mapApiBookToUiBook = (book) => ({
   reads: '0',
   sales: '$0',
   img:
-    buildStorageUrl(book?.cover_image_path) ||
-    buildStorageUrl(book?.cover_image_url) ||
-    normalizeAssetUrl(book?.cover_image_url) ||
+    buildStorageUrl(coverValue) ||
+    normalizeAssetUrl(coverValue) ||
     'https://picsum.photos/seed/new-book/300/450',
   description: book?.description || '',
   genre: book?.category || '',
@@ -94,11 +172,13 @@ export const mapApiBookToUiBook = (book) => ({
   manuscriptType: book?.manuscript_type || inferFileType(getFileName(book?.book_file_url || book?.book_file_path || '')),
   manuscriptSizeBytes: book?.manuscript_size_bytes || 0,
   source: 'database',
-});
+  };
+};
 
 const buildBooksQuery = (filters = {}) => {
   const params = new URLSearchParams();
-  const status = String(filters.status || 'approved').trim();
+  // Only apply status filter if explicitly provided in filters
+  const status = String(filters.status ?? '').trim();
   if (status) {
     params.set('status', status);
   }
@@ -106,11 +186,15 @@ const buildBooksQuery = (filters = {}) => {
   if (search) {
     params.set('search', search);
   }
-  return params.toString() ? `${BOOKS_ENDPOINT}?${params.toString()}` : BOOKS_ENDPOINT;
+  const query = params.toString();
+  return (endpoint) => (query ? `${endpoint}?${query}` : endpoint);
 };
 
 export const getBooksRequest = async (filters = {}) => {
-  const response = await apiClient.get(buildBooksQuery(filters));
+  const buildQuery = buildBooksQuery(filters);
+  const response = await requestWithFallback(BOOKS_ENDPOINTS, (endpoint) =>
+    apiClient.get(buildQuery(endpoint), withAuth()),
+  );
   const payload = response?.data;
   const rows =
     (Array.isArray(payload?.data) && payload.data) ||
@@ -121,28 +205,32 @@ export const getBooksRequest = async (filters = {}) => {
 };
 
 export const uploadBookRequest = (formData) =>
-  apiClient.post(UPLOAD_BOOK_ENDPOINT, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  requestWithFallback(UPLOAD_BOOK_ENDPOINTS, (endpoint) =>
+    postWithRetry(endpoint, formData),
+  );
 
 export const importLocalBooksRequest = async (books = []) => {
-  const response = await apiClient.post(IMPORT_BOOKS_ENDPOINT, { books });
+  const response = await requestWithFallback(IMPORT_BOOKS_ENDPOINTS, (endpoint) =>
+    apiClient.post(endpoint, { books }, withAuth()),
+  );
   return response?.data?.data || {};
 };
 
 export const updateBookRequest = (id, formData) =>
-  apiClient.post(`${BOOKS_ENDPOINT}/${id}`, (() => {
-    const payload = formData instanceof FormData ? formData : new FormData();
-    if (!payload.has('_method')) {
-      payload.append('_method', 'PATCH');
-    }
-    return payload;
-  })(), {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  requestWithFallback(BOOKS_ENDPOINTS, (endpoint) =>
+    postWithRetry(
+      `${endpoint}/${id}`,
+      (() => {
+        const payload = formData instanceof FormData ? formData : new FormData();
+        if (!payload.has('_method')) {
+          payload.append('_method', 'PATCH');
+        }
+        return payload;
+      })(),
+    ),
+  );
 
-export const deleteBookRequest = (id) => apiClient.delete(`${BOOKS_ENDPOINT}/${id}`);
+export const deleteBookRequest = (id) =>
+  requestWithFallback(BOOKS_ENDPOINTS, (endpoint) =>
+    apiClient.delete(`${endpoint}/${id}`, withAuth()),
+  );

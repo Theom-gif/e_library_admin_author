@@ -26,6 +26,19 @@ const statusStyles = {
   Draft: 'bg-slate-500/90 text-white',
 };
 
+const getApiErrorMessage = (error, fallback) => {
+  const status = Number(error?.response?.status || 0);
+  const message =
+    error?.response?.data?.message ||
+    error?.response?.data?.error ||
+    error?.message ||
+    '';
+  if (status === 401 || status === 403) {
+    return `${message || 'Unauthenticated.'} Please login again.`;
+  }
+  return message || fallback;
+};
+
 const getSafeCoverUrl = (value) => {
   const text = String(value || '').trim();
   if (text.startsWith('data:image/') || /^https?:\/\//i.test(text)) {
@@ -78,8 +91,8 @@ const MyBooks = () => {
       }
 
       setBooks(dbBooks);
-    } catch {
-      setBooksError('Unable to load books from database.');
+    } catch (error) {
+      setBooksError(getApiErrorMessage(error, 'Unable to load books from database.'));
       setBooks([]);
     } finally {
       setBooksLoading(false);

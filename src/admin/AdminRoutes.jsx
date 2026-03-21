@@ -116,7 +116,12 @@ export default function AdminRoutes() {
         <Route path="readers" element={<TopReaders />} />
         <Route path="monitor" element={<SystemMonitor />} />
         <Route path="settings" element={<Settings />} />
+        {/* Catch-all for unmatched admin routes */}
+        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
       </Route>
+
+      {/* Catch-all route - redirect to home */}
+      <Route path="*" element={<Navigate to={isAuthenticated ? homePath : "/login"} replace />} />
     </Routes>
   );
 }

@@ -10,6 +10,7 @@ import {
   Server,
   TrendingUp,
   Users,
+  Crown,
 } from "lucide-react";
 import {
   Area,
@@ -23,6 +24,7 @@ import {
 import HealthItem from "../components/HealthItem";
 import StatCard from "../components/StatCard";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { apiClient } from "../../lib/apiClient";
 import {
   fetchDashboard,
   fetchDashboardActivity,
@@ -44,6 +46,7 @@ const toActivity = (rows = []) =>
 const Dashboard = () => {
   const { t } = useLanguage();
   const [range, setRange] = useState("7d");
+  const [topReadersRange, setTopReadersRange] = useState("week");
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalBooks: 0,
@@ -57,6 +60,7 @@ const Dashboard = () => {
     authors: 0,
   });
   const [activity, setActivity] = useState([]);
+  const [topReaders, setTopReaders] = useState([]);
   const [health, setHealth] = useState({
     uptimePercent: 0,
     apiServer: { status: "online", latencyMs: 0 },
@@ -168,29 +172,39 @@ const Dashboard = () => {
             </select>
           </div>
 
-          <div className="h-[300px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={activity}>
-                <defs>
-                  <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 12 }} dy={10} />
-                <YAxis axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 12 }} />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "#1a1d26",
-                    border: "1px solid rgba(255,255,255,0.1)",
-                    borderRadius: "12px",
-                  }}
-                  itemStyle={{ color: "#fff" }}
-                />
-                <Area type="monotone" dataKey="users" stroke="#a855f7" strokeWidth={3} fillOpacity={1} fill="url(#colorUsers)" />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div className="h-[300px] w-full min-w-0 overflow-hidden">
+            {activity && activity.length > 0 ? (
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={activity}>
+                  <defs>
+                    <linearGradient id="colorUsers" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#a855f7" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#a855f7" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 12 }} dy={10} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 12 }} />
+                  <Tooltip
+                    contentStyle={{
+                      backgroundColor: "#1a1d26",
+                      border: "1px solid rgba(255,255,255,0.1)",
+                      borderRadius: "12px",
+                    }}
+                    itemStyle={{ color: "#fff" }}
+                  />
+                  <Area type="monotone" dataKey="users" stroke="#a855f7" strokeWidth={3} fillOpacity={1} fill="url(#colorUsers)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-full flex items-center justify-center text-slate-400">
+                {isLoading ? (
+                  <span>{t("Loading activity data...")}</span>
+                ) : (
+                  <span>{t("No activity data available")}</span>
+                )}
+              </div>
+            )}
           </div>
         </div>
 

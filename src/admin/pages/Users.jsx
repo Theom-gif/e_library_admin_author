@@ -1,34 +1,11 @@
 
 
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Eye, Search, UserRound, X } from "lucide-react";
 import { cn } from "../../lib/utils";
-import { API_BASE_URL } from "../../lib/apiClient";
+import { apiClient, API_BASE_URL } from "../../lib/apiClient";
 import { useLanguage } from "../../i18n/LanguageContext";
-
-const TOKEN_KEY = "bookhub_token";
-
-/* ---------------- API BASE ---------------- */
-const trimTrailingSlash = (v) => String(v || "").replace(/\/+$/, "");
-
-const getApiBaseCandidates = () => {
-  const list = [""];
-
-  if (typeof window !== "undefined") {
-    const origin = trimTrailingSlash(window.location.origin);
-    if (origin) list.push(origin);
-
-    const host = window.location.hostname;
-    const protocol = window.location.protocol === "https:" ? "https" : "http";
-    list.push(`${protocol}://${host}:8000`);
-  }
-
-  list.push(trimTrailingSlash(API_BASE_URL));
-  list.push("http://127.0.0.1:8000");
-
-  return [...new Set(list.filter(Boolean))];
-};
 
 /* ---------------- NORMALIZE ---------------- */
 const normalizeUser = (u) => ({
@@ -61,37 +38,28 @@ const Users = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  const [activeApiBase, setActiveApiBase] = useState("");
-  const apiBases = useMemo(() => getApiBaseCandidates(), []);
-
-  /* ---------------- FETCH ---------------- */
+  /* ---------------- FETCH USING CENTRALIZED API CLIENT ---------------- */
   const request = useCallback(async (path, { method = "GET", body } = {}) => {
-    const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) throw new Error("No token");
+    try {
+      const config = { method };
+      let response;
 
-    for (const base of apiBases) {
-      try {
-        const res = await fetch(`${base}${path}`, {
-          method,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-            ...(body ? { "Content-Type": "application/json" } : {}),
-          },
-          ...(body ? { body: JSON.stringify(body) } : {}),
-        });
-
-        if (!res.ok) continue;
-
-        setActiveApiBase(base);
-        return res.json();
-      } catch {
-        continue;
+      if (method === "GET") {
+        response = await apiClient.get(path, config);
+      } else if (method === "DELETE") {
+        response = await apiClient.delete(path, config);
+      } else if (method === "POST") {
+        response = await apiClient.post(path, body, config);
+      } else {
+        response = await apiClient.request({ ...config, url: path, data: body });
       }
-    }
 
-    throw new Error("Cannot connect backend");
-  }, [apiBases]);
+      return response?.data || {};
+    } catch (err) {
+      const message = err?.response?.data?.message || err?.message || "Request failed";
+      throw new Error(message);
+    }
+  }, []);
 
   const fetchUsers = useCallback(async () => {
     setLoading(true);

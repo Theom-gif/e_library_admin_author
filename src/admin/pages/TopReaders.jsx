@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { USERS } from "../data/mockData";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { getTopReaders } from "../../lib/userActivityService";
+import { apiClient } from "../../lib/apiClient";
 
 const fallbackLeaders = [
   { user: USERS[4], booksRead: 52, trend: 8 },
@@ -81,35 +81,79 @@ const TopReaders = () => {
       try {
         setIsLoading(true);
         setError("");
-        const result = await getTopReaders(
-          { range, limit: 50 },
-          { signal: controller.signal }
-        );
-        const rows = Array.isArray(result?.data) ? result.data : [];
+
+        // Backend Endpoint: GET /api/admin/leaderboard/readers
+        // Backend Query: Groups BookRead records by user_id, counts total books read
+        // Filters by date range (all|month|week) and limits results
+        // Response: { data: [{ user: {...}, booksRead: number, trend: number }, ...] }
+        
+        const response = await apiClient.get("/api/admin/leaderboard/readers", {
+          params: {
+            range: range,      // all | month | week
+            limit: 10,         // number of top readers to return
+          },
+          signal: controller.signal,
+        });
+
+        // Extract data array - handle both nested and flat response structures
+        const rows = Array.isArray(response?.data?.data) 
+          ? response.data.data 
+          : Array.isArray(response?.data) 
+          ? response.data 
+          : [];
+
         if (!isMounted) return;
-        if (!rows.length) {
+
+        // If no data found, use fallback mock data
+        if (!rows || rows.length === 0) {
+          console.warn("[TopReaders] No leaderboard data from backend, using fallback data");
           setLeaders(fallbackLeaders);
           return;
         }
-        const normalized = rows.map((row, idx) => ({
-          ...row,
-          rank: idx + 1,
-        }));
+
+        // Map backend response to component format
+        // Normalize field names (snake_case → camelCase)
+        const normalized = rows.map((row, idx) => {
+          const user = row.user || {};
+          return {
+            user: {
+              id: user.id ?? "",
+              first_name: user.first_name ?? user.firstName ?? "Unknown",
+              last_name: user.last_name ?? user.lastName ?? "",
+              email: user.email ?? "",
+              avatar_url: user.avatar_url || user.avatarUrl || null,
+              created_at: user.created_at ?? user.createdAt ?? "",
+            },
+            booksRead: Number(row.booksRead ?? row.books_read ?? 0),
+            trend: Number(row.trend ?? 0),
+            rank: idx + 1,
+          };
+        });
+
         setLeaders(normalized);
       } catch (err) {
         if (!isMounted || controller.signal.aborted) return;
+
         const status = err?.response?.status;
+        const message = err?.response?.data?.message || err?.message;
+
+        console.error("[TopReaders] API Error:", { status, message });
+
         if (status === 401) {
           setError(t("Session expired. Redirecting to login..."));
           handleUnauthorized();
+        } else if (status === 404) {
+          console.warn("[TopReaders] Endpoint not found, using fallback data");
+          setLeaders(fallbackLeaders);
         } else {
-          setError(err?.response?.data?.message || err?.message || t("Failed to load leaderboard."));
+          setError(message || t("Failed to load leaderboard."));
           setLeaders(fallbackLeaders);
         }
       } finally {
         if (isMounted) setIsLoading(false);
       }
     };
+
     load();
     return () => {
       isMounted = false;

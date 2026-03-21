@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { USERS } from "../data/mockData";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { apiClient } from "../../lib/apiClient";
+import { getTopReaders } from "../../lib/userActivityService";
 
 const fallbackLeaders = [
   { user: USERS[4], booksRead: 52, trend: 8 },
@@ -46,6 +46,7 @@ const PodiumBadge = ({ rank }) => {
 const TopReaders = () => {
   const { t } = useLanguage();
   const navigate = useNavigate();
+  const [range, setRange] = useState("all");
   const [leaders, setLeaders] = useState(fallbackLeaders);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -60,17 +61,31 @@ const TopReaders = () => {
     navigate("/login", { replace: true });
   };
 
+  const getRangeLabel = (rangeValue) => {
+    switch (rangeValue) {
+      case "week":
+        return t("This Week");
+      case "month":
+        return t("This Month");
+      case "all":
+      default:
+        return t("All Time");
+    }
+  };
+
   useEffect(() => {
     let isMounted = true;
+    const controller = new AbortController();
+
     const load = async () => {
       try {
         setIsLoading(true);
         setError("");
-        const { data } = await apiClient.get(
-          "/api/admin/leaderboard/readers",
-          { params: { range: "all", limit: 50 } }
+        const result = await getTopReaders(
+          { range, limit: 50 },
+          { signal: controller.signal }
         );
-        const rows = Array.isArray(data?.data) ? data.data : [];
+        const rows = Array.isArray(result?.data) ? result.data : [];
         if (!isMounted) return;
         if (!rows.length) {
           setLeaders(fallbackLeaders);
@@ -82,7 +97,7 @@ const TopReaders = () => {
         }));
         setLeaders(normalized);
       } catch (err) {
-        if (!isMounted) return;
+        if (!isMounted || controller.signal.aborted) return;
         const status = err?.response?.status;
         if (status === 401) {
           setError(t("Session expired. Redirecting to login..."));
@@ -98,8 +113,9 @@ const TopReaders = () => {
     load();
     return () => {
       isMounted = false;
+      controller.abort();
     };
-  }, [t]);
+  }, [range, t]);
 
   const podium = useMemo(() => {
     if (!leaders.length) return [];
@@ -130,6 +146,15 @@ const TopReaders = () => {
           </div>
         </div>
         <div className="flex items-center gap-3 text-sm">
+          <select
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none text-slate-100 cursor-pointer hover:bg-white/10 transition-colors"
+          >
+            <option value="all">{t("All Time")}</option>
+            <option value="month">{t("This Month")}</option>
+            <option value="week">{t("This Week")}</option>
+          </select>
           <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 text-emerald-200 px-3 py-1 border border-emerald-400/20">
             <TrendingUp size={16} />
             {t("Engagement +12%")}
@@ -227,14 +252,9 @@ const TopReaders = () => {
               {t("Complete Leaderboard")}
             </p>
             <h3 className="text-lg font-bold text-white">
-              {t("Reader Performance")}
+              {t("Reader Performance")} - {getRangeLabel(range)}
             </h3>
           </div>
-          <select className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none text-slate-100">
-            <option>{t("All Time")}</option>
-            <option>{t("This Month")}</option>
-            <option>{t("This Week")}</option>
-          </select>
         </div>
 
         <table className="w-full text-left">

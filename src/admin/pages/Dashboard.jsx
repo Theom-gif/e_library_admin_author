@@ -125,7 +125,17 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-8">
-    
+      {/* Error/Loading Messages */}
+      {(isLoading || error) && (
+        <div className="p-4 rounded-lg border border-white/10 bg-white/5">
+          {isLoading && (
+            <span className="text-slate-400 text-sm">{t("Loading dashboard...")}</span>
+          )}
+          {error && (
+            <span className="text-amber-300 text-sm">{error}</span>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {statCards.map((card) => (

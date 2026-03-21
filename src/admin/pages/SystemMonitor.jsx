@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Bell,
   BookOpen,
@@ -22,8 +22,17 @@ import {
   Tooltip,
   XAxis,
 } from "recharts";
+import { useLanguage } from "../../i18n/LanguageContext";
+import {
+  fetchMonitorDashboard,
+  fetchMonitorStats,
+  fetchMonitorActivity,
+  fetchMonitorHealth,
+  fetchMonitorTopBooks,
+} from "../services/adminService";
 
-const activityData = [
+// Fallback mock data for when API is unavailable
+const defaultActivityData = [
   { time: '00:00', value: 30 },
   { time: '04:00', value: 45 },
   { time: '08:00', value: 35 },
@@ -33,14 +42,14 @@ const activityData = [
   { time: '23:59', value: 55 },
 ];
 
-const healthData = [
+const defaultHealthData = [
   { name: 'CPU', cpu: 45, ram: 60 },
   { name: 'RAM', cpu: 70, ram: 40 },
   { name: 'Disk', cpu: 30, ram: 80 },
   { name: 'Net', cpu: 85, ram: 20 },
 ];
 
-const topBooks = [
+const defaultTopBooks = [
   {
     rank: "#1",
     title: "The Shadows of Time",
@@ -83,14 +92,132 @@ const topBooks = [
   },
 ];
 
-const stats = [
+const defaultStats = [
   { label: "Active Users", value: "1,284", change: "+12%", trend: "up", icon: Users },
   { label: "Authors Online", value: "42", change: "+5%", trend: "up", icon: PenLine },
   { label: "Books Uploaded Today", value: "156", change: "+8%", trend: "up", icon: UploadCloud },
   { label: "Failed Logins", value: "12", change: "-4%", trend: "down", icon: ShieldAlert, isAlert: true },
 ];
 
+const normalizeStatApiResponse = (apiStats = []) => {
+  // Convert API response to expected format
+  return apiStats.map((stat) => ({
+    label: stat.label || "",
+    value: stat.value || "—",
+    change: stat.change || "0%",
+    trend: stat.trend || "neutral",
+    icon: mapIconString(stat.icon),
+    isAlert: stat.isAlert || false,
+  }));
+};
+
+const normalizeActivityData = (apiActivity = []) => {
+  return (apiActivity || []).map((item) => ({
+    time: item.time || item.label || "",
+    value: Number(item.value || 0),
+  }));
+};
+
+const normalizeHealthData = (apiHealth = []) => {
+  return (apiHealth || []).map((item) => ({
+    name: item.name || "",
+    cpu: Number(item.cpu || 0),
+    ram: Number(item.ram || 0),
+  }));
+};
+
+const normalizeTopBooksData = (apiBooks = []) => {
+  return (apiBooks || []).map((book) => ({
+    rank: book.rank || "",
+    title: book.title || "",
+    author: book.author || "",
+    status: book.status || "Steady",
+    readers: Number(book.readers || 0),
+    coverGradient: book.coverGradient || "from-slate-400 to-slate-600",
+  }));
+};
+
+const mapIconString = (iconKey = "users") => {
+  const iconMap = {
+    users: Users,
+    "pen-line": PenLine,
+    "upload-cloud": UploadCloud,
+    "shield-alert": ShieldAlert,
+    activity: Library,
+  };
+  return iconMap[iconKey] || Users;
+};
+
 const SystemMonitor = () => {
+  const { t } = useLanguage();
+  const [range, setRange] = useState("24h");
+  const [stats, setStats] = useState(defaultStats);
+  const [activityData, setActivityData] = useState(defaultActivityData);
+  const [healthData, setHealthData] = useState(defaultHealthData);
+  const [topBooks, setTopBooks] = useState(defaultTopBooks);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+    const controller = new AbortController();
+
+    const loadData = async () => {
+      setIsLoading(true);
+      setError("");
+
+      try {
+        // Try unified endpoint first
+        const unified = await fetchMonitorDashboard({ signal: controller.signal });
+        if (unified?.stats) setStats(normalizeStatApiResponse(unified.stats));
+        if (unified?.activity) setActivityData(normalizeActivityData(unified.activity));
+        if (unified?.health) setHealthData(normalizeHealthData(unified.health));
+        if (unified?.topBooks) setTopBooks(normalizeTopBooksData(unified.topBooks));
+
+        // Fill gaps with split endpoints
+        if (!unified?.stats) {
+          const statsRes = await fetchMonitorStats({ signal: controller.signal });
+          if (statsRes?.stats)setStats(normalizeStatApiResponse(statsRes.stats));
+        }
+
+        if (!unified?.activity) {
+          const activityRes = await fetchMonitorActivity(range, { signal: controller.signal });
+          if (activityRes?.activity)
+            setActivityData(normalizeActivityData(activityRes.activity));
+        }
+
+        if (!unified?.health) {
+          const healthRes = await fetchMonitorHealth({ signal: controller.signal });
+          if (healthRes?.health)
+            setHealthData(normalizeHealthData(healthRes.health));
+        }
+
+        if (!unified?.topBooks) {
+          const booksRes = await fetchMonitorTopBooks(5, { signal: controller.signal });
+          if (booksRes?.topBooks) setTopBooks(normalizeTopBooksData(booksRes.topBooks));
+        }
+      } catch (err) {
+        if (controller.signal.aborted) return;
+        console.error("Failed to load monitor data:", err);
+        setError(
+          err?.response?.data?.message ||
+            err?.message ||
+            t("Failed to load system monitor data. Using fallback data.")
+        );
+        // Keep fallback data visible
+      } finally {
+        if (mounted) setIsLoading(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      mounted = false;
+      controller.abort();
+    };
+  }, [range, t]);
+
   return (
     <div className="flex h-screen flex-col bg-background-dark text-slate-100 font-sans selection:bg-primary/30">
       {/* Top Navigation Bar */}
@@ -139,6 +266,17 @@ const SystemMonitor = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
+            {/* Status Messages */}
+            {(isLoading || error) && (
+              <div className="mb-6 p-4 rounded-lg border border-white/10 bg-white/5">
+                {isLoading && (
+                  <span className="text-slate-400 text-sm">{t("Loading monitor data...")}</span>
+                )}
+                {error && (
+                  <span className="text-amber-300 text-sm">{error}</span>
+                )}
+              </div>
+            )}
             {/* Summary Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {stats.map((stat, idx) => {
@@ -174,10 +312,14 @@ const SystemMonitor = () => {
               {/* User Activity Chart */}
               <div className="bg-white/5 p-6 rounded-xl border border-white/5 shadow-sm">
                 <div className="flex items-center justify-between mb-6">
-                  <h4 className="font-bold">User Activity (24h)</h4>
-                  <select className="text-xs bg-white/5 border border-white/10 rounded-lg focus:ring-0 outline-none p-1 px-2 text-slate-400">
-                    <option>Last 24 Hours</option>
-                    <option>Last 7 Days</option>
+                  <h4 className="font-bold">User Activity ({range === "24h" ? "24h" : "7 Days"})</h4>
+                  <select
+                    value={range}
+                    onChange={(e) => setRange(e.target.value)}
+                    className="text-xs bg-white/5 border border-white/10 rounded-lg focus:ring-0 outline-none p-1 px-2 text-slate-400 cursor-pointer"
+                  >
+                    <option value="24h">Last 24 Hours</option>
+                    <option value="7d">Last 7 Days</option>
                   </select>
                 </div>
                 <div className="h-64 w-full">

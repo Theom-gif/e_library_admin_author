@@ -192,3 +192,22 @@ export const fetchDashboardActivity = (range = "7d", config = {}) =>
 
 export const fetchDashboardHealth = (config = {}) =>
   apiClient.get("/api/admin/dashboard/health", config).then((res) => res?.data || {});
+
+export const fetchMonitorDashboard = (config = {}) =>
+  apiClient.get("/api/admin/monitor/dashboard", config).then((res) => res?.data || {});
+
+export const fetchMonitorStats = (config = {}) =>
+  apiClient.get("/api/admin/monitor/summary", config).then((res) => res?.data || {});
+
+export const fetchMonitorActivity = (range = "24h", config = {}) =>
+  apiClient
+    .get(`/api/admin/monitor/activity?range=${encodeURIComponent(range)}`, config)
+    .then((res) => res?.data || {});
+
+export const fetchMonitorHealth = (config = {}) =>
+  apiClient.get("/api/admin/monitor/health", config).then((res) => res?.data || {});
+
+export const fetchMonitorTopBooks = (limit = 5, config = {}) =>
+  apiClient
+    .get(`/api/admin/monitor/top-books?limit=${encodeURIComponent(limit)}`, config)
+    .then((res) => res?.data || {});

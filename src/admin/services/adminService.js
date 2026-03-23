@@ -36,6 +36,8 @@ const buildBooksPath = ({ status, search, page, perPage } = {}) => {
 };
 
 const isAbsoluteUrl = (value = "") => /^https?:\/\//i.test(String(value));
+const isBlobLikeUrl = (value = "") => /^data:|^blob:/i.test(String(value));
+const isRootRelativeUrl = (value = "") => /^\//.test(String(value || "").trim());
 const trimSlash = (value = "") => String(value || "").replace(/\/+$/, "");
 
 // Asset URLs should point to the web root, not the /api prefix used for JSON routes.
@@ -57,6 +59,8 @@ const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
 const buildStorageUrl = (path = "") => {
   if (!path) return "";
   if (isAbsoluteUrl(path)) return path;
+  if (isBlobLikeUrl(path)) return path;
+  if (isRootRelativeUrl(path)) return `${ASSET_BASE_URL}${path}`;
 
   let clean = String(path).replace(/^\/+/, "");
 
@@ -71,6 +75,17 @@ const buildStorageUrl = (path = "") => {
   return `${ASSET_BASE_URL}/storage/${clean}`;
 };
 
+const resolveAssetUrl = (...candidates) => {
+  for (const candidate of candidates) {
+    const resolved = buildStorageUrl(candidate);
+    if (resolved) {
+      return resolved;
+    }
+  }
+
+  return "";
+};
+
 
 const DEFAULT_CATEGORY_ICON = "Tech";
 
@@ -82,16 +97,20 @@ const normalizeCategory = (category = {}) => ({
 });
 
 export const normalizeBook = (book = {}) => {
-  const coverPath =
-    book.cover_image_url ??
-    book.cover_image_path ??
-    book.cover ??
-    "";
-  const filePath =
-    book.book_file_url ??
-    book.book_file_path ??
-    book.file ??
-    "";
+  const coverPath = resolveAssetUrl(
+    book.cover_view_url,
+    book.cover_api_url,
+    book.cover_image_url,
+    book.cover_image_path,
+    book.cover,
+    book.image,
+    book.thumbnail,
+  );
+  const filePath = resolveAssetUrl(
+    book.book_file_url,
+    book.book_file_path,
+    book.file,
+  );
 
   return {
     id: book.id ?? book.bookId ?? book._id ?? "",
@@ -100,8 +119,8 @@ export const normalizeBook = (book = {}) => {
     category: book.category ?? book.genre ?? book.genre_name ?? "",
     status: book.status ?? "Pending",
     downloads: Number(book.downloads ?? 0),
-    coverUrl: buildStorageUrl(coverPath),
-    fileUrl: buildStorageUrl(filePath),
+    coverUrl: coverPath,
+    fileUrl: filePath,
     description: book.description ?? "",
     date: book.date ?? book.created_at ?? "",
     first_publish_year: book.first_publish_year,

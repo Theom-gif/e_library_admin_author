@@ -2,6 +2,7 @@ import { Bell, LogOut } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/AuthContext";
 import { useLanguage } from "../../i18n/LanguageContext";
+import ThemeToggle from "../../theme/ThemeToggle";
 
 const TITLES = {
   "/admin/dashboard": "Admin Dashboard",
@@ -36,6 +37,7 @@ export default function Header() {
         </p>
       </div>
       <div className="flex items-center gap-3">
+        <ThemeToggle />
         <button className="rounded-xl bg-white/5 p-2.5 text-slate-300 hover:bg-white/10">
           <Bell size={18} />
         </button>

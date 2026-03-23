@@ -2,11 +2,9 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App.jsx";
 import "./index.css";
+import { applyThemeToDocument, resolveInitialTheme } from "./theme/themeUtils";
 
-const savedTheme = window.localStorage.getItem("admin-theme");
-if (savedTheme === "light") {
-  document.documentElement.setAttribute("data-theme", "light");
-}
+applyThemeToDocument(resolveInitialTheme());
 
 const savedLanguage =
   window.localStorage.getItem("bookhub-language") ||

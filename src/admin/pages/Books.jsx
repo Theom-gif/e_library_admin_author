@@ -5,6 +5,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import { fetchAdminBooks } from "../services/adminService";
 
 const STATUS_FILTERS = ["All", "Approved", "Pending", "Rejected"];
+const FALLBACK_BOOK_COVER = "https://via.placeholder.com/64x96?text=Book";
 
 /* Normalize backend status */
 const normalizeStatus = (value) => {
@@ -107,7 +108,7 @@ const Books = () => {
       cover:
         book.cover ||
         book.coverUrl ||
-        "https://via.placeholder.com/64x96?text=Book",
+        FALLBACK_BOOK_COVER,
       status: normalizeStatus(book.status),
       category: toCategory(book.category),
       downloads: Number(book.downloads ?? 0),
@@ -245,6 +246,11 @@ const Books = () => {
                       src={book.cover}
                       alt={book.title}
                       className="w-10 h-14 rounded-md object-cover"
+                      onError={(event) => {
+                        if (event.currentTarget.src !== FALLBACK_BOOK_COVER) {
+                          event.currentTarget.src = FALLBACK_BOOK_COVER;
+                        }
+                      }}
                     />
                     <div>
                       <p className="font-bold">{book.title}</p>

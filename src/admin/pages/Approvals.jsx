@@ -19,6 +19,7 @@ const normalizeStatus = (value) => {
 };
 
 const statusFilters = ["Pending"];
+const FALLBACK_BOOK_COVER = "https://via.placeholder.com/64x96?text=Book";
 
 const formatDateLabel = (value) => {
   if (!value) return "";
@@ -88,7 +89,7 @@ const toUiBook = (book = {}) => {
     book.file ||
     "";
 
-  const cover = buildStorageUrl(coverPath) || "https://via.placeholder.com/64x96?text=Book";
+  const cover = buildStorageUrl(coverPath) || FALLBACK_BOOK_COVER;
   const fileUrl = buildStorageUrl(filePath);
 
   return {
@@ -416,6 +417,11 @@ const Approvals = () => {
                           src={book.cover}
                           alt={book.title}
                           className="h-12 w-9 rounded-md object-cover shadow-sm bg-white/5"
+                          onError={(event) => {
+                            if (event.currentTarget.src !== FALLBACK_BOOK_COVER) {
+                              event.currentTarget.src = FALLBACK_BOOK_COVER;
+                            }
+                          }}
                         />
                         <div>
                           <p className="font-semibold leading-tight">{book.title}</p>

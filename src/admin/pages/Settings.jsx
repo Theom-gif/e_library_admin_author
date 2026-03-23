@@ -63,7 +63,7 @@ const Settings = () => {
     setSavingPrefs(true);
     setMsg({ type: "", text: "" });
     try {
-      await apiClient.post("/api/admin/settings/notifications", {
+      await apiClient.post("/admin/settings/notifications", {
         notifications: notificationPrefs.reduce(
           (acc, item) => ({ ...acc, [item.key]: item.active }),
           {}
@@ -89,7 +89,7 @@ const Settings = () => {
     setSavingPassword(true);
 
     try {
-      const { data } = await apiClient.post("/api/admin/settings/password", {
+      const { data } = await apiClient.post("/admin/settings/password", {
         currentPassword,
         newPassword,
         confirmPassword,

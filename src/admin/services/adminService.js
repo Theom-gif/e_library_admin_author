@@ -24,7 +24,7 @@ const buildBooksPath = ({ status, search, page, perPage } = {}) => {
 
   if (isPendingRoute) {
     const query = params.toString();
-    return `/api/admin/books/pending${query ? `?${query}` : ""}`;
+    return `/admin/books/pending${query ? `?${query}` : ""}`;
   }
 
   if (cleanStatus && lowerStatus !== "all") {
@@ -32,7 +32,7 @@ const buildBooksPath = ({ status, search, page, perPage } = {}) => {
   }
 
   const query = params.toString();
-  return `/api/admin/books${query ? `?${query}` : ""}`;
+  return `/admin/books${query ? `?${query}` : ""}`;
 };
 
 const isAbsoluteUrl = (value = "") => /^https?:\/\//i.test(String(value));
@@ -147,13 +147,13 @@ export const fetchAdminBooks = async (filters = {}, config = {}) => {
 };
 
 export const approveBook = (id, config = {}) =>
-  apiClient.post(`/api/admin/books/${id}/approve`, null, config);
+  apiClient.post(`/admin/books/${id}/approve`, null, config);
 
 export const rejectBook = (id, config = {}) =>
-  apiClient.post(`/api/admin/books/${id}/reject`, null, config);
+  apiClient.post(`/admin/books/${id}/reject`, null, config);
 
 export const fetchAdminCategories = async (filters = {}, config = {}) => {
-  const response = await apiClient.get("/api/admin/categories", {
+  const response = await apiClient.get("/admin/categories", {
     ...config,
     params: { ...(config?.params || {}), ...(filters || {}) },
   });
@@ -169,7 +169,7 @@ export const fetchAdminCategories = async (filters = {}, config = {}) => {
 };
 
 export const createAdminCategory = async (payload = {}, config = {}) => {
-  const response = await apiClient.post("/api/admin/categories", payload, config);
+  const response = await apiClient.post("/admin/categories", payload, config);
   const body = response?.data;
   const created =
     (body && typeof body === "object" && !Array.isArray(body) && body.data && !Array.isArray(body.data)
@@ -180,34 +180,34 @@ export const createAdminCategory = async (payload = {}, config = {}) => {
 };
 
 export const fetchDashboard = (config = {}) =>
-  apiClient.get("/api/admin/dashboard", config).then((res) => res?.data || {});
+  apiClient.get("/admin/dashboard", config).then((res) => res?.data || {});
 
 export const fetchDashboardStats = (config = {}) =>
-  apiClient.get("/api/admin/dashboard/stats", config).then((res) => res?.data || {});
+  apiClient.get("/admin/dashboard/stats", config).then((res) => res?.data || {});
 
 export const fetchDashboardActivity = (range = "7d", config = {}) =>
   apiClient
-    .get(`/api/admin/dashboard/activity?range=${encodeURIComponent(range)}`, config)
+    .get(`/admin/dashboard/activity?range=${encodeURIComponent(range)}`, config)
     .then((res) => res?.data || {});
 
 export const fetchDashboardHealth = (config = {}) =>
-  apiClient.get("/api/admin/dashboard/health", config).then((res) => res?.data || {});
+  apiClient.get("/admin/dashboard/health", config).then((res) => res?.data || {});
 
 export const fetchMonitorDashboard = (config = {}) =>
-  apiClient.get("/api/admin/monitor/dashboard", config).then((res) => res?.data || {});
+  apiClient.get("/admin/monitor/dashboard", config).then((res) => res?.data || {});
 
 export const fetchMonitorStats = (config = {}) =>
-  apiClient.get("/api/admin/monitor/summary", config).then((res) => res?.data || {});
+  apiClient.get("/admin/monitor/summary", config).then((res) => res?.data || {});
 
 export const fetchMonitorActivity = (range = "24h", config = {}) =>
   apiClient
-    .get(`/api/admin/monitor/activity?range=${encodeURIComponent(range)}`, config)
+    .get(`/admin/monitor/activity?range=${encodeURIComponent(range)}`, config)
     .then((res) => res?.data || {});
 
 export const fetchMonitorHealth = (config = {}) =>
-  apiClient.get("/api/admin/monitor/health", config).then((res) => res?.data || {});
+  apiClient.get("/admin/monitor/health", config).then((res) => res?.data || {});
 
 export const fetchMonitorTopBooks = (limit = 5, config = {}) =>
   apiClient
-    .get(`/api/admin/monitor/top-books?limit=${encodeURIComponent(limit)}`, config)
+    .get(`/admin/monitor/top-books?limit=${encodeURIComponent(limit)}`, config)
     .then((res) => res?.data || {});

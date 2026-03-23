@@ -1,8 +1,8 @@
 import { apiClient, API_BASE_URL } from '../../lib/apiClient';
 
-const BOOKS_ENDPOINT = '/api/auth/books';
-const UPLOAD_BOOK_ENDPOINT = '/api/auth/book';
-const IMPORT_BOOKS_ENDPOINT = '/api/auth/books/import-local';
+const BOOKS_ENDPOINT = '/auth/books';
+const UPLOAD_BOOK_ENDPOINT = '/auth/book';
+const IMPORT_BOOKS_ENDPOINT = '/auth/books/import-local';
 
 const toNumberId = (value, fallback = Date.now()) => {
   const parsed = Number(value);

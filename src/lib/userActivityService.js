@@ -25,7 +25,7 @@ export const recordBookRead = async (bookId, options = {}, config = {}) => {
     progress: Number(options.progress) || 100,
   };
 
-  const response = await apiClient.post("/api/user/books/read", payload, config);
+  const response = await apiClient.post("/user/books/read", payload, config);
   return response?.data || {};
 };
 
@@ -38,7 +38,7 @@ export const recordBookRead = async (bookId, options = {}, config = {}) => {
  */
 export const updateBookReadProgress = async (readId, progress = 100, config = {}) => {
   const payload = { progress: Math.min(100, Math.max(0, Number(progress))) };
-  const response = await apiClient.patch(`/api/user/books/read/${readId}`, payload, config);
+  const response = await apiClient.patch(`/user/books/read/${readId}`, payload, config);
   return response?.data || {};
 };
 
@@ -84,7 +84,7 @@ export const pauseBook = async (bookId, progress = 50, config = {}) => {
  * }
  */
 export const getUserReadingStats = async (config = {}) => {
-  const response = await apiClient.get("/api/user/reading-stats", config);
+  const response = await apiClient.get("/user/reading-stats", config);
   return response?.data || {};
 };
 
@@ -130,7 +130,7 @@ export const getUserBooksRead = async (filters = {}, config = {}) => {
 
   const query = params.toString();
   const response = await apiClient.get(
-    `/api/user/books/read${query ? `?${query}` : ""}`,
+    `/user/books/read${query ? `?${query}` : ""}`,
     config
   );
 
@@ -157,7 +157,7 @@ export const getUserCurrentlyReading = async (filters = {}, config = {}) => {
 
   const query = params.toString();
   const response = await apiClient.get(
-    `/api/user/books/currently-reading${query ? `?${query}` : ""}`,
+    `/user/books/currently-reading${query ? `?${query}` : ""}`,
     config
   );
 
@@ -192,7 +192,7 @@ export const getUserCurrentlyReading = async (filters = {}, config = {}) => {
  * }
  */
 export const getUserProfile = async (userId, config = {}) => {
-  const response = await apiClient.get(`/api/users/${userId}`, config);
+  const response = await apiClient.get(`/users/${userId}`, config);
   return response?.data || {};
 };
 
@@ -229,7 +229,7 @@ export const getUserActivityTimeline = async (userId, filters = {}, config = {})
 
   const query = params.toString();
   const response = await apiClient.get(
-    `/api/users/${userId}/reading-activity${query ? `?${query}` : ""}`,
+    `/users/${userId}/reading-activity${query ? `?${query}` : ""}`,
     config
   );
 
@@ -284,7 +284,7 @@ export const getTopReaders = async (filters = {}, config = {}) => {
 
   const query = params.toString();
   const response = await apiClient.get(
-    `/api/admin/leaderboard/readers${query ? `?${query}` : ""}`,
+    `/admin/leaderboard/readers${query ? `?${query}` : ""}`,
     config
   );
 
@@ -316,7 +316,7 @@ export const getUserRank = async (userId, range = "all", config = {}) => {
   params.set("range", range);
 
   const response = await apiClient.get(
-    `/api/admin/leaderboard/readers/rank/${userId}?${params.toString()}`,
+    `/admin/leaderboard/readers/rank/${userId}?${params.toString()}`,
     config
   );
 
@@ -346,7 +346,7 @@ export const getUserRank = async (userId, range = "all", config = {}) => {
  */
 export const getBookReadAnalytics = async (bookId, config = {}) => {
   const response = await apiClient.get(
-    `/api/books/${bookId}/read-analytics`,
+    `/books/${bookId}/read-analytics`,
     config
   );
 
@@ -386,7 +386,7 @@ export const getTrendingBooks = async (filters = {}, config = {}) => {
 
   const query = params.toString();
   const response = await apiClient.get(
-    `/api/books/trending${query ? `?${query}` : ""}`,
+    `/books/trending${query ? `?${query}` : ""}`,
     config
   );
 

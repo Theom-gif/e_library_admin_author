@@ -68,7 +68,7 @@ const Users = () => {
     try {
       const role = roleFilter === "All" ? "" : roleFilter;
       const data = await request(
-        `/api/admin/users?search=${searchQuery}&role=${role}`
+        `/admin/users?search=${searchQuery}&role=${role}`
       );
 
       setUsers((data?.data || []).map(normalizeUser));
@@ -103,7 +103,7 @@ const Users = () => {
     setActionSuccess("");
 
     try {
-      await request(`/api/admin/users/${user.id}`, { method: "DELETE" });
+      await request(`/admin/users/${user.id}`, { method: "DELETE" });
 
       if (selectedUser?.id === user.id) {
         setSelectedUser(null);

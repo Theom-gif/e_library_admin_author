@@ -87,7 +87,7 @@ const TopReaders = () => {
         // Filters by date range (all|month|week) and limits results
         // Response: { data: [{ user: {...}, booksRead: number, trend: number }, ...] }
         
-        const response = await apiClient.get("/api/admin/leaderboard/readers", {
+        const response = await apiClient.get("/admin/leaderboard/readers", {
           params: {
             range: range,      // all | month | week
             limit: 10,         // number of top readers to return

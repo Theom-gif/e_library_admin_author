@@ -1,6 +1,6 @@
-import { Eye, EyeOff, BookOpen, ArrowRight, Mail, Lock, User as UserIcon, PenTool, Shield } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Mail, Lock, KeyRound } from "lucide-react";
 import { useState } from "react";
-import { Link, Navigate, useLocation, useNavigate } from "react-router-dom";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
 import {
   getInternalUserPortalPath,
@@ -10,19 +10,13 @@ import {
   USER_PORTAL_URL,
 } from "../roleUtils";
 
-const ROLE_OPTIONS = [
-  { label: "User", icon: UserIcon },
-  { label: "Author", icon: PenTool },
-  { label: "Admin", icon: Shield },
-];
-
 export default function Login() {
   const { isAuthenticated, isReady, user, login } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname;
 
-  const [form, setForm] = useState({ email: "", password: "", role: "User", remember: false });
+  const [form, setForm] = useState({ email: "", password: "", remember: false });
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -81,158 +75,160 @@ export default function Login() {
   };
 
   return (
-    <main className="min-h-screen bg-[#122024] flex flex-col items-center justify-center p-4 font-sans text-[#f8fafc]">
-      {/* Top Header */}
-      <header className="absolute top-0 flex w-full items-center justify-between px-8 py-6">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#4a868f]">
-            <BookOpen size={18} className="text-[#f8fafc]" />
-          </div>
-          <span className="text-xl font-bold tracking-tight">គម្ពី - ELibrary</span>
-        </div>
-        <button className="text-sm font-medium text-[#94a3b8] hover:text-[#f8fafc]">Help Center</button>
-      </header>
+    <main className="min-h-screen bg-[#f7f5f2] text-[#1f2933]">
+      <div className="grid min-h-screen lg:grid-cols-[1.16fr_0.92fr]">
+        <section className="relative hidden min-h-screen overflow-hidden lg:flex">
+          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80')] bg-cover bg-center" />
+          <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(17,24,39,0.12)_0%,rgba(17,24,39,0.18)_38%,rgba(11,13,17,0.62)_100%)]" />
 
-      <div className="flex w-full max-w-[900px] overflow-hidden rounded-3xl border border-[rgba(255,255,255,0.08)] bg-[#16282b] shadow-2xl">
-        {/* Left Side: Marketing/Visual */}
-        <div className="relative hidden w-1/2 flex-col justify-end p-10 lg:flex">
-          <div className="absolute inset-0 z-0 opacity-40">
-             {/* Background Image placeholder - similar to the library interior in your screenshot */}
-            <div className="h-full w-full bg-[url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80')] bg-cover bg-center mix-blend-overlay"></div>
-            <div className="absolute inset-0 bg-gradient-to-t from-[#16282b] via-transparent to-transparent"></div>
-          </div>
-          
-          <div className="relative z-10 space-y-4">
-            <BookOpen className="text-[#4a868f]" size={32} />
-            <h1 className="text-4xl font-bold leading-tight">Your gateway to infinite knowledge.</h1>
-            <p className="text-[#94a3b8]">
-              Access over 2 million digital volumes, research papers, and archival manuscripts from anywhere in the world.
-            </p>
-            <div className="flex items-center gap-2 pt-4">
-              <div className="flex -space-x-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="h-8 w-8 rounded-full border-2 border-[#16282b] bg-[#1d3438]" />
-                ))}
-              </div>
-              <span className="text-xs font-medium text-[#94a3b8]">Join thousands of researchers today.</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Right Side: Login Form */}
-        <div className="w-full bg-[#16282b] p-8 lg:w-1/2 lg:p-12">
-          <div className="mb-8">
-            <h2 className="text-3xl font-bold">Welcome Back</h2>
-            <p className="mt-1 text-[#94a3b8]">Sign in to access your digital collection</p>
-          </div>
-
-          <form className="space-y-5" onSubmit={onSubmit}>
-            <div>
-              <label className="mb-2 block text-sm font-medium text-[#94a3b8]">Library Email</label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94a3b8]" size={18} />
-                <input
-                  type="email"
-                  value={form.email}
-                  onChange={(e) => onChange("email", e.target.value)}
-                  placeholder="e.g. academic@university.edu"
-                  className="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1d3438] py-3 pl-12 pr-4 text-[#f8fafc] placeholder:text-[#94a3b8]/50 focus:border-[#4a868f] focus:outline-none"
-                  required
-                />
-              </div>
+          <div className="relative z-10 flex w-full flex-col justify-between p-8 xl:p-10">
+            <div className="text-[18px] font-semibold tracking-[-0.03em] text-[#0a6d87] xl:text-[30px]">
+              Digital Curator Admin
             </div>
 
-            <div>
-              <div className="mb-2 flex items-center justify-between">
-                <label className="text-sm font-medium text-[#94a3b8]">Password</label>
-                <button type="button" className="text-xs font-semibold text-[#4a868f] hover:underline">Forgot Password?</button>
-              </div>
-              <div className="relative">
-                <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-[#94a3b8]" size={18} />
-                <input
-                  type={showPassword ? "text" : "password"}
-                  value={form.password}
-                  onChange={(e) => onChange("password", e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full rounded-xl border border-[rgba(255,255,255,0.08)] bg-[#1d3438] py-3 pl-12 pr-12 text-[#f8fafc] focus:border-[#4a868f] focus:outline-none"
-                  required
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-[#94a3b8] hover:text-[#f8fafc]"
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
+            <div className="max-w-[480px]">
+              <h1 className="text-[56px] font-semibold leading-[0.94] tracking-[-0.045em] text-white xl:text-[56px]">
+                Your gateway to infinite knowledge
+              </h1>
+              <p className="mt-5 max-w-[360px] text-[16px] leading-7 text-white/86 xl:text-[20px]">
+                Access over 2 million digital volumes with administrative precision.
+              </p>
             </div>
 
-            <div>
-              <label className="mb-3 block text-sm font-medium text-[#94a3b8]">Role</label>
-              <div className="grid grid-cols-3 gap-2">
-                {ROLE_OPTIONS.map((roleOption) => {
-                  const Icon = roleOption.icon;
-                  const isActive = form.role === roleOption.label;
-                  return (
-                    <button
-                      key={roleOption.label}
-                      type="button"
-                      onClick={() => onChange("role", roleOption.label)}
-                      className={`flex items-center justify-center gap-2 rounded-xl border px-2 py-2 text-xs font-semibold transition-all ${
-                        isActive
-                          ? "border-[#4a868f] bg-[#1d3438] text-[#4a868f]"
-                          : "border-[rgba(255,255,255,0.08)] bg-[#1d3438]/60 text-[#94a3b8] hover:border-[#4a868f]/40"
-                      }`}
-                    >
-                      <Icon size={14} />
-                      {roleOption.label}
+            <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-3 text-[10px] uppercase tracking-[0.28em] text-white/58">
+              <span>(c) 2026 Digital Curator</span>
+              <button type="button" className="transition hover:text-white/85">Privacy Policy</button>
+              <button type="button" className="transition hover:text-white/85">Terms of Service</button>
+              <button type="button" className="transition hover:text-white/85">Security</button>
+            </div>
+          </div>
+        </section>
+
+        <section className="relative flex min-h-screen flex-col bg-[#faf9f7] px-5 py-5 sm:px-7 lg:px-8 xl:px-10">
+          <header className="flex items-center justify-end gap-8 pb-6 text-[15px] text-[#4b5563] sm:pb-10">
+            <button type="button" className="transition hover:text-[#0b6a86]">Support</button>
+            <button type="button" className="transition hover:text-[#0b6a86]">Documentation</button>
+          </header>
+
+          <div className="flex flex-1 items-center justify-center py-4 lg:py-10">
+            <div className="w-full max-w-[520px] rounded-[22px] border border-[#e8e4dc] bg-white p-7 shadow-[0_14px_32px_rgba(15,23,42,0.06)] sm:p-9">
+              <div className="mb-9">
+                <h2 className="text-[34px] font-semibold tracking-[-0.04em] text-[#20262e] sm:text-[38px]">
+                  Welcome Back
+                </h2>
+                <p className="mt-3 text-[15px] text-[#5e6773] sm:text-[16px]">
+                  Sign in to access your admin workspace
+                </p>
+              </div>
+
+              <form className="space-y-7" onSubmit={onSubmit}>
+                <div className="space-y-3">
+                  <label className="block text-[12px] font-semibold uppercase tracking-[0.24em] text-[#4b5563]">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#a4a8ae]" size={20} />
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={(e) => onChange("email", e.target.value)}
+                      placeholder="name@digitalcurator.com"
+                      className="h-14 w-full rounded-[14px] border border-[#efeae3] bg-[#f5f3f0] py-4 pl-14 pr-4 text-[16px] text-[#1f2933] placeholder:text-[#c3c7cc] focus:border-[#0d718d] focus:bg-white focus:outline-none"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <label className="block text-[12px] font-semibold uppercase tracking-[0.24em] text-[#4b5563]">
+                      Password
+                    </label>
+                    <button type="button" className="text-[14px] font-medium text-[#0b6a86] transition hover:text-[#084d63]">
+                      Forgot password?
                     </button>
-                  );
-                })}
-              </div>
+                  </div>
+                  <div className="relative">
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#a4a8ae]" size={20} />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={form.password}
+                      onChange={(e) => onChange("password", e.target.value)}
+                      placeholder="••••••••"
+                      className="h-14 w-full rounded-[14px] border border-[#efeae3] bg-[#f5f3f0] py-4 pl-14 pr-14 text-[16px] text-[#1f2933] placeholder:text-[#c3c7cc] focus:border-[#0d718d] focus:bg-white focus:outline-none"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9aa1a9] transition hover:text-[#20262e]"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <input
+                    type="checkbox"
+                    id="remember"
+                    checked={form.remember}
+                    onChange={(e) => onChange("remember", e.target.checked)}
+                    className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#0d718d]"
+                  />
+                  <label htmlFor="remember" className="text-[15px] text-[#374151] sm:text-[16px]">
+                    Remember me for 30 days
+                  </label>
+                </div>
+
+                {error && (
+                  <div className="rounded-[14px] border border-[#efc9c9] bg-[#fff5f5] px-4 py-3 text-sm text-[#b42318]">
+                    {error}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="flex h-14 w-full items-center justify-center gap-3 rounded-[14px] bg-[#0d718d] px-5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(13,113,141,0.22)] transition hover:bg-[#0b647d] disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {isSubmitting ? "Signing in..." : "Sign In to Library"}
+                  <ArrowRight size={16} />
+                </button>
+
+                <div className="space-y-5 pt-1">
+                  <div className="flex items-center gap-4 text-[10px] font-medium uppercase tracking-[0.24em] text-[#b5b1ab]">
+                    <div className="h-px flex-1 bg-[#ece7e1]" />
+                    <span>Help & Access</span>
+                    <div className="h-px flex-1 bg-[#ece7e1]" />
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled
+                    className="flex h-14 w-full items-center justify-center gap-3 rounded-[14px] border border-[#ece7e1] bg-[#f5f3f0] px-5 text-[15px] font-semibold text-[#20262e]"
+                  >
+                    <KeyRound size={16} />
+                    Single Sign-On (SSO)
+                  </button>
+
+                  <p className="text-center text-[13px] leading-6 text-[#7b8390]">
+                    Roles are assigned automatically from the database. Accounts are created manually by an administrator.
+                  </p>
+                </div>
+              </form>
             </div>
-
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="remember"
-                checked={form.remember}
-                onChange={(e) => onChange("remember", e.target.checked)}
-                className="h-4 w-4 rounded border-[#1d3438] bg-[#1d3438] accent-[#4a868f]"
-              />
-              <label htmlFor="remember" className="text-sm text-[#94a3b8]">Remember me on this device</label>
-            </div>
-
-            {error && <div className="rounded-lg bg-red-500/10 p-3 text-sm text-red-400 border border-red-500/20">{error}</div>}
-
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#4a868f] py-3 font-bold text-[#f8fafc] transition-all hover:bg-[#5ba1ab] disabled:opacity-50"
-            >
-              {isSubmitting ? "Signing in..." : "Sign In to Library"}
-              <ArrowRight size={18} />
-            </button>
-          </form>
-
-          <div className="mt-8 text-center text-sm text-[#94a3b8]">
-            Not a member yet?{" "}
-            <Link to="/register" className="font-semibold text-[#4a868f] hover:underline">
-              Apply for Library Card
-            </Link>
           </div>
-        </div>
-      </div>
 
-      {/* Footer */}
-      <footer className="mt-12 text-center text-[10px] text-[#94a3b8]/60 uppercase tracking-widest space-y-2">
-        <p>© 2024 Scholarly Library Systems. Licensed to Institutional Partners.</p>
-        <div className="flex justify-center gap-4">
-          <button className="hover:text-[#94a3b8]">Privacy Policy</button>
-          <button className="hover:text-[#94a3b8]">Terms of Service</button>
-          <button className="hover:text-[#94a3b8]">Accessibility Statement</button>
-        </div>
-      </footer>
+          <footer className="flex flex-wrap items-center justify-center gap-x-8 gap-y-3 pt-4 text-[10px] uppercase tracking-[0.24em] text-[#c2beb7] lg:hidden">
+            <span>(c) 2024 Digital Curator</span>
+            <button type="button">Privacy Policy</button>
+            <button type="button">Terms of Service</button>
+            <button type="button">Security</button>
+          </footer>
+        </section>
+      </div>
     </main>
   );
 }

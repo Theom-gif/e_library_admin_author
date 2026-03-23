@@ -41,9 +41,18 @@ const buildStorageUrl = (path = '') => {
   if (!path) return '';
   if (isBlobLikeUrl(path)) return path;
   if (isAbsoluteUrl(path)) return path;
-  const clean = String(path).replace(/^\/+/, '');
-  const normalized = clean.startsWith('storage/') ? clean.slice('storage/'.length) : clean;
-  return `${ASSET_BASE_URL}/storage/${normalized}`;
+  
+  let clean = String(path).replace(/^\/+/, '');
+  
+  // 🔥 FIX: remove wrong prefixes from backend
+  clean = clean.replace(/^storage\/app\/public\//, '');
+  clean = clean.replace(/^public\//, '');
+  
+  if (clean.startsWith('storage/')) {
+    clean = clean.slice('storage/'.length);
+  }
+  
+  return `${ASSET_BASE_URL}/storage/${clean}`;
 };
 
 const normalizeAssetUrl = (value = '') => {

@@ -322,7 +322,7 @@ const SystemMonitor = () => {
                     <option value="7d">Last 7 Days</option>
                   </select>
                 </div>
-                <div className="h-64 w-full">
+                <div className="h-64 w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={activityData}>
                       <defs>
@@ -369,7 +369,7 @@ const SystemMonitor = () => {
                     </div>
                   </div>
                 </div>
-                <div className="h-64 w-full">
+                <div className="h-64 w-full min-w-0">
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={healthData}>
                       <XAxis

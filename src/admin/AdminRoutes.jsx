@@ -17,6 +17,18 @@ import Login from "../auth/pages/Login";
 import Register from "../auth/pages/Register";
 import UserDashboard from "../auth/pages/UserDashboard";
 
+// Author imports
+import AuthorLayout from "../author/components/Layout";
+import AuthorDashboard from "../author/pages/Dashboard";
+import MyBooks from "../author/pages/MyBooks";
+import UploadBook from "../author/pages/UploadBook";
+import Profile from "../author/pages/Profile";
+import AuthorSettings from "../author/pages/Setting";
+import Feedback from "../author/pages/Feedback";
+import Research from "../author/pages/Research";
+import EditBookPage from "../author/pages/EditBookPage";
+import BookDetailPage from "../author/pages/BookDetailPage";
+
 import {
   getInternalUserPortalPath,
   getHomePathByRole,
@@ -116,8 +128,27 @@ export default function AdminRoutes() {
         <Route path="readers" element={<TopReaders />} />
         <Route path="monitor" element={<SystemMonitor />} />
         <Route path="settings" element={<Settings />} />
-        {/* Catch-all for unmatched admin routes */}
-        <Route path="*" element={<Navigate to="/admin/dashboard" replace />} />
+      </Route>
+
+      {/* Author Routes */}
+      <Route
+        path="/author"
+        element={
+          <ProtectedRoute>
+            <AuthorLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<AuthorDashboard />} />
+        <Route path="my-books" element={<MyBooks />} />
+        <Route path="upload" element={<UploadBook />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="settings" element={<AuthorSettings />} />
+        <Route path="feedback" element={<Feedback />} />
+        <Route path="research" element={<Research />} />
+        <Route path="analytics" element={<AuthorDashboard />} />
+        <Route path="edit-book" element={<EditBookPage />} />
+        <Route path="book-detail" element={<BookDetailPage />} />
       </Route>
 
       {/* Catch-all route - redirect to home */}

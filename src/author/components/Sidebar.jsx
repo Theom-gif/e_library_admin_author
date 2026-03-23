@@ -83,13 +83,12 @@ const Sidebar = () => {
       <div className="px-4 py-2">
         <NavLink
           to="/author/profile"
-          className={({ isActive }) =>
-            `flex items-center gap-3 p-2 mb-6 rounded-lg transition-all ${
-              isActive
-                ? 'bg-primary/20'
-                : 'hover:bg-primary/10'
-            }`
-          }
+          className={({ isActive }) => {
+            const baseClasses = "flex items-center gap-3 p-2 mb-6 rounded-lg transition-all cursor-pointer";
+            const activeClasses = "bg-primary/20";
+            const inactiveClasses = "hover:bg-primary/10";
+            return `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`;
+          }}
         >
           <img 
             src={profile.avatarUrl}
@@ -109,12 +108,12 @@ const Sidebar = () => {
             key={item.path}
             to={item.path}
             end={item.path === '/author'}
-            className={({ isActive }) => `
-              flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200
-              ${isActive 
-                ? 'bg-primary text-on-primary shadow-glow' 
-                : 'text-slate-400 hover:bg-primary/10 hover:text-[color:var(--text)]'}
-            `}
+            className={({ isActive }) => {
+              const baseClasses = "flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 cursor-pointer";
+              const activeClasses = "bg-primary text-on-primary shadow-glow";
+              const inactiveClasses = "text-slate-400 hover:bg-primary/10 hover:text-white";
+              return `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`;
+            }}
           >
             <item.icon className="size-5" />
             <span className="text-sm font-medium">{item.label}</span>

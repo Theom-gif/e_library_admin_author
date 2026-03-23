@@ -15,17 +15,35 @@ import { searchAuthors, searchBooks } from '../services/openLibraryService';
 import { uploadBookRequest } from '../services/bookService';
 
 const PROFILE_STORAGE_KEY = 'author_studio_profile';
-const GENRE_OPTIONS = ['Fantasy', 'Sci-Fi', 'Mystery', 'Romance', 'Thriller'];
+const GENRE_OPTIONS = ['Technology', 'Novel', 'Education', 'Business', 'History'];
 const NATIVE_OPTION_STYLE = { color: '#0f172a', backgroundColor: '#ffffff' };
 const FALLBACK_COVER_URL = 'https://picsum.photos/seed/new-book/300/450';
 
 const mapOpenLibrarySubjectToGenre = (subject = '') => {
+  if (!subject || typeof subject !== 'string') return '';
+  
   const normalized = subject.toLowerCase();
-  if (normalized.includes('science') || normalized.includes('sci-fi')) return 'Sci-Fi';
-  if (normalized.includes('fantasy')) return 'Fantasy';
-  if (normalized.includes('mystery') || normalized.includes('crime')) return 'Mystery';
-  if (normalized.includes('romance') || normalized.includes('love')) return 'Romance';
-  if (normalized.includes('thriller') || normalized.includes('suspense')) return 'Thriller';
+  
+  // Technology mapping
+  const technologyKeywords = ['technology', 'science', 'computer', 'software', 'engineering', 'innovation', 'digital', 'tech', 'programming'];
+  if (technologyKeywords.some(keyword => normalized.includes(keyword))) return 'Technology';
+  
+  // Novel mapping
+  const novelKeywords = ['novel', 'fiction', 'story', 'narrative', 'literary', 'contemporary', 'novels', 'short stories'];
+  if (novelKeywords.some(keyword => normalized.includes(keyword))) return 'Novel';
+  
+  // Education mapping
+  const educationKeywords = ['education', 'learning', 'academic', 'school', 'teaching', 'study', 'educational', 'textbook'];
+  if (educationKeywords.some(keyword => normalized.includes(keyword))) return 'Education';
+  
+  // Business mapping
+  const businessKeywords = ['business', 'economics', 'finance', 'management', 'entrepreneurship', 'corporate', 'commerce', 'trade'];
+  if (businessKeywords.some(keyword => normalized.includes(keyword))) return 'Business';
+  
+  // History mapping
+  const historyKeywords = ['history', 'historical', 'biography', 'era', 'period', 'ancient', 'medieval', 'war', 'historical fiction'];
+  if (historyKeywords.some(keyword => normalized.includes(keyword))) return 'History';
+  
   return '';
 };
 
@@ -65,18 +83,22 @@ const UploadBook = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    const defaultAuthor = 'Alex Rivera';
+    // Load logged-in author's name from profile (no fallback to default)
     const profileRaw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
     if (!profileRaw) {
-      setAuthorQuery(defaultAuthor);
+      console.warn('Author profile not found in localStorage');
       return;
     }
 
     try {
       const profile = JSON.parse(profileRaw);
-      setAuthorQuery(profile?.fullName?.trim() || defaultAuthor);
-    } catch {
-      setAuthorQuery(defaultAuthor);
+      const authorName = profile?.fullName?.trim();
+      if (authorName) {
+        setAuthorQuery(authorName);
+        console.log('Author loaded from profile:', authorName);
+      }
+    } catch (error) {
+      console.error('Failed to parse author profile:', error);
     }
   }, []);
 
@@ -222,6 +244,14 @@ const UploadBook = () => {
     setSubmitError('');
     setIsSubmitting(true);
     try {
+      // Verify token exists before uploading
+      const token = window.localStorage.getItem('bookhub_token');
+      if (!token) {
+        setSubmitError('Authentication failed. Please login again.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload = new FormData();
       payload.append('title', title.trim());
       payload.append('author', selectedAuthor?.name || authorQuery.trim());
@@ -238,16 +268,48 @@ const UploadBook = () => {
         payload.append('cover_image_url', coverPreviewUrl);
       }
 
-      await uploadBookRequest(payload);
-      navigate('/author/my-books');
+      console.log('Uploading book with data:', {
+        title: title.trim(),
+        author: selectedAuthor?.name || authorQuery.trim(),
+        category: genre.trim(),
+        hasManuscript: !!manuscriptFile,
+        hasCover: !!coverFile,
+      });
+
+      const response = await uploadBookRequest(payload);
+      
+      console.log('Book uploaded successfully:', response?.data);
+      
+      // Success - navigate to my books
+      window.setTimeout(() => {
+        navigate('/author/my-books', { replace: true });
+      }, 500);
+      
     } catch (error) {
-      const apiMessage =
-        error?.response?.data?.errors ||
-        error?.response?.data?.message ||
-        'Unable to upload book. Please try again.';
-      setSubmitError(
-        typeof apiMessage === 'string' ? apiMessage : 'Unable to upload book. Please check your input.',
-      );
+      console.error('Upload error details:', {
+        status: error?.response?.status,
+        message: error?.response?.data?.message,
+        errors: error?.response?.data?.errors,
+        fullError: error,
+      });
+
+      let errorMessage = 'Unable to upload book. Please try again.';
+      
+      if (error?.response?.status === 401 || error?.response?.status === 403) {
+        errorMessage = 'Your session has expired. Please login again.';
+      } else if (error?.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error?.response?.data?.errors) {
+        const errors = error.response.data.errors;
+        if (typeof errors === 'string') {
+          errorMessage = errors;
+        } else if (typeof errors === 'object') {
+          const firstError = Object.values(errors)[0];
+          errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
+        }
+      }
+
+      setSubmitError(errorMessage);
     } finally {
       setIsSubmitting(false);
     }
@@ -619,7 +681,9 @@ const UploadBook = () => {
           </button>
         </div>
         {submitError && (
-          <p className="mt-4 text-sm text-rose-400">{submitError}</p>
+          <div className="mt-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-xl">
+            <p className="text-sm text-rose-400 font-medium">{submitError}</p>
+          </div>
         )}
       </div>
     </div>

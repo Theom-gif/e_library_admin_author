@@ -211,3 +211,86 @@ export const fetchMonitorTopBooks = (limit = 5, config = {}) =>
   apiClient
     .get(`/admin/monitor/top-books?limit=${encodeURIComponent(limit)}`, config)
     .then((res) => res?.data || {});
+
+const unwrapPayload = (payload, fallback) => {
+  if (payload == null) return fallback;
+  if (payload?.data != null) return payload.data;
+  return payload;
+};
+
+const unwrapObjectPayload = (payload) => {
+  const value = unwrapPayload(payload, {});
+  return value && typeof value === "object" && !Array.isArray(value) ? value : {};
+};
+
+const unwrapArrayPayload = (payload) => {
+  const value = unwrapPayload(payload, []);
+  return Array.isArray(value) ? value : [];
+};
+
+const isRequestConfig = (value) =>
+  Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      ("signal" in value || "headers" in value || "params" in value || "timeout" in value),
+  );
+
+// ============================================
+// Author Dashboard Endpoints
+// ============================================
+
+export const fetchAuthorStats = (config = {}) =>
+  apiClient.get("/author/dashboard/stats", config).then((res) => unwrapObjectPayload(res?.data));
+
+export const fetchAuthorPerformance = (range = "30d", groupBy = "daily", config = {}) =>
+  apiClient
+    .get(`/author/dashboard/performance?range=${encodeURIComponent(range)}&groupBy=${encodeURIComponent(groupBy)}`, config)
+    .then((res) => unwrapArrayPayload(res?.data));
+
+export const fetchAuthorTopBooks = (optionsOrConfig = {}, config = {}) => {
+  const options = isRequestConfig(optionsOrConfig) ? {} : optionsOrConfig;
+  const requestConfig = isRequestConfig(optionsOrConfig) ? optionsOrConfig : config;
+  const limit = Number(options?.limit) > 0 ? Number(options.limit) : 4;
+  const orderBy = String(options?.orderBy || "sales").trim() || "sales";
+
+  return apiClient
+    .get(
+      `/author/dashboard/top-books?limit=${encodeURIComponent(limit)}&orderBy=${encodeURIComponent(orderBy)}`,
+      requestConfig,
+    )
+    .then((res) => unwrapArrayPayload(res?.data));
+};
+
+export const fetchAuthorFeedback = (limit = 10, filter = "all", config = {}) =>
+  apiClient
+    .get(`/author/dashboard/feedback?limit=${encodeURIComponent(limit)}&filter=${encodeURIComponent(filter)}`, config)
+    .then((res) => unwrapArrayPayload(res?.data));
+
+export const fetchAuthorDemographics = (config = {}) =>
+  apiClient.get("/author/dashboard/demographics", config).then((res) => unwrapObjectPayload(res?.data));
+
+// Export as object for consistent naming
+export default {
+  fetchAdminBooks,
+  approveBook,
+  rejectBook,
+  fetchAdminCategories,
+  createAdminCategory,
+  fetchDashboard,
+  fetchDashboardStats,
+  fetchDashboardActivity,
+  fetchDashboardHealth,
+  fetchMonitorDashboard,
+  fetchMonitorStats,
+  fetchMonitorActivity,
+  fetchMonitorHealth,
+  fetchMonitorTopBooks,
+  fetchAuthorStats,
+  fetchAuthorPerformance,
+  fetchAuthorTopBooks,
+  fetchAuthorFeedback,
+  fetchAuthorDemographics,
+  normalizeBook,
+  buildStorageUrl,
+};

@@ -59,9 +59,18 @@ const assetBaseUrl = stripApiSuffix(API_BASE_URL).replace(/\/+$/, "");
 const buildStorageUrl = (path = "") => {
   if (!path) return "";
   if (isAbsoluteUrl(path)) return path;
-  const clean = String(path).replace(/^\/+/, "");
-  const normalized = clean.startsWith("storage/") ? clean.slice("storage/".length) : clean;
-  return `${assetBaseUrl}/storage/${normalized}`;
+  
+  let clean = String(path).replace(/^\/+/, "");
+  
+  // 🔥 FIX: remove wrong prefixes from backend
+  clean = clean.replace(/^storage\/app\/public\//, "");
+  clean = clean.replace(/^public\//, "");
+  
+  if (clean.startsWith("storage/")) {
+    clean = clean.slice("storage/".length);
+  }
+  
+  return `${assetBaseUrl}/storage/${clean}`;
 };
 
 const fallbackId = () => `book-${Math.random().toString(36).slice(2, 10)}`;

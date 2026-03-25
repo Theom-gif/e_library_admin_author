@@ -1,11 +1,28 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import { Activity, Check, Filter, Loader2, MoreVertical, Search, X } from "lucide-react";
+import { Activity, BookOpen, Check, Filter, Loader2, MoreVertical, Search, X } from "lucide-react";
 import { cn } from "../../lib/utils";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { fetchAdminBooks } from "../services/adminService";
 
 const STATUS_FILTERS = ["All", "Approved", "Pending", "Rejected"];
-const FALLBACK_BOOK_COVER = "https://via.placeholder.com/64x96?text=Book";
+const BookCoverFallback = () => (
+  <div className="w-10 h-14 rounded-md bg-white/5 border border-white/10 flex items-center justify-center flex-shrink-0">
+    <BookOpen size={18} className="text-slate-500" />
+  </div>
+);
+
+const BookCover = ({ src, alt }) => {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) return <BookCoverFallback />;
+  return (
+    <img
+      src={src}
+      alt={alt}
+      className="w-10 h-14 rounded-md object-cover flex-shrink-0"
+      onError={() => setFailed(true)}
+    />
+  );
+};
 
 /* Normalize backend status */
 const normalizeStatus = (value) => {
@@ -105,10 +122,7 @@ const Books = () => {
 
     return books.map((book) => ({
       ...book,
-      cover:
-        book.cover ||
-        book.coverUrl ||
-        FALLBACK_BOOK_COVER,
+      cover: book.cover || book.coverUrl || null,
       status: normalizeStatus(book.status),
       category: toCategory(book.category),
       downloads: Number(book.downloads ?? 0),
@@ -242,16 +256,7 @@ const Books = () => {
               <tr key={book.id} className="hover:bg-white/2">
                 <td className="px-6 py-4">
                   <div className="flex items-center gap-3">
-                    <img
-                      src={book.cover}
-                      alt={book.title}
-                      className="w-10 h-14 rounded-md object-cover"
-                      onError={(event) => {
-                        if (event.currentTarget.src !== FALLBACK_BOOK_COVER) {
-                          event.currentTarget.src = FALLBACK_BOOK_COVER;
-                        }
-                      }}
-                    />
+                    <BookCover src={book.cover} alt={book.title} />
                     <div>
                       <p className="font-bold">{book.title}</p>
                       <p className="text-[10px] text-slate-500 uppercase font-bold">

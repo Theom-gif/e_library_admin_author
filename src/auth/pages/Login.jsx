@@ -1,4 +1,4 @@
-import { Eye, EyeOff, ArrowRight, Mail, Lock, KeyRound } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Mail, Lock } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
@@ -68,9 +68,9 @@ export default function Login() {
     const homePath = getHomePathByRole(resolvedRole);
     const safeFrom =
       typeof from === "string" &&
-      ((resolvedRole === "Admin" && from.startsWith("/admin")) ||
-        (resolvedRole === "Author" && from.startsWith("/author")) ||
-        (resolvedRole === "User" && from.startsWith("/user")))
+        ((resolvedRole === "Admin" && from.startsWith("/admin")) ||
+          (resolvedRole === "Author" && from.startsWith("/author")) ||
+          (resolvedRole === "User" && from.startsWith("/user")))
         ? from
         : null;
 
@@ -99,43 +99,24 @@ export default function Login() {
         <section className="relative hidden min-h-screen overflow-hidden lg:flex">
           <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80')] bg-cover bg-center" />
           <div
-            className={`absolute inset-0 ${
-              isDark
-                ? "bg-[linear-gradient(180deg,rgba(3,8,10,0.36)_0%,rgba(6,18,23,0.48)_38%,rgba(1,6,9,0.82)_100%)]"
-                : "bg-[linear-gradient(180deg,rgba(17,24,39,0.12)_0%,rgba(17,24,39,0.18)_38%,rgba(11,13,17,0.62)_100%)]"
-            }`}
+            className={`absolute inset-0 ${isDark
+              ? "bg-[linear-gradient(180deg,rgba(3,8,10,0.36)_0%,rgba(6,18,23,0.48)_38%,rgba(1,6,9,0.82)_100%)]"
+              : "bg-[linear-gradient(180deg,rgba(17,24,39,0.12)_0%,rgba(17,24,39,0.18)_38%,rgba(11,13,17,0.62)_100%)]"
+              }`}
           />
-
-          <div className="relative z-10 flex w-full flex-col justify-between p-8 xl:p-10">
-            <div className="text-[18px] font-semibold tracking-[-0.03em] text-[#0a6d87] xl:text-[20px]">
-              Digital Curator Admin
-            </div>
-
-            <div className="max-w-[480px]">
-              <h1 className="text-[56px] font-semibold leading-[0.94] tracking-[-0.045em] text-white xl:text-[64px]">
+          <div className="relative z-10 flex h-full w-full flex-col items-center justify-center text-center p-8 xl:p-10">
+            <div className="mt-6 max-w-[600px]">
+              <h1 className="text-[42px] font-semibold leading-tight tracking-[-0.03em] text-white xl:text-[56px]">
                 Your gateway to infinite knowledge
               </h1>
-              <p className="mt-5 max-w-[360px] text-[16px] leading-7 text-white/86 xl:text-[17px]">
+              <p className="mt-4 text-[16px] leading-7 text-white/80 xl:text-[17px]">
                 Access over 2 million digital volumes with administrative precision.
               </p>
             </div>
 
-            <div className="flex flex-wrap items-center justify-end gap-x-8 gap-y-3 text-[10px] uppercase tracking-[0.28em] text-white/58">
-              <span>(c) 2024 Digital Curator</span>
-              <button type="button" className="transition hover:text-white/85">Privacy Policy</button>
-              <button type="button" className="transition hover:text-white/85">Terms of Service</button>
-              <button type="button" className="transition hover:text-white/85">Security</button>
-            </div>
           </div>
         </section>
-
         <section className={`relative flex min-h-screen flex-col px-5 py-5 sm:px-7 lg:px-8 xl:px-10 ${rightPanelClass}`}>
-          <header className={`flex items-center justify-end gap-3 pb-6 text-[15px] sm:gap-4 sm:pb-10 ${rightTextClass}`}>
-            <ThemeToggle className="rounded-full p-2.5" iconSize={18} />
-            <button type="button" className="transition hover:text-[#0b6a86]">Support</button>
-            <button type="button" className="transition hover:text-[#0b6a86]">Documentation</button>
-          </header>
-
           <div className="flex flex-1 items-center justify-center py-4 lg:py-10">
             <div className={`w-full max-w-[520px] rounded-[22px] p-7 sm:p-9 ${cardClass}`}>
               <div className="mb-9">
@@ -146,7 +127,6 @@ export default function Login() {
                   Sign in to access your admin workspace
                 </p>
               </div>
-
               <form className="space-y-7" onSubmit={onSubmit}>
                 <div className="space-y-3">
                   <label className={`block text-[12px] font-semibold uppercase tracking-[0.24em] ${labelClass}`}>
@@ -159,12 +139,11 @@ export default function Login() {
                       value={form.email}
                       onChange={(e) => onChange("email", e.target.value)}
                       placeholder="name@digitalcurator.com"
-                      className={`h-16 w-full rounded-[14px] py-4 pl-14 pr-4 text-[16px] focus:border-[#0d718d] focus:outline-none ${inputClass}`}
+                      className={`h-14 w-full rounded-[14px] py-4 pl-14 pr-4 text-[16px] focus:border-[#0d718d] focus:outline-none ${inputClass}`}
                       required
                     />
                   </div>
                 </div>
-
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <label className={`block text-[12px] font-semibold uppercase tracking-[0.24em] ${labelClass}`}>
@@ -181,7 +160,7 @@ export default function Login() {
                       value={form.password}
                       onChange={(e) => onChange("password", e.target.value)}
                       placeholder="........"
-                      className={`h-16 w-full rounded-[14px] py-4 pl-14 pr-14 text-[16px] focus:border-[#0d718d] focus:outline-none ${inputClass}`}
+                      className={`h-14 w-full rounded-[14px] py-4 pl-14 pr-14 text-[16px] focus:border-[#0d718d] focus:outline-none ${inputClass}`}
                       required
                     />
                     <button
@@ -194,7 +173,6 @@ export default function Login() {
                     </button>
                   </div>
                 </div>
-
                 <div className="flex items-center gap-3">
                   <input
                     type="checkbox"
@@ -207,56 +185,22 @@ export default function Login() {
                     Remember me for 30 days
                   </label>
                 </div>
-
                 {error && (
                   <div className="rounded-[14px] border border-[#efc9c9] bg-[#fff5f5] px-4 py-3 text-sm text-[#b42318]">
                     {error}
                   </div>
                 )}
-
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex h-16 w-full items-center justify-center gap-3 rounded-[14px] bg-[#0d718d] px-5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(13,113,141,0.22)] transition hover:bg-[#0b647d] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-14 w-full items-center justify-center gap-3 rounded-[14px] bg-[#0d718d] px-5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(13,113,141,0.22)] transition hover:bg-[#0b647d] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSubmitting ? "Signing in..." : "Sign In to Library"}
                   <ArrowRight size={16} />
                 </button>
-
-                <div className="space-y-5 pt-1">
-                  <div className={`flex items-center gap-4 text-[10px] font-medium uppercase tracking-[0.24em] ${mutedFooterClass}`}>
-                    <div className={`h-px flex-1 ${dividerClass}`} />
-                    <span>Help & Access</span>
-                    <div className={`h-px flex-1 ${dividerClass}`} />
-                  </div>
-
-                  <button
-                    type="button"
-                    disabled
-                    className={`flex h-14 w-full items-center justify-center gap-3 rounded-[14px] px-5 text-[15px] font-semibold ${
-                      isDark
-                        ? "border border-[rgba(255,255,255,0.08)] bg-[#0c1519] text-[#d4dde2]"
-                        : "border border-[#ece7e1] bg-[#f5f3f0] text-[#20262e]"
-                    }`}
-                  >
-                    <KeyRound size={16} />
-                    Single Sign-On (SSO)
-                  </button>
-
-                  <p className={`text-center text-[13px] leading-6 ${helperTextClass}`}>
-                    Roles are assigned automatically from the database. Accounts are created manually by an administrator.
-                  </p>
-                </div>
               </form>
             </div>
           </div>
-
-          <footer className={`flex flex-wrap items-center justify-center gap-x-8 gap-y-3 pt-4 text-[10px] uppercase tracking-[0.24em] lg:hidden ${mutedFooterClass}`}>
-            <span>(c) 2024 Digital Curator</span>
-            <button type="button">Privacy Policy</button>
-            <button type="button">Terms of Service</button>
-            <button type="button">Security</button>
-          </footer>
         </section>
       </div>
     </main>

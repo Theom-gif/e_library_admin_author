@@ -231,6 +231,11 @@ export const fetchMonitorTopBooks = (limit = 5, config = {}) =>
     .get(`/admin/monitor/top-books?limit=${encodeURIComponent(limit)}`, config)
     .then((res) => res?.data || {});
 
+export const fetchTopReaders = (range = "week", limit = 3, config = {}) =>
+  apiClient
+    .get(`/admin/leaderboard/readers?range=${encodeURIComponent(range)}&limit=${encodeURIComponent(limit)}`, config)
+    .then((res) => res?.data || {});
+
 const unwrapPayload = (payload, fallback) => {
   if (payload == null) return fallback;
   if (payload?.data != null) return payload.data;
@@ -305,6 +310,7 @@ export default {
   fetchMonitorActivity,
   fetchMonitorHealth,
   fetchMonitorTopBooks,
+  fetchTopReaders,
   fetchAuthorStats,
   fetchAuthorPerformance,
   fetchAuthorTopBooks,

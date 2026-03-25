@@ -1,9 +1,7 @@
-import { Eye, EyeOff, ArrowRight, Mail, Lock } from "lucide-react";
+import { Eye, EyeOff, ArrowRight, Mail, Lock, BookOpen } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext";
-import { useTheme } from "../../theme/ThemeContext";
-import ThemeToggle from "../../theme/ThemeToggle";
 import {
   getInternalUserPortalPath,
   getHomePathByRole,
@@ -14,7 +12,6 @@ import {
 
 export default function Login() {
   const { isAuthenticated, isReady, user, login } = useAuth();
-  const { isDark } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname;
@@ -77,76 +74,66 @@ export default function Login() {
     navigate(safeFrom || homePath, { replace: true });
   };
 
-  const rightPanelClass = isDark ? "bg-[#0d171c]" : "bg-[#faf9f7]";
-  const rightTextClass = isDark ? "text-[#b9c4cb]" : "text-[#4b5563]";
-  const cardClass = isDark
-    ? "border border-[rgba(255,255,255,0.08)] bg-[#111d22] shadow-[0_18px_36px_rgba(0,0,0,0.28)]"
-    : "border border-[#e8e4dc] bg-white shadow-[0_14px_32px_rgba(15,23,42,0.06)]";
-  const headingClass = isDark ? "text-white" : "text-[#20262e]";
-  const bodyTextClass = isDark ? "text-[#96a5b0]" : "text-[#5e6773]";
-  const labelClass = isDark ? "text-[#aeb7bf]" : "text-[#4b5563]";
-  const iconClass = isDark ? "text-[#6f7f8a]" : "text-[#a4a8ae]";
-  const inputClass = isDark
-    ? "border border-[rgba(255,255,255,0.08)] bg-[#0c1519] text-[#f2f7f8] placeholder:text-[#6a7984] focus:bg-[#0f1a1f]"
-    : "border border-[#efeae3] bg-[#f5f3f0] text-[#1f2933] placeholder:text-[#c3c7cc] focus:bg-white";
-  const helperTextClass = isDark ? "text-[#8e9aa3]" : "text-[#7b8390]";
-  const dividerClass = isDark ? "bg-[rgba(255,255,255,0.08)]" : "bg-[#ece7e1]";
-  const mutedFooterClass = isDark ? "text-[#70808a]" : "text-[#c2beb7]";
-
   return (
-    <main className={`min-h-screen ${isDark ? "bg-[#081116] text-[#ecf4f6]" : "bg-[#f7f5f2] text-[#1f2933]"}`}>
-      <div className="grid min-h-screen lg:grid-cols-[1.16fr_0.92fr]">
-        <section className="relative hidden min-h-screen overflow-hidden lg:flex">
-          <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80')] bg-cover bg-center" />
-          <div
-            className={`absolute inset-0 ${isDark
-              ? "bg-[linear-gradient(180deg,rgba(3,8,10,0.36)_0%,rgba(6,18,23,0.48)_38%,rgba(1,6,9,0.82)_100%)]"
-              : "bg-[linear-gradient(180deg,rgba(17,24,39,0.12)_0%,rgba(17,24,39,0.18)_38%,rgba(11,13,17,0.62)_100%)]"
-              }`}
-          />
-          <div className="relative z-10 flex h-full w-full flex-col items-center justify-center text-center p-8 xl:p-10">
-            <div className="mt-6 max-w-[600px]">
-              <h1 className="text-[42px] font-semibold leading-tight tracking-[-0.03em] text-white xl:text-[56px]">
-                Your gateway to infinite knowledge
-              </h1>
-              <p className="mt-4 text-[16px] leading-7 text-white/80 xl:text-[17px]">
-                Access over 2 million digital volumes with administrative precision.
-              </p>
-            </div>
-
+    <main className="min-h-screen bg-[#eef4f6] text-[#1f2933]">
+      <div className="mx-auto w-full max-w-[1220px] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mb-8 flex items-center gap-3">
+          <div className="h-9 w-9 rounded-lg bg-[#5caeba] text-white font-bold text-sm flex items-center justify-center shadow-sm">
+            <BookOpen
+              size={16}
+              className="text-white"
+            />
           </div>
-        </section>
-        <section className={`relative flex min-h-screen flex-col px-5 py-5 sm:px-7 lg:px-8 xl:px-10 ${rightPanelClass}`}>
-          <div className="flex flex-1 items-center justify-center py-4 lg:py-10">
-            <div className={`w-full max-w-[520px] rounded-[22px] p-7 sm:p-9 ${cardClass}`}>
-              <div className="mb-9">
-                <h2 className={`text-[34px] font-semibold tracking-[-0.04em] sm:text-[38px] ${headingClass}`}>
+          <span className="text-[28px] font-semibold tracking-[-0.02em] text-[#1f2933]">E-Library</span>
+        </div>
+
+        <div>
+          <div className="grid gap-0 overflow-hidden rounded-2xl border border-[#e4ebee] lg:grid-cols-[1.05fr_1fr]">
+            <section className="relative hidden min-h-[560px] lg:block">
+              <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1507842217343-583bb7270b66?auto=format&fit=crop&q=80')] bg-cover bg-center" />
+              <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.24)_0%,rgba(2,6,23,0.65)_100%)]" />
+              <div className="relative z-10 flex h-full items-center justify-center p-8 text-center">
+                <div className="max-w-[520px]">
+                  <h1 className="text-[46px] font-bold leading-[1.02] tracking-[-0.03em] text-white/85">
+                    Your gateway to infinite knowledge.
+                  </h1>
+                  <p className="mt-4 text-base leading-7 text-white/85">
+                    Access over 2 million digital volumes, research papers, and archival manuscripts from anywhere in the world.
+                  </p>
+                </div>
+              </div>
+            </section>
+
+            <section className="bg-[#fdfefe] p-6 sm:p-8 lg:p-9">
+              <div className="mb-8">
+                <h2 className="text-[42px] font-bold leading-none tracking-[-0.035em] text-[#111827]">
                   Welcome Back
                 </h2>
-                <p className={`mt-3 text-[15px] sm:text-[16px] ${bodyTextClass}`}>
-                  Sign in to access your admin workspace
+                <p className="mt-2 text-[16px] text-[#6b7280]">
+                  Sign in to access your digital collection
                 </p>
               </div>
-              <form className="space-y-7" onSubmit={onSubmit}>
+
+              <form className="space-y-6" onSubmit={onSubmit}>
                 <div className="space-y-3">
-                  <label className={`block text-[12px] font-semibold uppercase tracking-[0.24em] ${labelClass}`}>
-                    Email Address
+                  <label className="block text-[12px] font-semibold uppercase tracking-[0.2em] text-[#4b5563]">
+                    Library Email
                   </label>
                   <div className="relative">
-                    <Mail className={`absolute left-5 top-1/2 -translate-y-1/2 ${iconClass}`} size={20} />
+                    <Mail className="absolute left-5 top-1/2 -translate-y-1/2 text-[#a4a8ae]" size={18} />
                     <input
                       type="email"
                       value={form.email}
                       onChange={(e) => onChange("email", e.target.value)}
-                      placeholder="name@digitalcurator.com"
-                      className={`h-14 w-full rounded-[14px] py-4 pl-14 pr-4 text-[16px] focus:border-[#0d718d] focus:outline-none ${inputClass}`}
+                      placeholder="e.g. academic@university.edu"
+                      className="auth-input h-14 w-full rounded-[14px] border border-[#d8e0e6] bg-white py-4 pl-14 pr-4 text-[16px] text-[#1f2933] placeholder:text-[#aeb5bd] focus:border-[#56aeb9] focus:outline-none"
                       required
                     />
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <label className={`block text-[12px] font-semibold uppercase tracking-[0.24em] ${labelClass}`}>
+                    <label className="block text-[12px] font-semibold uppercase tracking-[0.2em] text-[#4b5563]">
                       Password
                     </label>
                     <button type="button" className="text-[14px] font-medium text-[#0b6a86] transition hover:text-[#084d63]">
@@ -154,19 +141,19 @@ export default function Login() {
                     </button>
                   </div>
                   <div className="relative">
-                    <Lock className={`absolute left-5 top-1/2 -translate-y-1/2 ${iconClass}`} size={20} />
+                    <Lock className="absolute left-5 top-1/2 -translate-y-1/2 text-[#a4a8ae]" size={18} />
                     <input
                       type={showPassword ? "text" : "password"}
                       value={form.password}
                       onChange={(e) => onChange("password", e.target.value)}
                       placeholder="........"
-                      className={`h-14 w-full rounded-[14px] py-4 pl-14 pr-14 text-[16px] focus:border-[#0d718d] focus:outline-none ${inputClass}`}
+                      className="auth-input h-14 w-full rounded-[14px] border border-[#d8e0e6] bg-white py-4 pl-14 pr-14 text-[16px] text-[#1f2933] placeholder:text-[#aeb5bd] focus:border-[#56aeb9] focus:outline-none"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className={`absolute right-5 top-1/2 -translate-y-1/2 transition ${isDark ? "text-[#6f7f8a] hover:text-white" : "text-[#9aa1a9] hover:text-[#20262e]"}`}
+                      className="absolute right-5 top-1/2 -translate-y-1/2 text-[#9aa1a9] transition hover:text-[#20262e]"
                       aria-label={showPassword ? "Hide password" : "Show password"}
                     >
                       {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -179,9 +166,9 @@ export default function Login() {
                     id="remember"
                     checked={form.remember}
                     onChange={(e) => onChange("remember", e.target.checked)}
-                    className={`h-4 w-4 rounded-[6px] accent-[#0d718d] ${isDark ? "border-[#53626c] bg-[#0c1519]" : "border-[#c2c7ce] bg-white"}`}
+                    className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#56aeb9]"
                   />
-                  <label htmlFor="remember" className={`text-[15px] sm:text-[16px] ${isDark ? "text-[#d4dde2]" : "text-[#374151]"}`}>
+                  <label htmlFor="remember" className="text-[15px] sm:text-[16px] text-[#374151]">
                     Remember me for 30 days
                   </label>
                 </div>
@@ -193,15 +180,18 @@ export default function Login() {
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="flex h-14 w-full items-center justify-center gap-3 rounded-[14px] bg-[#0d718d] px-5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(13,113,141,0.22)] transition hover:bg-[#0b647d] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-[14px] bg-[#56aeb9] px-5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(86,174,185,0.32)] transition hover:bg-[#4aa3ae] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSubmitting ? "Signing in..." : "Sign In to Library"}
                   <ArrowRight size={16} />
                 </button>
+                <p className="text-center text-[15px] text-[#7d8793]">
+                  Not a member yet? <button type="button" className="font-semibold text-[#0b6a86] hover:text-[#084d63]">Apply for Library Card</button>
+                </p>
               </form>
-            </div>
+            </section>
           </div>
-        </section>
+        </div>
       </div>
     </main>
   );

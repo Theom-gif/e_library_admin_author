@@ -2,14 +2,19 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowUpRight,
+  BarChart3,
   BookOpen,
-  Crown,
-  Sparkles,
+  CalendarDays,
+  Download,
+  Search,
+  Target,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { USERS } from "../data/mockData";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { apiClient } from "../../lib/apiClient";
+import { cn } from "../../lib/utils";
 
 const fallbackLeaders = [
   { user: USERS[4], booksRead: 52, trend: 8 },
@@ -25,22 +30,19 @@ const getAvatarUrl = (user) => {
     getDisplayName(user)
   )}&background=0b1625&color=00f5a0`;
 };
+const getUserHandle = (user = {}) => {
+  const local = user?.email ? String(user.email).split("@")[0] : "";
+  return local ? `@${local}` : "@reader";
+};
 
-const PodiumBadge = ({ rank }) => {
-  const palette = [
-    "from-emerald-500 to-emerald-300",
-    "from-slate-600 to-slate-400",
-    "from-amber-500 to-amber-300",
-  ];
-  return (
-    <div
-      className={`absolute -top-6 w-14 h-14 rounded-2xl bg-gradient-to-br ${
-        palette[rank] || palette[0]
-      } shadow-lg shadow-emerald-900/30 border border-white/10 flex items-center justify-center text-bg-dark text-2xl font-black`}
-    >
-      {rank + 1}
-    </div>
-  );
+const formatCompactNumber = (value) =>
+  new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 1 }).format(Number(value || 0));
+
+const formatMemberSince = (value) => {
+  if (!value) return "-";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return String(value);
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 };
 
 const TopReaders = () => {
@@ -48,6 +50,8 @@ const TopReaders = () => {
   const navigate = useNavigate();
   const [range, setRange] = useState("all");
   const [leaders, setLeaders] = useState(fallbackLeaders);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState("books");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
@@ -161,52 +165,202 @@ const TopReaders = () => {
     };
   }, [range, t]);
 
-  const podium = useMemo(() => {
-    if (!leaders.length) return [];
-    const enriched = leaders.map((entry, idx) => ({ ...entry, rank: entry.rank || idx + 1 }));
-    const first = enriched[0];
-    const second = enriched[1];
-    const third = enriched[2];
-    const order = [];
-    if (second) order.push(second);
-    if (first) order.push(first);
-    if (third) order.push(third);
-    return order;
+  const normalizedLeaders = useMemo(() => {
+    return leaders.map((entry, idx) => ({
+      ...entry,
+      rank: entry.rank || idx + 1,
+      booksRead: Number(entry.booksRead || 0),
+      trend: Number(entry.trend || 0),
+    }));
   }, [leaders]);
 
+  const rankedLeaders = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    const filtered = normalizedLeaders.filter((entry) => {
+      if (!query) return true;
+      const text = `${getDisplayName(entry.user)} ${entry.user?.email || ""}`.toLowerCase();
+      return text.includes(query);
+    });
+
+    const sorted = [...filtered].sort((a, b) => {
+      if (sortBy === "activity") {
+        const scoreA = Number(a.booksRead || 0) * 7 + Number(a.trend || 0) * 14;
+        const scoreB = Number(b.booksRead || 0) * 7 + Number(b.trend || 0) * 14;
+        return scoreB - scoreA;
+      }
+      return Number(b.booksRead || 0) - Number(a.booksRead || 0);
+    });
+
+    return sorted.map((entry, index) => ({ ...entry, rank: index + 1 }));
+  }, [normalizedLeaders, searchQuery, sortBy]);
+
+  const podium = useMemo(() => {
+    if (!rankedLeaders.length) return [];
+    const first = rankedLeaders[0];
+    const second = rankedLeaders[1];
+    const third = rankedLeaders[2];
+    return [second, first, third].filter(Boolean);
+  }, [rankedLeaders]);
+
+  const totalBooksRead = useMemo(
+    () => rankedLeaders.reduce((sum, entry) => sum + Number(entry.booksRead || 0), 0),
+    [rankedLeaders]
+  );
+
+  const totalReaders = rankedLeaders.length;
+  const goalTarget = Math.max(100, totalReaders * 40);
+  const goalPct = Math.min(100, Math.round((totalBooksRead / goalTarget) * 100));
+  const maxScore = Math.max(
+    ...rankedLeaders.map((entry) => Number(entry.booksRead || 0) * 7 + Number(entry.trend || 0) * 14),
+    1
+  );
+
+  const getActivityScore = (entry) =>
+    Number(entry.booksRead || 0) * 7 + Number(entry.trend || 0) * 14;
+
+  const getStatus = (entry, idx) => {
+    if (idx < 3) return t("Top Reader");
+    if (Number(entry.trend || 0) >= 7) return t("Rising Star");
+    return t("Active");
+  };
+
+  const handleExportData = () => {
+    const rows = rankedLeaders.map((entry, idx) => ({
+      rank: entry.rank || idx + 1,
+      name: getDisplayName(entry.user),
+      handle: getUserHandle(entry.user),
+      books_read: entry.booksRead,
+      activity_score: getActivityScore(entry),
+      trend: entry.trend,
+      member_since: formatMemberSince(entry.user?.created_at),
+    }));
+    const header = Object.keys(rows[0] || {
+      rank: "",
+      name: "",
+      handle: "",
+      books_read: "",
+      activity_score: "",
+      trend: "",
+      member_since: "",
+    });
+    const csv = [
+      header.join(","),
+      ...rows.map((row) => header.map((key) => `"${String(row[key] ?? "").replace(/"/g, '""')}"`).join(",")),
+    ].join("\n");
+
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `top-readers-${range}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
-    <div className="space-y-8">
-      {/* Header / Shell */}
-      <div className="glass-card flex flex-wrap items-center justify-between gap-3 px-6 py-4 border border-white/5">
-        <div className="flex items-center gap-3">
-          <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-300 flex items-center justify-center text-bg-dark font-black shadow-lg shadow-emerald-900/30">
-            <Crown size={20} />
-          </div>
-          <div>
-            <p className="text-xs uppercase tracking-[0.18em] text-emerald-200/80">
-              Obsidian Ledger
-            </p>
-            <h2 className="text-xl font-bold">Top Readers Leaderboard</h2>
+    <div className="mx-auto max-w-[1400px] space-y-6">
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_1.8fr]">
+        <div className="glass-card rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(72,84,171,0.2),rgba(8,12,28,0.56))] p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black">{t("Total Readers")}</p>
+              <h3 className="mt-2 text-3xl font-extrabold">{formatCompactNumber(totalReaders)}</h3>
+              <p className="mt-2 text-xs text-slate-500 inline-flex items-center gap-1">
+                <ArrowUpRight size={12} />
+                +{formatCompactNumber(Math.max(1, totalReaders * 0.12))} {t("this period")}
+              </p>
+            </div>
+            <div className="h-10 w-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+              <Users size={18} className="text-indigo-300" />
+            </div>
           </div>
         </div>
-        <div className="flex items-center gap-3 text-sm">
-          <select
-            value={range}
-            onChange={(e) => setRange(e.target.value)}
-            className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm focus:outline-none text-slate-100 cursor-pointer hover:bg-white/10 transition-colors"
-          >
-            <option value="all">{t("All Time")}</option>
-            <option value="month">{t("This Month")}</option>
-            <option value="week">{t("This Week")}</option>
-          </select>
-          <span className="inline-flex items-center gap-2 rounded-full bg-emerald-500/10 text-emerald-200 px-3 py-1 border border-emerald-400/20">
-            <TrendingUp size={16} />
-            {t("Engagement +12%")}
-          </span>
-          <span className="inline-flex items-center gap-2 rounded-full bg-white/5 text-slate-200 px-3 py-1 border border-white/10">
-            <Sparkles size={16} />
-            {t("Updated daily")}
-          </span>
+
+        <div className="glass-card rounded-2xl border border-pink-400/25 bg-[linear-gradient(135deg,rgba(232,121,249,0.15),rgba(12,17,36,0.58))] p-5">
+          <div className="flex items-start justify-between">
+            <div>
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black">{t("Books Read")}</p>
+              <h3 className="mt-2 text-3xl font-extrabold">{formatCompactNumber(totalBooksRead)}</h3>
+              <p className="mt-2 text-xs text-pink-300 inline-flex items-center gap-1">
+                <TrendingUp size={12} />
+                +{(rankedLeaders[0]?.trend || 0).toFixed(1)}% {t("trend")}
+              </p>
+            </div>
+            <div className="h-10 w-10 rounded-xl bg-white/10 border border-white/10 flex items-center justify-center">
+              <BookOpen size={18} className="text-pink-300" />
+            </div>
+          </div>
+        </div>
+
+        <div className="glass-card rounded-2xl border border-white/10 bg-[linear-gradient(135deg,rgba(72,84,171,0.2),rgba(8,12,28,0.58))] p-5">
+          <div className="flex items-start justify-between gap-5">
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] uppercase tracking-[0.18em] text-slate-500 font-black">{t("Weekly Reading Goal")}</p>
+              <p className="mt-1 text-sm text-slate-500">{t("Community reading challenge progress")}</p>
+              <div className="mt-4 h-2.5 rounded-full bg-black/40 overflow-hidden">
+                <div
+                  className="h-full rounded-full"
+                  style={{ width: `${goalPct}%`, background: "linear-gradient(90deg,#818cf8,#ec4899)" }}
+                />
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-2xl font-extrabold">{goalPct}%</div>
+              <p className="text-xs text-slate-500 mt-1">{t("Target")}: {formatCompactNumber(goalTarget)}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h2 className="text-[46px] font-black tracking-tight leading-none">{t("Top Readers")}</h2>
+          <p className="text-base text-slate-500 mt-2">{t("Users with highest reading activity across all categories")}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 text-sm">
+          <div className="relative">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t("Search users")}
+              className="w-48 rounded-full border border-white/10 bg-white/5 pl-9 pr-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+            />
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+            <CalendarDays size={14} className="text-slate-400" />
+            <select
+              value={range}
+              onChange={(e) => setRange(e.target.value)}
+              className="bg-transparent text-sm focus:outline-none"
+            >
+              <option value="all">{t("All Time")}</option>
+              <option value="month">{t("Monthly Stats")}</option>
+              <option value="week">{t("This Week")}</option>
+            </select>
+          </div>
+          <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-3 py-2">
+            <BarChart3 size={14} className="text-slate-400" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              className="bg-transparent text-sm focus:outline-none"
+            >
+              <option value="books">{t("Sort: Books")}</option>
+              <option value="activity">{t("Sort: Activity")}</option>
+            </select>
+          </div>
+          <div>
+            <button
+              type="button"
+              onClick={handleExportData}
+              className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 font-semibold hover:bg-white/10 transition"
+            >
+              <Download size={14} />
+              {t("Export Data")}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -220,67 +374,76 @@ const TopReaders = () => {
         </div>
       )}
 
-      {/* Podium with centered #1 */}
-      <div className="flex flex-col md:flex-row items-center justify-center gap-4 md:gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-5 items-stretch">
         {podium.map((entry, index) => {
-          const isCenter = index === 1;
-          const rankIndex = isCenter ? 0 : index === 0 ? 1 : 2; // visual badge gradient
-          const cardClasses = isCenter
-            ? "md:-mt-8 scale-100 md:scale-105 bg-gradient-to-br from-slate-900/80 via-slate-900/70 to-slate-800/70 border border-emerald-400/20 shadow-2xl shadow-emerald-900/30"
-            : "bg-gradient-to-br from-slate-900/70 via-slate-900/60 to-slate-800/60 border border-white/10 shadow-xl shadow-black/25";
+          const isChampion = index === 1;
+          const displayRank = isChampion ? 1 : index === 0 ? 2 : 3;
+          const activityScore = getActivityScore(entry);
+          const medal = displayRank === 1
+            ? {
+                text: "text-amber-200",
+                avatar: "border-amber-300/70",
+                badge: "bg-gradient-to-br from-amber-300 to-yellow-500 text-[#4a3200]",
+                card: "border-amber-300/30 shadow-amber-900/25",
+              }
+            : displayRank === 2
+            ? {
+                text: "text-slate-200",
+                avatar: "border-slate-300/70",
+                badge: "bg-gradient-to-br from-slate-200 to-slate-400 text-[#1f2937]",
+                card: "border-slate-300/25 shadow-slate-900/20",
+              }
+            : {
+                text: "text-orange-200",
+                avatar: "border-orange-300/70",
+                badge: "bg-gradient-to-br from-orange-300 to-amber-600 text-[#3f2200]",
+                card: "border-orange-300/25 shadow-orange-900/20",
+              };
 
           return (
             <div
               key={entry.user?.id ?? entry.rank ?? index}
-              className={`relative rounded-2xl px-6 pt-10 pb-6 w-full max-w-sm flex flex-col items-center text-center ${cardClasses}`}
+              className={cn(
+                "relative rounded-2xl p-6 text-center border border-white/10 bg-[linear-gradient(135deg,rgba(39,55,110,0.22),rgba(8,13,30,0.64))] h-full flex flex-col",
+                isChampion ? "md:-mt-8 shadow-2xl" : "shadow-xl shadow-black/15",
+                medal.card
+              )}
             >
-              <PodiumBadge rank={rankIndex} />
+              {isChampion && (
+                <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full px-5 py-1 text-xs font-black tracking-[0.16em] text-[#5b3f03] bg-[#f2c863] border border-[#ffd978]">
+                  {t("Champion")}
+                </div>
+              )}
               <div
-                className={`rounded-2xl overflow-hidden border ${
-                  isCenter ? "border-emerald-400/40" : "border-white/10"
-                } shadow-lg shadow-black/30 mb-4`}
+                className={cn(
+                  "mx-auto relative rounded-full overflow-hidden border-2 shadow-lg mb-4",
+                  isChampion ? "w-32 h-32" : "w-24 h-24",
+                  medal.avatar
+                )}
               >
                 <img
                   src={getAvatarUrl(entry.user)}
                   alt={getDisplayName(entry.user)}
-                  className={`object-cover ${
-                    isCenter ? "w-28 h-28" : "w-24 h-24"
-                  }`}
+                  className="w-full h-full object-cover"
                 />
+                <div className={cn("absolute -bottom-1 left-1/2 -translate-x-1/2 h-8 w-8 rounded-full border border-white/20 flex items-center justify-center font-black", medal.badge)}>
+                  {displayRank}
+                </div>
               </div>
-              <h4
-                className={`font-bold ${
-                  isCenter ? "text-xl" : "text-lg"
-                }`}
-              >
-                {getDisplayName(entry.user)}
-              </h4>
-              <p className="text-slate-400 text-sm mb-4">
-                {entry.user.email}
-              </p>
-              <div
-                className={`flex items-center gap-2 px-5 py-3 rounded-xl border ${
-                  isCenter
-                    ? "bg-emerald-500/10 border-emerald-400/30"
-                    : "bg-white/5 border-white/10"
-                }`}
-              >
-                <BookOpen
-                  size={16}
-                  className={isCenter ? "text-emerald-300" : "text-emerald-200"}
-                />
-                <span
-                  className={`font-bold ${
-                    isCenter ? "text-2xl" : "text-xl"
-                  } text-white`}
-                >
-                  {entry.booksRead}
-                </span>
-                <span className="text-xs text-slate-400 uppercase font-black tracking-wide">
-                  {t("Books")}
-                </span>
+              <h4 className={cn("font-bold leading-tight break-words", isChampion ? "text-4xl" : "text-3xl", medal.text)}>{getDisplayName(entry.user)}</h4>
+              <p className="text-base text-slate-500 mt-1">{getUserHandle(entry.user)}</p>
+
+              <div className="mt-5 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-white/10 bg-black/30 py-3">
+                  <p className="text-2xl font-black text-amber-300">{entry.booksRead}</p>
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-black">{t("Books Read")}</p>
+                </div>
+                <div className="rounded-2xl border border-white/10 bg-black/30 py-3">
+                  <p className="text-2xl font-black text-indigo-300">{activityScore}</p>
+                  <p className="text-[10px] uppercase tracking-[0.16em] text-slate-500 font-black">{t("Activity Score")}</p>
+                </div>
               </div>
-              <div className="mt-3 text-xs font-semibold text-emerald-200 inline-flex items-center gap-1">
+              <div className="mt-4 text-sm font-semibold text-emerald-300 inline-flex items-center gap-1 justify-center">
                 <ArrowUpRight size={14} /> {t("Momentum")} +{entry.trend}
               </div>
             </div>
@@ -288,36 +451,51 @@ const TopReaders = () => {
         })}
       </div>
 
-      {/* Leaderboard */}
-      <div className="glass-card overflow-hidden border border-white/10 shadow-xl shadow-black/25">
+      <div className="glass-card overflow-hidden border border-white/10 shadow-xl shadow-black/20 rounded-2xl">
         <div className="p-6 border-b border-white/5 flex items-center justify-between">
           <div>
-            <p className="text-xs uppercase tracking-[0.16em] text-slate-500">
-              {t("Complete Leaderboard")}
-            </p>
-            <h3 className="text-lg font-bold text-white">
-              {t("Reader Performance")} - {getRangeLabel(range)}
-            </h3>
+            <h3 className="text-2xl font-black">{t("Leaderboard Rankings")}</h3>
+            <p className="text-sm text-slate-500 mt-1">{t("Reader Performance")} - {getRangeLabel(range)}</p>
           </div>
+          <p className="text-sm text-slate-500">{t("Showing")} {rankedLeaders.length} {t("users")}</p>
         </div>
 
         <table className="w-full text-left">
           <thead>
             <tr className="bg-white/2 text-slate-500 text-[11px] font-black uppercase tracking-[0.12em]">
               <th className="px-6 py-4">{t("Rank")}</th>
-              <th className="px-6 py-4">{t("Reader")}</th>
-              <th className="px-6 py-4">{t("Books Read")}</th>
-              <th className="px-6 py-4">{t("Member Since")}</th>
-              <th className="px-6 py-4 text-right">{t("Trend")}</th>
+              <th className="px-6 py-4">
+                <span className="inline-flex items-center gap-1.5">
+                  <Users size={12} />
+                  {t("Reader")}
+                </span>
+              </th>
+              <th className="px-6 py-4">
+                <span className="inline-flex items-center gap-1.5">
+                  <BookOpen size={12} />
+                  {t("Books Read")}
+                </span>
+              </th>
+              <th className="px-6 py-4">
+                <span className="inline-flex items-center gap-1.5">
+                  <BarChart3 size={12} />
+                  {t("Activity Score")}
+                </span>
+              </th>
+              <th className="px-6 py-4">{t("Status")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {leaders.map((entry, idx) => (
+            {rankedLeaders.map((entry, idx) => {
+              const score = getActivityScore(entry);
+              const scorePct = Math.max(8, Math.round((score / maxScore) * 100));
+              const status = getStatus(entry, idx);
+              return (
               <tr
                 key={entry.user?.id ?? entry.rank ?? idx}
                 className="hover:bg-white/5 transition-colors"
               >
-                <td className="px-6 py-4 font-black text-slate-500">
+                <td className="px-6 py-4 font-black text-slate-500 text-lg">
                   #{entry.rank || idx + 1}
                 </td>
                 <td className="px-6 py-4">
@@ -328,29 +506,45 @@ const TopReaders = () => {
                       className="w-10 h-10 rounded-full object-cover border border-white/10"
                     />
                     <div className="leading-tight">
-                      <span className="font-semibold text-white block">
+                      <span className="font-semibold block">
                         {getDisplayName(entry.user)}
                       </span>
                       <span className="text-xs text-slate-500">
-                        {entry.user.email}
+                        {getUserHandle(entry.user)} - {formatMemberSince(entry.user.created_at)}
                       </span>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 font-bold text-emerald-200">
+                <td className="px-6 py-4 font-bold text-xl">
                   {entry.booksRead}
                 </td>
-                <td className="px-6 py-4 text-slate-400 text-sm">
-                  {entry.user.created_at}
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className="h-2 w-32 rounded-full bg-black/40 overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${scorePct}%`, background: "linear-gradient(90deg,#818cf8,#ec4899)" }}
+                      />
+                    </div>
+                    <span className="font-bold text-sm">{score}</span>
+                  </div>
                 </td>
-                <td className="px-6 py-4 text-right">
-                  <span className="text-emerald-300 text-xs font-bold inline-flex items-center justify-end gap-1 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded-full">
-                    <ArrowUpRight size={14} />
-                    +{entry.trend}
+                <td className="px-6 py-4">
+                  <span className={cn(
+                    "text-xs font-bold inline-flex items-center gap-1 border px-2.5 py-1 rounded-full",
+                    status === t("Top Reader")
+                      ? "bg-pink-500/10 text-pink-300 border-pink-400/30"
+                      : status === t("Rising Star")
+                      ? "bg-indigo-500/10 text-indigo-300 border-indigo-400/30"
+                      : "bg-white/5 text-slate-300 border-white/10"
+                  )}>
+                    <Target size={12} />
+                    {status}
                   </span>
                 </td>
               </tr>
-            ))}
+            );
+            })}
           </tbody>
         </table>
       </div>
@@ -359,3 +553,4 @@ const TopReaders = () => {
 };
 
 export default TopReaders;
+

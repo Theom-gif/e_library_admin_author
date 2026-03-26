@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import { CATEGORIES } from "../data/mockData";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { createAdminCategory, fetchAdminCategories } from "../services/adminService";
+import { useTheme } from "../../theme/ThemeContext";
 
 const ICON_MAP = {
   Tech: Cpu,
@@ -39,6 +40,7 @@ const getErrorMessage = (error, fallback) => {
 
 const Categories = () => {
   const { t } = useLanguage();
+  const { isDark } = useTheme();
   const nameInputRef = useRef(null);
   const [categories, setCategories] = useState(() => CATEGORIES);
   const [searchTerm, setSearchTerm] = useState("");
@@ -53,6 +55,20 @@ const Categories = () => {
 
   const totalBooks = categories.reduce((sum, category) => sum + Number(category.count || 0), 0);
   const averageBooks = categories.length > 0 ? Math.round(totalBooks / categories.length) : 0;
+  const categoryCardStyle = {
+    background: isDark
+      ? "linear-gradient(180deg,#13294b 0%,#10203c 100%)"
+      : "linear-gradient(180deg,#f7fbff 0%,#edf4ff 100%)",
+    borderColor: isDark ? "rgba(255,255,255,0.1)" : "rgba(15,23,42,0.12)",
+  };
+  const categoryIconWrapStyle = {
+    background: isDark
+      ? "linear-gradient(180deg,#5f3d95 0%,#4b2f77 100%)"
+      : "linear-gradient(180deg,#8f4cf6 0%,#6f38d7 100%)",
+    boxShadow: isDark
+      ? "0 8px 22px rgba(58,25,102,0.35)"
+      : "0 8px 20px rgba(111,56,215,0.25)",
+  };
 
   const focusCreateForm = () => {
     nameInputRef.current?.focus();
@@ -192,10 +208,11 @@ const Categories = () => {
               return (
                 <article
                   key={cat.id}
-                  className="rounded-2xl border border-white/10 bg-[linear-gradient(180deg,#13294b_0%,#10203c_100%)] p-5 transition-all hover:border-[#5f7aa4]"
+                  className="rounded-2xl border p-5 transition-all hover:border-[#5f7aa4]"
+                  style={categoryCardStyle}
                 >
-                  <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#5f3d95_0%,#4b2f77_100%)] shadow-[0_8px_22px_rgba(58,25,102,0.35)]">
-                    <CategoryIcon size={26} className="text-slate-100" aria-hidden />
+                  <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-2xl" style={categoryIconWrapStyle}>
+                    <CategoryIcon size={26} style={{ color: "#ffffff" }} aria-hidden />
                   </div>
                   <h4 className="text-2xl font-bold">{cat.name}</h4>
                   <p className="mt-2 flex items-center gap-2 text-sm text-slate-300">

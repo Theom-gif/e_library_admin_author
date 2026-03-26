@@ -14,7 +14,6 @@ import TopReaders from "./pages/TopReaders";
 import Users from "./pages/Users";
 
 import Login from "../auth/pages/Login";
-import Register from "../auth/pages/Register";
 import UserDashboard from "../auth/pages/UserDashboard";
 
 // Author imports
@@ -67,7 +66,7 @@ export default function AdminRoutes() {
 
       <Route
         path="/register"
-        element={isAuthenticated ? <Navigate to={homePath} replace /> : <Register />}
+        element={<Navigate to={isAuthenticated ? homePath : "/login"} replace />}
       />
 
       {/* Root Route */}

@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { cn } from "../../lib/utils";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { apiClient } from "../../lib/apiClient";
+import { useTheme } from "../../theme/ThemeContext";
 
 const defaultNotifications = [
   { key: "new_reader", label: "New Reader", desc: "When someone starts reading your book", active: true },
@@ -9,8 +10,6 @@ const defaultNotifications = [
   { key: "weekly_report", label: "Weekly Report", desc: "Weekly analytics summary email", active: false },
   { key: "new_comment", label: "New Comment", desc: "When someone comments on your book", active: true },
 ];
-
-const ADMIN_THEME_KEY = "admin-theme";
 
 const LANGUAGE_OPTIONS = [
   { value: "en", label: "English" },
@@ -22,26 +21,12 @@ const Settings = () => {
   const [currentPassword, setCurrentPassword] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-  const [theme, setTheme] = useState(() => {
-    if (typeof window === "undefined") return "dark";
-    const savedTheme = window.localStorage.getItem(ADMIN_THEME_KEY);
-    return savedTheme === "light" ? "light" : "dark";
-  });
   const [notificationPrefs, setNotificationPrefs] = useState(defaultNotifications);
   const { language, setLanguage, t } = useLanguage();
+  const { theme, setTheme } = useTheme();
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    window.localStorage.setItem(ADMIN_THEME_KEY, theme);
-    if (theme === "light") {
-      document.documentElement.setAttribute("data-theme", "light");
-      return;
-    }
-    document.documentElement.removeAttribute("data-theme");
-  }, [theme]);
 
   const themeOptions = useMemo(
     () => [

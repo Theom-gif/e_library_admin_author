@@ -31,6 +31,7 @@ const isLoopbackHost = (host = '') =>
 
 const isAbsoluteUrl = (value = '') => /^https?:\/\//i.test(String(value));
 const isBlobLikeUrl = (value = '') => /^data:|^blob:/i.test(String(value));
+const isRootRelativeUrl = (value = '') => /^\//.test(String(value || '').trim());
 const trimSlash = (value = '') => String(value || '').replace(/\/+$/, '');
 
 // Assets live at the site root (e.g., https://example.com/storage/...), not under /api.
@@ -58,6 +59,10 @@ const buildStorageUrl = (path = '') => {
 const normalizeAssetUrl = (value = '') => {
   const raw = String(value || '').trim();
   if (!raw) return '';
+  if (isBlobLikeUrl(raw)) return raw;
+  if (isRootRelativeUrl(raw)) {
+    return `${ASSET_BASE_URL}${raw}`;
+  }
 
   try {
     const url = new URL(raw);
@@ -69,8 +74,22 @@ const normalizeAssetUrl = (value = '') => {
     }
     return url.toString();
   } catch {
-    return raw;
+    return buildStorageUrl(raw);
   }
+};
+
+const resolveAssetUrl = (...candidates) => {
+  for (const candidate of candidates) {
+    const normalized =
+      normalizeAssetUrl(candidate) ||
+      buildStorageUrl(candidate);
+
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return '';
 };
 
 const normalizeStatus = (value) => {
@@ -93,19 +112,22 @@ export const mapApiBookToUiBook = (book) => ({
   reads: '0',
   sales: '$0',
   img:
-    normalizeAssetUrl(book?.cover_view_url) ||
-    buildStorageUrl(book?.cover_view_url) ||
-    buildStorageUrl(book?.cover_api_url) ||
-    buildStorageUrl(book?.cover_image_url) ||
-    buildStorageUrl(book?.cover_image_path) ||
-    normalizeAssetUrl(book?.cover_image_url) ||
-    'https://picsum.photos/seed/new-book/300/450',
+    resolveAssetUrl(
+      book?.cover_view_url,
+      book?.cover_api_url,
+      book?.cover_image_url,
+      book?.cover_image_path,
+      book?.cover,
+      book?.image,
+      book?.thumbnail,
+    ) || 'https://picsum.photos/seed/new-book/300/450',
   description: book?.description || '',
   genre: book?.category || '',
-  manuscriptUrl:
-    buildStorageUrl(book?.book_file_path) ||
-    buildStorageUrl(book?.book_file_url) ||
-    normalizeAssetUrl(book?.book_file_url),
+  manuscriptUrl: resolveAssetUrl(
+    book?.book_file_path,
+    book?.book_file_url,
+    book?.file,
+  ),
   manuscriptName: getFileName(book?.book_file_url || book?.book_file_path || ''),
   manuscriptType: book?.manuscript_type || inferFileType(getFileName(book?.book_file_url || book?.book_file_path || '')),
   manuscriptSizeBytes: book?.manuscript_size_bytes || 0,

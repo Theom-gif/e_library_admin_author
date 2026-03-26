@@ -1,14 +1,9 @@
 import React, { useEffect, useState } from "react";
 import {
-  Bell,
   BookOpen,
   Library,
   PenLine,
-  Search,
-  Settings,
   ShieldAlert,
-  TrendingDown,
-  TrendingUp,
   UploadCloud,
   Users,
 } from "lucide-react";
@@ -177,7 +172,7 @@ const SystemMonitor = () => {
         // Fill gaps with split endpoints
         if (!unified?.stats) {
           const statsRes = await fetchMonitorStats({ signal: controller.signal });
-          if (statsRes?.stats)setStats(normalizeStatApiResponse(statsRes.stats));
+          if (statsRes?.stats) setStats(normalizeStatApiResponse(statsRes.stats));
         }
 
         if (!unified?.activity) {
@@ -201,8 +196,8 @@ const SystemMonitor = () => {
         console.error("Failed to load monitor data:", err);
         setError(
           err?.response?.data?.message ||
-            err?.message ||
-            t("Failed to load system monitor data. Using fallback data.")
+          err?.message ||
+          t("Failed to load system monitor data. Using fallback data.")
         );
         // Keep fallback data visible
       } finally {
@@ -220,43 +215,6 @@ const SystemMonitor = () => {
 
   return (
     <div className="flex h-screen flex-col bg-background-dark text-slate-100 font-sans selection:bg-primary/30">
-      {/* Top Navigation Bar */}
-      <header className="flex items-center justify-between border-b border-white/5 bg-background-dark px-6 py-3 z-20">
-        <div className="flex items-center gap-8">
-          <div className="relative flex items-center w-80">
-            <Search className="absolute left-3 w-4 h-4 text-slate-500" />
-            <input
-              className="w-full rounded-lg border border-white/10 bg-white/5 pl-10 py-2 focus:ring-1 focus:ring-primary text-sm transition-all outline-none"
-              placeholder="Search resources, books, or users..."
-              type="text"
-            />
-          </div>
-        </div>
-        <div className="flex items-center gap-4">
-          <button className="p-2 rounded-lg bg-white/5 border border-white/10 text-primary hover:bg-white/10 transition-colors">
-            <Bell className="w-5 h-5" />
-          </button>
-          <button className="p-2 rounded-lg bg-white/5 border border-white/10 text-primary hover:bg-white/10 transition-colors">
-            <Settings className="w-5 h-5" />
-          </button>
-          <div className="h-8 w-[1px] bg-white/10 mx-2"></div>
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
-              <p className="text-xs font-semibold">Admin User</p>
-              <p className="text-[10px] text-slate-500">System Overseer</p>
-            </div>
-            <div
-              className="h-10 w-10 rounded-full bg-primary flex items-center justify-center text-white font-bold overflow-hidden border-2 border-primary/20"
-              style={{
-                backgroundImage: "url('https://picsum.photos/seed/admin/100/100')",
-                backgroundSize: 'cover'
-              }}
-            >
-            </div>
-          </div>
-        </div>
-      </header>
-
       <div className="flex flex-1 overflow-hidden">
 
         {/* Main Content Area */}
@@ -277,35 +235,6 @@ const SystemMonitor = () => {
                 )}
               </div>
             )}
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {stats.map((stat, idx) => {
-                const Icon = stat.icon;
-                const isUp = stat.trend === "up";
-
-                return (
-                  <motion.div
-                    key={stat.label}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    className={`bg-white/5 p-6 rounded-xl border shadow-sm ${stat.isAlert ? "border-rose-500/20 bg-rose-500/5" : "border-white/5"}`}
-                  >
-                    <div className="flex justify-between items-start mb-4">
-                      <span className={`p-2 rounded-lg ${stat.isAlert ? "bg-rose-500/10 text-rose-500" : "bg-primary/10 text-primary"}`}>
-                        <Icon className="w-4 h-4" />
-                      </span>
-                      <span className={`${isUp ? "text-emerald-500" : "text-rose-500"} text-xs font-bold flex items-center gap-1`}>
-                        {stat.change}
-                        {isUp ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                      </span>
-                    </div>
-                    <p className="text-slate-400 text-sm font-medium">{stat.label}</p>
-                    <h3 className={`text-2xl font-bold mt-1 ${stat.isAlert ? "text-rose-500" : ""}`}>{stat.value}</h3>
-                  </motion.div>
-                );
-              })}
-            </div>
 
             {/* Charts Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

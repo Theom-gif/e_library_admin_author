@@ -84,6 +84,7 @@ docs/
   user-reading-activity-backend.md
   top-readers-backend.md
   books-backend-guide.md
+  book-cover-image-backend-guide.md
   categories-backend-guide.md
   system-monitor-backend.md
   login-troubleshooting.md
@@ -586,6 +587,7 @@ git push origin main
 | `user-reading-activity-backend.md` | User activity tracking | Reading records, statistics, leaderboard |
 | `top-readers-backend.md` | Leaderboard API | Reader ranking, trends |
 | `books-backend-guide.md` | Book management | CRUD, approval workflow |
+| `book-cover-image-backend-guide.md` | Uploaded book cover images | Storage paths, public URLs, response fields |
 | `categories-backend-guide.md` | Category management | Category CRUD, counts |
 | `system-monitor-backend.md` | System monitoring | Health, metrics, top books |
 | `login-troubleshooting.md` | Authentication & auth issues | Login flow, error handling |

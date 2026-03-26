@@ -214,7 +214,7 @@ function isRoleValidationError(error) {
   const text = getErrorMessageText(error).toLowerCase();
   const isClientValidationStatus = status >= 400 && status < 500;
   return (
-    isClientValidationStatus &&
+    isClientValidationStatus &&s
     (text.includes("role") ||
       text.includes("user, author, or admin") ||
       text.includes("selected role is invalid") ||

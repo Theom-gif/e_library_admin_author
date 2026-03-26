@@ -126,6 +126,7 @@ function syncAuthorProfileFromAuth(sessionUser, backendUser) {
     !existingName ||
     (existingIsGeneric && !resolvedIsGeneric);
 
+
   const nextProfile = {
     ...(shouldResetProfile ? {} : existingProfile),
     ...(shouldUpdateName ? { name: resolvedName } : {}),
@@ -157,29 +158,6 @@ function resolveSessionRole(backendUser, data, requestedRole) {
     requestedRole,
   ]);
   return getRoleName(backendRole);
-}
-
-function extractRoleValue(backendUser, data) {
-  return firstDefinedValue([
-    backendUser?.role_id,
-    backendUser?.roleId,
-    backendUser?.role,
-    backendUser?.role_name,
-    backendUser?.roleName,
-    backendUser?.user_role,
-    backendUser?.type,
-    data?.role_id,
-    data?.roleId,
-    data?.role,
-    data?.role_name,
-    data?.roleName,
-    data?.user_role,
-    data?.type,
-  ]);
-}
-
-function resolveSessionRole(backendUser, data) {
-  return getRoleName(extractRoleValue(backendUser, data));
 }
 
 function resolveSessionUserId(backendUser) {
@@ -271,6 +249,7 @@ export function AuthProvider({ children }) {
     const storedSession = getSession();
     const storedToken = getTokenFromStorage();
 
+
     if (!storedSession || !storedToken) {
       clearSession();
       clearToken();
@@ -289,7 +268,7 @@ export function AuthProvider({ children }) {
       user,
       isReady,
       isAuthenticated: Boolean(user),
-      login: async ({ email, password, remember = false }) => {
+      login: async ({ email, password, remember = false, role } = {}) => {
         try {
           const response = await loginWithRequestFallbacks({ email, password });
           const data = response?.data || {};

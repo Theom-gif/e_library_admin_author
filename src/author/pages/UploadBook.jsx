@@ -18,6 +18,22 @@ const PROFILE_STORAGE_KEY = 'author_studio_profile';
 const GENRE_OPTIONS = ['Technology', 'Novel', 'Education', 'Business', 'History'];
 const NATIVE_OPTION_STYLE = { color: '#0f172a', backgroundColor: '#ffffff' };
 const FALLBACK_COVER_URL = 'https://picsum.photos/seed/new-book/300/450';
+const COVER_CACHE_KEY = 'author_book_covers';
+
+const buildCoverKey = (title, author) =>
+  `${String(title || '').trim().toLowerCase()}|${String(author || '').trim().toLowerCase()}`;
+
+const saveCoverToCache = (key, url) => {
+  if (!key || !url) return;
+  try {
+    const raw = window.localStorage.getItem(COVER_CACHE_KEY);
+    const current = raw ? JSON.parse(raw) : {};
+    const next = { ...current, [key]: url };
+    window.localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore storage errors.
+  }
+};
 
 const mapOpenLibrarySubjectToGenre = (subject = '') => {
   if (!subject || typeof subject !== 'string') return '';
@@ -280,9 +296,24 @@ const UploadBook = () => {
       
       console.log('Book uploaded successfully:', response?.data);
       
+      const resolvedAuthorName = selectedAuthor?.name || authorQuery.trim();
+      const coverState = coverPreviewUrl
+        ? {
+            key: buildCoverKey(title, resolvedAuthorName),
+            url: coverPreviewUrl,
+          }
+        : null;
+
+      if (coverState) {
+        saveCoverToCache(coverState.key, coverState.url);
+      }
+
       // Success - navigate to my books
       window.setTimeout(() => {
-        navigate('/author/my-books', { replace: true });
+        navigate('/author/my-books', {
+          replace: true,
+          state: coverState ? { uploadedCover: coverState } : null,
+        });
       }, 500);
       
     } catch (error) {

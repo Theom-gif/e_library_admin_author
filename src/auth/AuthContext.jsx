@@ -74,7 +74,6 @@ function firstDefinedValue(values) {
   return values.find((value) => String(value ?? "").trim() !== "");
 }
 
-<<<<<<< HEAD
 function isGenericAuthorName(name) {
   return GENERIC_AUTHOR_NAMES.has(String(name || "").trim());
 }
@@ -158,33 +157,6 @@ function resolveSessionRole(backendUser, data, requestedRole) {
     requestedRole,
   ]);
   return getRoleName(backendRole);
-=======
-function extractBackendUser(data) {
-  return data?.user || data?.data?.user || data || {};
->>>>>>> 6f6d89284a94fc2f43ddf1f15abf6b28c7888fc7
-}
-
-function extractRoleValue(backendUser, data) {
-  return firstDefinedValue([
-    backendUser?.role_id,
-    backendUser?.roleId,
-    backendUser?.role,
-    backendUser?.role_name,
-    backendUser?.roleName,
-    backendUser?.user_role,
-    backendUser?.type,
-    data?.role_id,
-    data?.roleId,
-    data?.role,
-    data?.role_name,
-    data?.roleName,
-    data?.user_role,
-    data?.type,
-  ]);
-}
-
-function resolveSessionRole(backendUser, data) {
-  return getRoleName(extractRoleValue(backendUser, data));
 }
 
 function resolveSessionUserId(backendUser) {
@@ -294,11 +266,10 @@ export function AuthProvider({ children }) {
       user,
       isReady,
       isAuthenticated: Boolean(user),
-      login: async ({ email, password, remember = false }) => {
+      login: async ({ email, password, remember = false, role } = {}) => {
         try {
           const response = await loginWithRequestFallbacks({ email, password });
           const data = response?.data || {};
-<<<<<<< HEAD
           const backendUser = data.user || data.data?.user || data;
           const resolvedRole = resolveSessionRole(backendUser, data, role);
           const resolvedName = resolveBackendFullName(backendUser);
@@ -306,20 +277,6 @@ export function AuthProvider({ children }) {
           const sessionUser = {
             id: backendUser?.id || backendUser?._id || backendUser?.userId || `u_${Date.now()}`,
             name: resolvedName || backendUser?.username || backendUser?.email || "User",
-=======
-          const backendUser = extractBackendUser(data);
-          const backendRole = extractRoleValue(backendUser, data);
-
-          if (!backendRole) {
-            return { ok: false, error: "Login succeeded, but the backend did not return the user's role." };
-          }
-
-          const resolvedRole = resolveSessionRole(backendUser, data);
-
-          const sessionUser = {
-            id: resolveSessionUserId(backendUser) || `u_${Date.now()}`,
-            name: resolveSessionUserName(backendUser),
->>>>>>> 6f6d89284a94fc2f43ddf1f15abf6b28c7888fc7
             email: backendUser?.email || String(email || "").trim().toLowerCase(),
             role: resolvedRole,
           };

@@ -239,7 +239,7 @@ const Dashboard = () => {
         <div className="flex gap-3">
           <button
             onClick={() => window.alert('Report download started.')}
-            className="px-4 py-2 bg-black text-white rounded-lg text-sm font-bold border border-white/10 hover:bg-slate-900 transition-colors"
+            className="px-4 py-2 rounded-lg text-sm font-bold border border-white/10 bg-primary text-on-primary shadow-glow hover:brightness-110 transition-all"
           >
             Download Report
           </button>
@@ -284,11 +284,11 @@ const Dashboard = () => {
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <div className="size-2 rounded-full bg-accent"></div>
-                <span className="text-xs text-slate-400">Books Sold</span>
+                <span className="text-xs font-semibold text-[color:var(--text)]">Books Sold</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="size-2 rounded-full bg-primary"></div>
-                <span className="text-xs text-slate-400">Books Read</span>
+                <span className="text-xs font-semibold text-[color:var(--text)]">Books Read</span>
               </div>
             </div>
           </div>

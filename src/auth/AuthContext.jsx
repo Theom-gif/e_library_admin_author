@@ -7,6 +7,10 @@ import { getRoleName } from "./roleUtils";
 const SESSION_KEY = "bookhub_session";
 const TOKEN_KEY = "bookhub_token";
 const REMEMBER_KEY = "bookhub_remember";
+const AUTHOR_PROFILE_KEY = "author_studio_profile";
+const AUTHOR_PROFILE_UPDATED_EVENT = "author-profile-updated";
+const DEFAULT_AUTHOR_NAME = "Alex Rivera";
+const GENERIC_AUTHOR_NAMES = new Set(["User", "Author", DEFAULT_AUTHOR_NAME]);
 
 const AuthContext = createContext(null);
 
@@ -196,6 +200,7 @@ export function AuthProvider({ children }) {
 
     // if session + token exist → restore login
     setUser(storedSession);
+    syncAuthorProfileFromAuth(storedSession, null);
     setIsReady(true);
   }, []);
   const value = useMemo(
@@ -238,6 +243,7 @@ export function AuthProvider({ children }) {
           saveToken(token, Boolean(remember));
           setRememberPreference(Boolean(remember));
           setUser(sessionUser);
+          syncAuthorProfileFromAuth(sessionUser, backendUser);
           return { ok: true, user: sessionUser };
         } catch (error) {
           return { ok: false, error: toErrorMessage(error, "Login failed. Please try again.") };
@@ -261,6 +267,7 @@ export function AuthProvider({ children }) {
         saveToken("demo-session-token", false);
         setRememberPreference(false);
         setUser(sessionUser);
+        syncAuthorProfileFromAuth(sessionUser, demoUser);
         return { ok: true, user: sessionUser };
       },
       logout: () => {

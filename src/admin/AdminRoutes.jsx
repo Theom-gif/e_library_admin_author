@@ -27,6 +27,7 @@ import Feedback from "../author/pages/Feedback";
 import Research from "../author/pages/Research";
 import EditBookPage from "../author/pages/EditBookPage";
 import BookDetailPage from "../author/pages/BookDetailPage";
+import Analytics from "../author/pages/Analytics";
 
 import {
   getInternalUserPortalPath,
@@ -145,7 +146,7 @@ export default function AdminRoutes() {
         <Route path="settings" element={<AuthorSettings />} />
         <Route path="feedback" element={<Feedback />} />
         <Route path="research" element={<Research />} />
-        <Route path="analytics" element={<AuthorDashboard />} />
+        <Route path="analytics" element={<Analytics />} />
         <Route path="edit-book" element={<EditBookPage />} />
         <Route path="book-detail" element={<BookDetailPage />} />
       </Route>

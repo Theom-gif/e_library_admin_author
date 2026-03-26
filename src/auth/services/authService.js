@@ -106,3 +106,7 @@ AUTH API
 export function loginRequest(payload, options = {}) {
   return postAuth("/api/auth/login", payload, options.mode || "json");
 }
+
+export function registerRequest(payload, options = {}) {
+  return postAuth("/api/auth/register", payload, options.mode || "json");
+}

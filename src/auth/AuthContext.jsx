@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { DEMO_AUTH_USERS } from "../admin/data/mockData";
-import { loginRequest, registerRequest } from "./services/authService";
+import { loginRequest } from "./services/authService";
 import { API_BASE_URL } from "../lib/apiClient";
 import { getRoleName } from "./roleUtils";
 
@@ -74,6 +74,7 @@ function firstDefinedValue(values) {
   return values.find((value) => String(value ?? "").trim() !== "");
 }
 
+<<<<<<< HEAD
 function isGenericAuthorName(name) {
   return GENERIC_AUTHOR_NAMES.has(String(name || "").trim());
 }
@@ -157,12 +158,14 @@ function resolveSessionRole(backendUser, data, requestedRole) {
     requestedRole,
   ]);
   return getRoleName(backendRole);
+=======
+function extractBackendUser(data) {
+  return data?.user || data?.data?.user || data || {};
+>>>>>>> 6f6d89284a94fc2f43ddf1f15abf6b28c7888fc7
 }
 
-function extractRoleNameFromAuthResponse(responseData) {
-  const data = responseData || {};
-  const backendUser = data.user || data.data?.user || data;
-  const backendRole = firstDefinedValue([
+function extractRoleValue(backendUser, data) {
+  return firstDefinedValue([
     backendUser?.role_id,
     backendUser?.roleId,
     backendUser?.role,
@@ -178,7 +181,18 @@ function extractRoleNameFromAuthResponse(responseData) {
     data?.user_role,
     data?.type,
   ]);
-  return getRoleName(backendRole);
+}
+
+function resolveSessionRole(backendUser, data) {
+  return getRoleName(extractRoleValue(backendUser, data));
+}
+
+function resolveSessionUserId(backendUser) {
+  return backendUser?.id || backendUser?._id || backendUser?.userId || backendUser?.user_id || null;
+}
+
+function resolveSessionUserName(backendUser) {
+  return backendUser?.name || backendUser?.fullName || backendUser?.username || "User";
 }
 
 function toErrorMessage(error, fallbackMessage) {
@@ -210,32 +224,6 @@ function toErrorMessage(error, fallbackMessage) {
   return message || fallbackMessage;
 }
 
-function getRoleWord(role) {
-  return getRoleName(role);
-}
-
-function getRoleAliases(role) {
-  const roleWord = getRoleWord(role);
-  if (roleWord === "Admin") {
-    return ["Admin", "admin", "Administrator", "administrator", "1"];
-  }
-  if (roleWord === "Author") {
-    return ["Author", "author", "Writer", "writer", "2"];
-  }
-  return ["User", "user", "Reader", "reader", "Member", "member", "3"];
-}
-
-function getRoleIdByWord(role) {
-  const roleWord = getRoleWord(role);
-  if (roleWord === "Admin") {
-    return 1;
-  }
-  if (roleWord === "Author") {
-    return 2;
-  }
-  return 3;
-}
-
 function getErrorMessageText(error) {
   const validationErrors = error?.response?.data?.errors;
   const roleErrors = validationErrors?.role || validationErrors?.role_id || validationErrors?.Role;
@@ -261,111 +249,21 @@ function isRoleValidationError(error) {
   );
 }
 
-async function loginWithRoleFallbacks({ email, password, role }) {
+async function loginWithRequestFallbacks({ email, password }) {
   const cleanEmail = String(email || "").trim().toLowerCase();
-  const requestedRoleName = getRoleWord(role);
-  const roleId = getRoleIdByWord(requestedRoleName);
-  const roleAliases = getRoleAliases(requestedRoleName);
   const requestModes = ["urlencoded", "multipart", "json"];
 
-  const attempts = [];
-  for (const alias of roleAliases) {
-    const numericAlias = Number(alias);
-    if (Number.isFinite(numericAlias) && numericAlias > 0) {
-      attempts.push({ email: cleanEmail, password, role_id: numericAlias });
-    } else {
-      attempts.push({ email: cleanEmail, password, role: alias, role_id: roleId });
-      attempts.push({ email: cleanEmail, password, role: alias });
-    }
-  }
-  attempts.push({ email: cleanEmail, password, role_id: roleId });
-  attempts.push({ email: cleanEmail, password });
-
-  let lastRoleError = null;
-  for (const payload of attempts) {
-    for (const mode of requestModes) {
-      try {
-        const response = await loginRequest(payload, { mode });
-        const responseRoleName = extractRoleNameFromAuthResponse(response?.data);
-
-        if (responseRoleName !== requestedRoleName) {
-          lastRoleError = new Error(
-            `This account logged in as ${responseRoleName}. Please choose ${responseRoleName} role to continue.`,
-          );
-          continue;
-        }
-
-        return response;
-      } catch (error) {
-        if (!isRoleValidationError(error)) {
-          throw error;
-        }
-        lastRoleError = error;
+  for (const mode of requestModes) {
+    try {
+      return await loginRequest({ email: cleanEmail, password }, { mode });
+    } catch (error) {
+      if (!isRoleValidationError(error)) {
+        throw error;
       }
     }
   }
 
-  throw lastRoleError || new Error("Unable to authenticate with the selected role.");
-}
-
-async function registerWithRoleFallbacks({
-  firstname,
-  lastname,
-  email,
-  password,
-  password_confirmation,
-  role,
-  role_id,
-}) {
-  const cleanEmail = String(email || "").trim().toLowerCase();
-  const roleName = getRoleWord(role ?? role_id);
-  const roleId = getRoleIdByWord(roleName);
-  const roleAliases = getRoleAliases(roleName);
-
-  const basePayload = {
-    firstname,
-    lastname,
-    first_name: firstname,
-    last_name: lastname,
-    email: cleanEmail,
-    password,
-    password_confirmation,
-  };
-
-  const attempts = [];
-  for (const alias of roleAliases) {
-    const numericAlias = Number(alias);
-    if (Number.isFinite(numericAlias) && numericAlias > 0) {
-      attempts.push({ ...basePayload, role_id: numericAlias });
-    } else {
-      attempts.push({ ...basePayload, role: alias, role_id: roleId });
-      attempts.push({ ...basePayload, role: alias });
-    }
-  }
-  attempts.push({ ...basePayload, role_id: roleId });
-
-  const requestModes = ["urlencoded", "multipart", "json"];
-
-  let lastRoleError = null;
-  let lastSpecificRoleError = null;
-  for (const payload of attempts) {
-    for (const mode of requestModes) {
-      try {
-        return await registerRequest(payload, { mode });
-      } catch (error) {
-        if (!isRoleValidationError(error)) {
-          throw error;
-        }
-        lastRoleError = error;
-        const roleText = getErrorMessageText(error).toLowerCase();
-        if (!roleText.includes("required")) {
-          lastSpecificRoleError = error;
-        }
-      }
-    }
-  }
-
-  throw lastSpecificRoleError || lastRoleError;
+  throw new Error("Login failed because the backend still expects a role field.");
 }
 
 export function AuthProvider({ children }) {
@@ -396,10 +294,11 @@ export function AuthProvider({ children }) {
       user,
       isReady,
       isAuthenticated: Boolean(user),
-      login: async ({ email, password, role, remember = false }) => {
+      login: async ({ email, password, remember = false }) => {
         try {
-          const response = await loginWithRoleFallbacks({ email, password, role });
+          const response = await loginWithRequestFallbacks({ email, password });
           const data = response?.data || {};
+<<<<<<< HEAD
           const backendUser = data.user || data.data?.user || data;
           const resolvedRole = resolveSessionRole(backendUser, data, role);
           const resolvedName = resolveBackendFullName(backendUser);
@@ -407,6 +306,20 @@ export function AuthProvider({ children }) {
           const sessionUser = {
             id: backendUser?.id || backendUser?._id || backendUser?.userId || `u_${Date.now()}`,
             name: resolvedName || backendUser?.username || backendUser?.email || "User",
+=======
+          const backendUser = extractBackendUser(data);
+          const backendRole = extractRoleValue(backendUser, data);
+
+          if (!backendRole) {
+            return { ok: false, error: "Login succeeded, but the backend did not return the user's role." };
+          }
+
+          const resolvedRole = resolveSessionRole(backendUser, data);
+
+          const sessionUser = {
+            id: resolveSessionUserId(backendUser) || `u_${Date.now()}`,
+            name: resolveSessionUserName(backendUser),
+>>>>>>> 6f6d89284a94fc2f43ddf1f15abf6b28c7888fc7
             email: backendUser?.email || String(email || "").trim().toLowerCase(),
             role: resolvedRole,
           };
@@ -452,30 +365,6 @@ export function AuthProvider({ children }) {
         setUser(sessionUser);
         syncAuthorProfileFromAuth(sessionUser, demoUser);
         return { ok: true, user: sessionUser };
-      },
-      register: async ({
-        firstname,
-        lastname,
-        email,
-        password,
-        password_confirmation,
-        role,
-        role_id,
-      }) => {
-        try {
-          await registerWithRoleFallbacks({
-            firstname,
-            lastname,
-            email,
-            password,
-            password_confirmation,
-            role,
-            role_id,
-          });
-          return { ok: true };
-        } catch (error) {
-          return { ok: false, error: toErrorMessage(error, "Registration failed. Please try again.") };
-        }
       },
       logout: () => {
         clearSession();

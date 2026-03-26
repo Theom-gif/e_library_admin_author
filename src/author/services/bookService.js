@@ -42,18 +42,25 @@ const buildStorageUrl = (path = '') => {
   if (!path) return '';
   if (isBlobLikeUrl(path)) return path;
   if (isAbsoluteUrl(path)) return path;
-  
-  let clean = String(path).replace(/^\/+/, '');
-  
-  // 🔥 FIX: remove wrong prefixes from backend
-  clean = clean.replace(/^storage\/app\/public\//, '');
-  clean = clean.replace(/^public\//, '');
-  
-  if (clean.startsWith('storage/')) {
-    clean = clean.slice('storage/'.length);
+
+  const normalized = String(path).replace(/\\/g, '/').trim();
+  let clean = normalized.replace(/^\/+/, '');
+
+  // Accept filesystem paths and common Laravel storage prefixes.
+  const storageAppPublic = 'storage/app/public/';
+  const storageIndex = clean.indexOf('storage/');
+  const storageAppIndex = clean.indexOf(storageAppPublic);
+  const publicIndex = clean.indexOf('public/');
+
+  if (storageAppIndex !== -1) {
+    clean = clean.slice(storageAppIndex + storageAppPublic.length);
+  } else if (publicIndex !== -1) {
+    clean = clean.slice(publicIndex + 'public/'.length);
+  } else if (storageIndex !== -1) {
+    clean = clean.slice(storageIndex + 'storage/'.length);
   }
-  
-  return `${ASSET_BASE_URL}/storage/${clean}`;
+
+  return `${ASSET_BASE_URL}/storage/${clean.replace(/^\/+/, '')}`;
 };
 
 const normalizeAssetUrl = (value = '') => {
@@ -117,6 +124,14 @@ export const mapApiBookToUiBook = (book) => ({
       book?.cover_api_url,
       book?.cover_image_url,
       book?.cover_image_path,
+      book?.cover_image,
+      book?.coverImage,
+      book?.cover_url,
+      book?.coverUrl,
+      book?.image_url,
+      book?.imageUrl,
+      book?.image_path,
+      book?.imagePath,
       book?.cover,
       book?.image,
       book?.thumbnail,

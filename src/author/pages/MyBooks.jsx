@@ -8,15 +8,19 @@ import {
   MoreVertical, 
   Eye, 
   Edit3,
-  Star
+  Star,
+  Trash2
 } from 'lucide-react';
 import { searchBooks } from '../services/openLibraryService';
 import { deleteManuscriptFile } from '../services/manuscriptStorage';
-import { getBooksRequest, importLocalBooksRequest } from '../services/bookService';
+import { deleteBookRequest, getBooksRequest, importLocalBooksRequest } from '../services/bookService';
 
 const BOOKS_STORAGE_KEY = 'author_studio_books';
 const DEFAULT_COVER = 'https://picsum.photos/seed/new-book/300/450';
 const FALLBACK_COVER_URL = DEFAULT_COVER;
+const COVER_CACHE_KEY = 'author_book_covers';
+const buildCoverKey = (title, author) =>
+  `${String(title || '').trim().toLowerCase()}|${String(author || '').trim().toLowerCase()}`;
 
 const statusStyles = {
   Approved: 'bg-emerald-500/90 text-white',
@@ -32,6 +36,35 @@ const getSafeCoverUrl = (value) => {
     return text;
   }
   return FALLBACK_COVER_URL;
+};
+
+const isPlaceholderCover = (value) => {
+  const text = String(value || '').trim();
+  return text === DEFAULT_COVER || text === FALLBACK_COVER_URL;
+};
+
+const resolveCoverUrl = (book, overrideUrl) => {
+  const apiCover = getSafeCoverUrl(book?.img);
+  if (apiCover && !isPlaceholderCover(apiCover)) {
+    return apiCover;
+  }
+
+  const overrideCover = getSafeCoverUrl(overrideUrl);
+  if (overrideCover && !isPlaceholderCover(overrideCover)) {
+    return overrideCover;
+  }
+
+  return FALLBACK_COVER_URL;
+};
+
+const readCoverCache = () => {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = window.localStorage.getItem(COVER_CACHE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
 };
 
 const mapLocalBookForImport = (book) => ({
@@ -53,6 +86,9 @@ const MyBooks = () => {
   const [books, setBooks] = React.useState([]);
   const [booksLoading, setBooksLoading] = React.useState(false);
   const [booksError, setBooksError] = React.useState('');
+  const [deletingBookId, setDeletingBookId] = React.useState(null);
+  const [recentCover, setRecentCover] = React.useState(null);
+  const [coverCache, setCoverCache] = React.useState(() => readCoverCache());
 
   const loadBooks = React.useCallback(async () => {
     setBooksLoading(true);
@@ -98,6 +134,14 @@ const MyBooks = () => {
       loadBooks();
       navigate(location.pathname, { replace: true, state: null });
       return;
+    }
+
+    if (state.uploadedCover) {
+      setRecentCover(state.uploadedCover);
+      setCoverCache((current) => ({
+        ...current,
+        [state.uploadedCover.key]: state.uploadedCover.url,
+      }));
     }
 
     if (typeof state.deletedBookId === 'number') {
@@ -194,6 +238,24 @@ const MyBooks = () => {
     source: 'openlibrary',
   });
 
+  const handleDeleteBook = async (book) => {
+    if (!book?.id) return;
+    const confirmDelete = window.confirm(
+      `Are you sure you want to delete "${book.title}"? This cannot be undone.`
+    );
+    if (!confirmDelete) return;
+
+    try {
+      setDeletingBookId(book.id);
+      await deleteBookRequest(book.id);
+      await loadBooks();
+    } catch {
+      window.alert('Unable to delete this book. Please try again.');
+    } finally {
+      setDeletingBookId(null);
+    }
+  };
+
   return (
     <div className="p-8 max-w-7xl mx-auto">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
@@ -247,25 +309,36 @@ const MyBooks = () => {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-        {filteredLocalBooks.map((book, i) => (
-          <MotionDiv 
-            key={book.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="group bg-card-dark border border-white/5 rounded-2xl overflow-hidden card-shadow hover:border-accent/30 transition-all duration-300"
-          >
-            <div className="relative aspect-[2/3] overflow-hidden">
-              <img 
-                src={book.img || DEFAULT_COVER}
-                alt={book.title} 
-                className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                onError={(event) => {
-                  if (event.currentTarget.src !== FALLBACK_COVER_URL) {
-                    event.currentTarget.src = FALLBACK_COVER_URL;
-                  }
-                }}
-              />
+        {filteredLocalBooks.map((book, i) => {
+          const coverKey = buildCoverKey(book.title, book.author);
+          const cachedCover = coverCache?.[coverKey] || null;
+          const coverOverride =
+            recentCover &&
+            (recentCover.id === book.id || recentCover.key === coverKey)
+              ? recentCover.url
+              : cachedCover;
+          const resolvedCoverUrl = resolveCoverUrl(book, coverOverride);
+
+          return (
+            <MotionDiv 
+              key={book.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="group bg-card-dark border border-white/5 rounded-2xl overflow-hidden card-shadow hover:border-accent/30 transition-all duration-300"
+            >
+              <div className="relative aspect-[2/3] overflow-hidden">
+                <img 
+                  src={resolvedCoverUrl}
+                  alt={book.title} 
+                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+                  onClick={() => navigate('/author/book-detail', { state: { book: toDetailBook(book) } })}
+                  onError={(event) => {
+                    if (event.currentTarget.src !== FALLBACK_COVER_URL) {
+                      event.currentTarget.src = FALLBACK_COVER_URL;
+                    }
+                  }}
+                />
               <div className="absolute top-3 left-3">
                 <span
                   className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
@@ -275,31 +348,16 @@ const MyBooks = () => {
                   {book.status || 'Pending'}
                 </span>
               </div>
-              <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+              <div className="absolute top-3 right-3">
                 <button
-                  onClick={() => window.alert(`Actions for "${book.title}" coming soon.`)}
-                  className="p-2 bg-black/50 backdrop-blur-md rounded-lg text-white hover:bg-black/70 transition-colors"
+                  onClick={() => handleDeleteBook(book)}
+                  className="p-2 bg-black/60 backdrop-blur-md rounded-lg text-white hover:bg-rose-600 transition-colors"
+                  aria-label={`Delete ${book.title}`}
+                  disabled={deletingBookId === book.id}
                 >
-                  <MoreVertical className="size-4" />
+
+                  <Trash2 className="size-4" />
                 </button>
-              </div>
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-4">
-                <div className="flex gap-2 w-full">
-                  <button
-                    onClick={() => navigate('/author/book-detail', { state: { book: toDetailBook(book) } })}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-white text-black rounded-lg text-xs font-bold hover:bg-slate-200 transition-colors"
-                  >
-                    <Eye className="size-3.5" />
-                    <span>View</span>
-                  </button>
-                  <button
-                    onClick={() => navigate('/author/edit-book', { state: { book: toEditableBook(book) } })}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/80 transition-colors"
-                  >
-                    <Edit3 className="size-3.5" />
-                    <span>Edit</span>
-                  </button>
-                </div>
               </div>
             </div>
             <div className="p-5">
@@ -311,6 +369,23 @@ const MyBooks = () => {
                 </div>
               </div>
               <p className="text-xs text-slate-500 mb-4">{book.author}</p>
+
+              <div className="flex gap-2 mb-4">
+                <button
+                  onClick={() => navigate('/author/book-detail', { state: { book: toDetailBook(book) } })}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:brightness-110 transition-colors"
+                >
+                  <Eye className="size-3.5" />
+                  <span>View Details</span>
+                </button>
+                <button
+                  onClick={() => navigate('/author/edit-book', { state: { book: toEditableBook(book) } })}
+                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/80 transition-colors"
+                >
+                  <Edit3 className="size-3.5" />
+                  <span>Edit</span>
+                </button>
+              </div>
               
               <div className="grid grid-cols-2 gap-4 pt-4 border-top border-white/5">
                 <div>
@@ -322,9 +397,10 @@ const MyBooks = () => {
                   <p className="text-sm font-bold">{book.sales}</p>
                 </div>
               </div>
-            </div>
-          </MotionDiv>
-        ))}
+              </div>
+            </MotionDiv>
+          );
+        })}
       </div>
 
       {searchQuery.trim() && (

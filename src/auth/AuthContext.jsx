@@ -7,6 +7,10 @@ import { getRoleName } from "./roleUtils";
 const SESSION_KEY = "bookhub_session";
 const TOKEN_KEY = "bookhub_token";
 const REMEMBER_KEY = "bookhub_remember";
+const AUTHOR_PROFILE_KEY = "author_studio_profile";
+const AUTHOR_PROFILE_UPDATED_EVENT = "author-profile-updated";
+const DEFAULT_AUTHOR_NAME = "Alex Rivera";
+const GENERIC_AUTHOR_NAMES = new Set(["User", "Author", DEFAULT_AUTHOR_NAME]);
 
 const AuthContext = createContext(null);
 
@@ -68,6 +72,70 @@ function clearSession() {
 
 function firstDefinedValue(values) {
   return values.find((value) => String(value ?? "").trim() !== "");
+}
+
+function isGenericAuthorName(name) {
+  return GENERIC_AUTHOR_NAMES.has(String(name || "").trim());
+}
+
+function resolveBackendFullName(backendUser) {
+  const firstName = backendUser?.first_name ?? backendUser?.firstname ?? "";
+  const lastName = backendUser?.last_name ?? backendUser?.lastname ?? "";
+  const joinedName = [firstName, lastName].filter(Boolean).join(" ");
+  return firstDefinedValue([
+    backendUser?.name,
+    backendUser?.fullName,
+    joinedName,
+    backendUser?.username,
+  ]);
+}
+
+function syncAuthorProfileFromAuth(sessionUser, backendUser) {
+  if (typeof window === "undefined") return;
+  if (getRoleName(sessionUser?.role) !== "Author") return;
+
+  const resolvedName =
+    resolveBackendFullName(backendUser) ||
+    sessionUser?.name ||
+    "Author";
+  const resolvedEmail = firstDefinedValue([backendUser?.email, sessionUser?.email]);
+  const resolvedUsername = firstDefinedValue([
+    backendUser?.username,
+    backendUser?.userName,
+    resolvedEmail ? resolvedEmail.split("@")[0] : "",
+  ]);
+
+  let existingProfile = null;
+  try {
+    const raw = window.localStorage.getItem(AUTHOR_PROFILE_KEY);
+    existingProfile = raw ? JSON.parse(raw) : null;
+  } catch {
+    existingProfile = null;
+  }
+
+  const shouldResetProfile =
+    !existingProfile ||
+    (resolvedEmail && existingProfile?.email && existingProfile.email !== resolvedEmail);
+
+  const existingName = existingProfile?.name;
+  const existingIsGeneric = isGenericAuthorName(existingName);
+  const resolvedIsGeneric = isGenericAuthorName(resolvedName);
+
+  const shouldUpdateName =
+    shouldResetProfile ||
+    !existingName ||
+    (existingIsGeneric && !resolvedIsGeneric);
+
+  const nextProfile = {
+    ...(shouldResetProfile ? {} : existingProfile),
+    ...(shouldUpdateName ? { name: resolvedName } : {}),
+    ...(resolvedEmail ? { email: resolvedEmail } : {}),
+    ...(resolvedUsername && !existingProfile?.username ? { username: resolvedUsername } : {}),
+    tier: existingProfile?.tier || "Pro Author",
+  };
+
+  window.localStorage.setItem(AUTHOR_PROFILE_KEY, JSON.stringify(nextProfile));
+  window.dispatchEvent(new Event(AUTHOR_PROFILE_UPDATED_EVENT));
 }
 
 function resolveSessionRole(backendUser, data, requestedRole) {
@@ -320,6 +388,7 @@ export function AuthProvider({ children }) {
 
     // if session + token exist → restore login
     setUser(storedSession);
+    syncAuthorProfileFromAuth(storedSession, null);
     setIsReady(true);
   }, []);
   const value = useMemo(
@@ -333,10 +402,11 @@ export function AuthProvider({ children }) {
           const data = response?.data || {};
           const backendUser = data.user || data.data?.user || data;
           const resolvedRole = resolveSessionRole(backendUser, data, role);
+          const resolvedName = resolveBackendFullName(backendUser);
 
           const sessionUser = {
             id: backendUser?.id || backendUser?._id || backendUser?.userId || `u_${Date.now()}`,
-            name: backendUser?.name || backendUser?.fullName || backendUser?.username || "User",
+            name: resolvedName || backendUser?.username || backendUser?.email || "User",
             email: backendUser?.email || String(email || "").trim().toLowerCase(),
             role: resolvedRole,
           };
@@ -356,6 +426,7 @@ export function AuthProvider({ children }) {
           saveToken(token, Boolean(remember));
           setRememberPreference(Boolean(remember));
           setUser(sessionUser);
+          syncAuthorProfileFromAuth(sessionUser, backendUser);
           return { ok: true, user: sessionUser };
         } catch (error) {
           return { ok: false, error: toErrorMessage(error, "Login failed. Please try again.") };
@@ -379,6 +450,7 @@ export function AuthProvider({ children }) {
         saveToken("demo-session-token", false);
         setRememberPreference(false);
         setUser(sessionUser);
+        syncAuthorProfileFromAuth(sessionUser, demoUser);
         return { ok: true, user: sessionUser };
       },
       register: async ({

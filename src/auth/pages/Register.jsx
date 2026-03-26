@@ -58,6 +58,7 @@ export default function Register() {
     event.preventDefault();
     const trimmedFirstName = form.firstname.trim();
     const trimmedLastName = form.lastname.trim();
+    const fullName = [trimmedFirstName, trimmedLastName].filter(Boolean).join(" ");
     
     if (trimmedFirstName.length < 2 || trimmedLastName.length < 2) {
       setError("First name and last name must be at least 2 characters.");
@@ -77,6 +78,21 @@ export default function Register() {
     if (!result.ok) {
       setError(result.error);
       return;
+    }
+
+    if (getRoleName(form.role) === "Author") {
+      try {
+        const profile = {
+          name: fullName,
+          email: form.email.trim().toLowerCase(),
+          username: form.email ? form.email.split("@")[0] : "",
+          tier: "Pro Author",
+        };
+        window.localStorage.setItem("author_studio_profile", JSON.stringify(profile));
+        window.dispatchEvent(new Event("author-profile-updated"));
+      } catch {
+        // ignore localStorage errors
+      }
     }
 
     const loginResult = await login({

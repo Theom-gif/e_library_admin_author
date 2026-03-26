@@ -6,10 +6,7 @@ import {
   BookOpen, 
   Star,
   ArrowUpRight,
-  ArrowDownRight,
-  MoreHorizontal,
-  Calendar,
-  AlertCircle
+  ArrowDownRight
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -17,9 +14,7 @@ import {
   XAxis, 
   YAxis, 
   CartesianGrid, 
-  Tooltip, 
-  BarChart,
-  Bar
+  Tooltip
 } from 'recharts';
 import adminService from '../../admin/services/adminService';
 
@@ -47,8 +42,23 @@ const getMetricValue = (value, fallback = 0) => {
   return Number.isFinite(numericValue) ? numericValue : fallback;
 };
 
+const PROFILE_STORAGE_KEY = 'author_studio_profile';
+
+const getStoredAuthorName = () => {
+  if (typeof window === 'undefined') return '';
+  try {
+    const profileRaw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+    if (!profileRaw) return '';
+    const profile = JSON.parse(profileRaw);
+    return profile?.fullName?.trim() || profile?.name?.trim() || '';
+  } catch (error) {
+    console.error('Failed to parse author profile:', error);
+    return '';
+  }
+};
+
 const normalizeAuthorStats = (payload = {}) => ({
-  authorName: payload.authorName || payload.author?.name || payload.name || 'Author',
+  authorName: payload.authorName || payload.author?.name || payload.name || '',
   totalSales: getMetricValue(payload.totalSales ?? payload.sales, 0),
   totalReaders: getMetricValue(payload.totalReaders ?? payload.activeReaders, 0),
   totalReads: getMetricValue(payload.totalReads ?? payload.reads, 0),
@@ -84,39 +94,6 @@ const normalizeTopBooks = (rows = []) =>
       book.bookCover ||
       (book.cover_image_path ? adminService.buildStorageUrl(book.cover_image_path) : ''),
   }));
-
-const normalizeFeedback = (rows = []) =>
-  rows.map((item, index) => ({
-    id: item.id ?? `feedback-${index}`,
-    readerName: item.readerName || item.userName || item.name || 'Anonymous',
-    comment: item.comment || item.message || 'No comment provided.',
-    rating: getMetricValue(item.rating, 0),
-    createdAt: item.createdAt || item.created_at || '',
-  }));
-
-const normalizeDemographics = (payload = {}) => {
-  const ageDistribution = Array.isArray(payload.ageDistribution)
-    ? payload.ageDistribution.map((item) => ({
-        age: item.age || item.label || 'Unknown',
-        count: getMetricValue(item.count, 0),
-      }))
-    : Object.entries(payload.byAge || {}).map(([age, count]) => ({
-        age,
-        count: getMetricValue(count, 0),
-      }));
-
-  const topRegions = Array.isArray(payload.topRegions)
-    ? payload.topRegions.map((item) => ({
-        country: item.country || item.name || 'Unknown',
-        percentage: getMetricValue(item.percentage, 0),
-      }))
-    : Object.entries(payload.byCountry || {}).map(([country, percentage]) => ({
-        country,
-        percentage: getMetricValue(percentage, 0),
-      }));
-
-  return { ageDistribution, topRegions };
-};
 
 const MeasuredChart = ({ className, hasData, emptyMessage, children }) => {
   const containerRef = useRef(null);
@@ -188,13 +165,12 @@ const StatCard = ({ title, value, change, icon, isPositive }) => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const [storedAuthorName] = useState(() => getStoredAuthorName());
   const [stats, setStats] = useState(null);
+  const displayName = stats?.authorName || storedAuthorName || 'Author';
   const [performanceData, setPerformanceData] = useState([]);
   const [topBooks, setTopBooks] = useState([]);
-  const [feedback, setFeedback] = useState([]);
-  const [demographics, setDemographics] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     let mounted = true;
@@ -203,59 +179,30 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        setError(null);
-
-        const [statsRes, perfRes, booksRes, feedbackRes, demoRes] = await Promise.allSettled([
+        const [statsRes, perfRes, booksRes] = await Promise.allSettled([
           adminService.fetchAuthorStats({ signal: controller.signal }),
           adminService.fetchAuthorPerformance('30d', 'daily', { signal: controller.signal }),
           adminService.fetchAuthorTopBooks({ limit: 4, orderBy: 'sales' }, { signal: controller.signal }),
-          adminService.fetchAuthorFeedback(10, 'all', { signal: controller.signal }),
-          adminService.fetchAuthorDemographics({ signal: controller.signal }),
         ]);
 
         if (controller.signal.aborted || !mounted) {
           return;
         }
 
-        const failedSections = [];
-
         if (statsRes.status === 'fulfilled') {
           setStats(normalizeAuthorStats(statsRes.value));
-        } else {
-          failedSections.push('summary stats');
         }
 
         if (perfRes.status === 'fulfilled') {
           setPerformanceData(normalizePerformanceData(perfRes.value));
-        } else {
-          failedSections.push('performance');
         }
 
         if (booksRes.status === 'fulfilled') {
           setTopBooks(normalizeTopBooks(booksRes.value));
-        } else {
-          failedSections.push('top books');
-        }
-
-        if (feedbackRes.status === 'fulfilled') {
-          setFeedback(normalizeFeedback(feedbackRes.value));
-        } else {
-          failedSections.push('feedback');
-        }
-
-        if (demoRes.status === 'fulfilled') {
-          setDemographics(normalizeDemographics(demoRes.value));
-        } else {
-          failedSections.push('demographics');
-        }
-
-        if (failedSections.length > 0) {
-          setError(`Some dashboard sections could not be loaded: ${failedSections.join(', ')}.`);
         }
       } catch (err) {
         if (controller.signal.aborted || !mounted) return;
         console.error('Error fetching dashboard data:', err);
-        setError('Failed to load dashboard data');
       } finally {
         if (mounted) {
           setLoading(false);
@@ -284,29 +231,15 @@ const Dashboard = () => {
 
   return (
     <div className="p-8 max-w-7xl mx-auto">
-      {error && (
-        <div className="mb-6 p-4 bg-rose-500/10 border border-rose-500/20 rounded-lg flex items-center gap-3 text-rose-400">
-          <AlertCircle className="size-5 flex-shrink-0" />
-          <p className="text-sm">{error}</p>
-        </div>
-      )}
-
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {stats?.authorName || 'Author'}</h1>
+          <h1 className="text-3xl font-bold tracking-tight">Welcome back, {displayName}</h1>
           <p className="text-slate-400 mt-1">Here's what's happening with your books today.</p>
         </div>
         <div className="flex gap-3">
           <button
-            onClick={() => window.alert('Showing metrics for the last 30 days.')}
-            className="flex items-center gap-2 px-4 py-2 bg-card-dark border border-white/5 rounded-lg text-sm font-medium hover:bg-primary/20 transition-colors"
-          >
-            <Calendar className="size-4" />
-            <span>Last 30 Days</span>
-          </button>
-          <button
             onClick={() => window.alert('Report download started.')}
-            className="px-4 py-2 bg-accent text-white rounded-lg text-sm font-bold shadow-glow hover:opacity-90 transition-all"
+            className="px-4 py-2 bg-black text-white rounded-lg text-sm font-bold border border-white/10 hover:bg-slate-900 transition-colors"
           >
             Download Report
           </button>
@@ -315,7 +248,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard 
-          title="Total Sales" 
+          title="Total Books" 
           value={stats ? `$${stats.totalSales?.toFixed(2) || '0.00'}` : '$0.00'} 
           change={stats?.salesTrend || '+0%'} 
           icon={TrendingUp} 
@@ -347,22 +280,22 @@ const Dashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         <div className="lg:col-span-2 bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
           <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold">Performance Overview</h2>
+            <h2 className="text-lg font-bold">Books Overview</h2>
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <div className="size-2 rounded-full bg-accent"></div>
-                <span className="text-xs text-slate-400">Sales</span>
+                <span className="text-xs text-slate-400">Books Sold</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="size-2 rounded-full bg-primary"></div>
-                <span className="text-xs text-slate-400">Reads</span>
+                <span className="text-xs text-slate-400">Books Read</span>
               </div>
             </div>
           </div>
           <MeasuredChart
             className="h-[300px] w-full min-w-0"
             hasData={performanceData.length > 0}
-            emptyMessage="No performance data available"
+            emptyMessage="No book data available"
           >
             {({ width, height }) => (
               <AreaChart width={width} height={height} data={performanceData}>
@@ -450,85 +383,6 @@ const Dashboard = () => {
           >
             View All Books
           </button>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-1 bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
-          <h2 className="text-lg font-bold mb-6">Recent Feedback</h2>
-          <div className="space-y-4">
-            {feedback.length > 0 ? feedback.map((item) => (
-              <div key={item.id} className="p-4 bg-primary/5 rounded-xl border border-white/5">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <div className="size-6 rounded-full bg-accent/20 flex items-center justify-center text-[10px] font-bold text-accent">
-                      {item.readerName?.[0] || 'U'}
-                    </div>
-                    <span className="text-xs font-bold">{item.readerName || 'Anonymous'}</span>
-                  </div>
-                  <span className="text-[10px] text-slate-500">{item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'Unknown'}</span>
-                </div>
-                <p className="text-xs text-slate-300 leading-relaxed">{item.comment}</p>
-                <div className="flex gap-0.5 mt-2">
-                  {[...Array(5)].map((_, i) => (
-                    <Star key={i} className={`size-2.5 ${i < (item.rating || 0) ? 'text-yellow-500 fill-yellow-500' : 'text-slate-600'}`} />
-                  ))}
-                </div>
-              </div>
-            )) : (
-              <p className="text-slate-500 text-sm">No feedback available yet</p>
-            )}
-          </div>
-        </div>
-
-        <div className="lg:col-span-2 bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-lg font-bold">Reader Demographics</h2>
-            <button
-              onClick={() => window.alert('More demographic actions coming soon.')}
-              className="text-slate-400 hover:text-[color:var(--text)] transition-colors"
-            >
-              <MoreHorizontal className="size-5" />
-            </button>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div className="w-full min-w-0">
-              <MeasuredChart
-                className="h-[200px] w-full min-w-0"
-                hasData={Boolean(demographics?.ageDistribution?.length)}
-                emptyMessage="No demographic data"
-              >
-                {({ width, height }) => (
-                  <BarChart width={width} height={height} data={demographics?.ageDistribution || []}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff05" />
-                    <XAxis dataKey="age" axisLine={false} tickLine={false} tick={{ fill: '#64748b', fontSize: 10 }} />
-                    <Tooltip cursor={{fill: 'rgba(255,255,255,0.05)'}} contentStyle={{ backgroundColor: '#16282b', border: 'none', borderRadius: '8px' }} />
-                    <Bar dataKey="count" fill="#4a868f" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                )}
-              </MeasuredChart>
-              <p className="text-[10px] text-center text-slate-500 mt-2 uppercase tracking-wider font-bold">Age Distribution</p>
-            </div>
-            <div className="space-y-4">
-              <h3 className="text-sm font-bold text-slate-400">Top Regions</h3>
-              {demographics?.topRegions?.length ? demographics.topRegions.map(({ country, percentage }, i) => {
-                const colors = ["bg-accent", "bg-primary", "bg-slate-600", "bg-slate-700"];
-                return (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex justify-between text-xs">
-                      <span>{country}</span>
-                      <span className="font-bold">{percentage}%</span>
-                    </div>
-                    <div className="h-1.5 w-full bg-white/5 rounded-full overflow-hidden">
-                      <div className={`h-full ${colors[i % colors.length]}`} style={{ width: `${percentage}%` }}></div>
-                    </div>
-                  </div>
-                );
-              }) : (
-                <p className="text-slate-500 text-sm">No regional data available</p>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </div>

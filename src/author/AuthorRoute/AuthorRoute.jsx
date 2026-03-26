@@ -16,6 +16,7 @@ import Feedback from '../pages/Feedback';
 import EditBookPage from '../pages/EditBookPage';
 import BookDetailPage from '../pages/BookDetailPage';
 import Research from '../pages/Research';
+import Analytics from '../pages/Analytics';
 
 export default function App() {
   return (
@@ -35,7 +36,7 @@ export default function App() {
         <Route path="settings" element={<Settings />} />
         <Route path="feedback" element={<Feedback />} />
         <Route path="research" element={<Research />} />
-        <Route path="analytics" element={<Dashboard />} />
+        <Route path="analytics" element={<Analytics />} />
         <Route path="edit-book" element={<EditBookPage />} />
         <Route path="book-detail" element={<BookDetailPage />} />
       </Route>

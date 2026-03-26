@@ -1,50 +1,12 @@
 import React from 'react';
-import { ChevronRight, CloudUpload, X, Plus } from 'lucide-react';
+import { ChevronRight, CloudUpload } from 'lucide-react';
 
-export const EditBookForm = ({ book, onSave, onCancel, onDelete, isSaving = false, isDeleting = false, errorMessage = '' }) => {
+export const EditBookForm = ({ book, onSave, onCancel, isSaving = false, isDeleting = false, errorMessage = '' }) => {
   const [formData, setFormData] = React.useState({
     ...book,
     tags: Array.isArray(book?.tags) ? book.tags : [],
   });
-  const [newTag, setNewTag] = React.useState('');
   const coverInputRef = React.useRef(null);
-
-  const handleStatusChange = (status) => {
-    setFormData(prev => ({ ...prev, status }));
-  };
-
-  const removeTag = (tagToRemove) => {
-    setFormData(prev => ({
-      ...prev,
-      tags: prev.tags.filter(tag => tag !== tagToRemove)
-    }));
-  };
-
-  const addTag = () => {
-    const tag = newTag.trim();
-    if (!tag) {
-      return;
-    }
-
-    setFormData((prev) => {
-      if (prev.tags.includes(tag)) {
-        return prev;
-      }
-
-      return {
-        ...prev,
-        tags: [...prev.tags, tag],
-      };
-    });
-    setNewTag('');
-  };
-
-  const handleTagInputKeyDown = (event) => {
-    if (event.key === 'Enter') {
-      event.preventDefault();
-      addTag();
-    }
-  };
 
   const handleCoverImageSelected = (event) => {
     const [file] = event.target.files ?? [];
@@ -135,98 +97,7 @@ export const EditBookForm = ({ book, onSave, onCancel, onDelete, isSaving = fals
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-primary/10">
-          <div>
-            <label className="block text-sm font-semibold app-text-primary mb-2">Category</label>
-            <select 
-              className="w-full rounded-lg border border-slate-600/60 bg-slate-900/40 p-3 focus:border-primary focus:ring-1 focus:ring-primary text-slate-100 outline-none transition-all"
-              value={formData.category}
-              onChange={(e) => setFormData(prev => ({ ...prev, category: e.target.value }))}
-            >
-              <option value="Fantasy & Mystery">Fantasy & Mystery</option>
-              <option value="Sci-Fi">Science Fiction</option>
-              <option value="Horror">Horror</option>
-              <option value="Romance">Romance</option>
-              <option value="Non-fiction">Non-fiction</option>
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-semibold app-text-primary mb-2">Release Status</label>
-            <div className="flex gap-4">
-              <button 
-                type="button"
-                onClick={() => handleStatusChange('Published')}
-                className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all font-bold text-sm ${
-                  formData.status === 'Published' 
-                    ? 'border-primary bg-primary/20 text-slate-100' 
-                    : 'border-primary/20 text-slate-300'
-                }`}
-              >
-                Published
-              </button>
-              <button 
-                type="button"
-                onClick={() => handleStatusChange('Draft')}
-                className={`flex-1 py-3 px-4 rounded-lg border-2 transition-all font-bold text-sm ${
-                  formData.status === 'Draft' 
-                    ? 'border-primary bg-primary/20 text-slate-100' 
-                    : 'border-primary/20 text-slate-300'
-                }`}
-              >
-                Draft
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="pt-4 border-t border-primary/10">
-          <label className="block text-sm font-semibold app-text-primary mb-2">Tags</label>
-          <div className="flex flex-wrap gap-2 mb-3">
-            {formData.tags.map(tag => (
-              <span key={tag} className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/20 text-slate-100 text-xs font-medium">
-                {tag} 
-                <button type="button" onClick={() => removeTag(tag)} className="hover:text-rose-500">
-                  <X size={12} />
-                </button>
-              </span>
-            ))}
-            <button
-              type="button"
-              onClick={addTag}
-              className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary text-on-primary text-xs font-medium hover:brightness-110"
-            >
-              <Plus size={12} /> Add Tag
-            </button>
-          </div>
-          <input 
-            className="w-full rounded-lg border border-slate-600/60 bg-slate-900/40 p-3 focus:border-primary focus:ring-1 focus:ring-primary text-slate-100 placeholder:text-slate-500 outline-none transition-all" 
-            placeholder="Type a tag and press enter..." 
-            type="text"
-            value={newTag}
-            onChange={(e) => setNewTag(e.target.value)}
-            onKeyDown={handleTagInputKeyDown}
-          />
-        </div>
-
-        <div className="flex items-center justify-between gap-4 pt-10 border-t border-primary/10">
-          <button
-            type="button"
-            onClick={onDelete}
-            disabled={!onDelete || isDeleting || isSaving}
-            className={`px-6 py-2.5 rounded-lg font-bold transition-colors ${
-              onDelete && !isDeleting && !isSaving ? 'text-rose-500 hover:bg-rose-500/10' : 'text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            {isDeleting ? 'Deleting...' : 'Delete Book'}
-          </button>
-          <div className="flex items-center gap-4">
-          <button 
-            type="button" 
-            onClick={onCancel}
-            className="px-6 py-2.5 rounded-lg text-slate-500 font-bold hover:bg-primary/5 transition-colors"
-          >
-            Discard Changes
-          </button>
+        <div className="flex items-center justify-end gap-4 pt-10 border-t border-primary/10">
           <button 
             type="submit"
             disabled={isSaving || isDeleting}
@@ -238,7 +109,6 @@ export const EditBookForm = ({ book, onSave, onCancel, onDelete, isSaving = fals
           >
             {isSaving ? 'Saving...' : 'Save Book'}
           </button>
-          </div>
         </div>
         {errorMessage && (
           <p className="text-sm text-rose-400">{errorMessage}</p>

@@ -387,7 +387,7 @@ const MyBooks = () => {
                 </button>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 pt-4 border-top border-white/5">
+              {/* <div className="grid grid-cols-2 gap-4 pt-4 border-top border-white/5">
                 <div>
                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Reads</p>
                   <p className="text-sm font-bold">{book.reads}</p>
@@ -396,7 +396,7 @@ const MyBooks = () => {
                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Sales</p>
                   <p className="text-sm font-bold">{book.sales}</p>
                 </div>
-              </div>
+              </div> */}
               </div>
             </MotionDiv>
           );

@@ -74,12 +74,23 @@ const buildStorageUrl = (path = "") => {
   return `${assetBaseUrl}/storage/${clean}`;
 };
 
+const buildCoverApiUrl = (id) => {
+  if (!id) return "";
+  const base = String(API_BASE_URL || "").replace(/\/+$/, "");
+  if (/\/api$/i.test(base)) {
+    return `${base}/books/${id}/cover`;
+  }
+  return `${base}/api/books/${id}/cover`;
+};
+
 const toUiBook = (book = {}) => {
   const coverPath =
     book.coverUrl ||
     book.cover ||
+    book.cover_api_url ||
     book.cover_image_url ||
     book.cover_image_path ||
+    buildCoverApiUrl(book.id ?? book._id ?? book.bookId) ||
     "";
   const filePath =
     book.fileUrl ||

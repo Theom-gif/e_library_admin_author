@@ -17,6 +17,54 @@ export const API_BASE_URL = apiBaseFromEnv || DEFAULT_API_BASE_URL;
 export const API_TIMEOUT_MS =
   Number(import.meta.env.VITE_API_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
+function extractTokenCandidate(value) {
+  if (!value) return "";
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return "";
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        return String(
+          parsed?.token ||
+            parsed?.access_token ||
+            parsed?.accessToken ||
+            parsed?.jwt ||
+            ""
+        ).trim();
+      } catch {
+        return trimmed;
+      }
+    }
+    return trimmed;
+  }
+  if (typeof value === "object") {
+    return String(
+      value?.token ||
+        value?.access_token ||
+        value?.accessToken ||
+        value?.jwt ||
+        ""
+    ).trim();
+  }
+  return "";
+}
+
+function getStoredAccessToken() {
+  if (typeof window === "undefined") return "";
+  const candidates = [
+    localStorage.getItem(TOKEN_KEY),
+    sessionStorage.getItem(TOKEN_KEY),
+    localStorage.getItem("access_token"),
+    sessionStorage.getItem("access_token"),
+  ];
+  for (const candidate of candidates) {
+    const token = extractTokenCandidate(candidate);
+    if (token) return token;
+  }
+  return "";
+}
+
 function normalizeApiUrl(url) {
   if (!url || isAbsoluteUrl(url)) {
     return url;
@@ -58,8 +106,7 @@ apiClient.interceptors.request.use((config) => {
   config.url = normalizeApiUrl(config.url);
 
   if (typeof window !== "undefined") {
-    const token =
-      localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+    const token = getStoredAccessToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;

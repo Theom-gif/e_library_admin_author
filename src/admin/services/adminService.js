@@ -48,6 +48,15 @@ const stripApiSuffix = (value = "") =>
 
 const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
 
+const buildCoverApiUrl = (id) => {
+  if (!id) return "";
+  const base = trimSlash(API_BASE_URL);
+  if (/\/api$/i.test(base)) {
+    return `${base}/books/${id}/cover`;
+  }
+  return `${base}/api/books/${id}/cover`;
+};
+
 // const buildStorageUrl = (path = "") => {
 //   if (!path) return "";
 //   if (isAbsoluteUrl(path)) return path;
@@ -102,9 +111,18 @@ export const normalizeBook = (book = {}) => {
     book.cover_api_url,
     book.cover_image_url,
     book.cover_image_path,
+    book.cover_image,
+    book.coverImage,
+    book.cover_url,
+    book.coverUrl,
+    book.image_url,
+    book.imageUrl,
+    book.image_path,
+    book.imagePath,
     book.cover,
     book.image,
     book.thumbnail,
+    buildCoverApiUrl(book.id ?? book.bookId ?? book._id),
   );
   const filePath = resolveAssetUrl(
     book.book_file_url,

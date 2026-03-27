@@ -285,7 +285,11 @@ const UploadBook = () => {
     setIsSubmitting(true);
     try {
       // Verify token exists before uploading
-      const token = window.localStorage.getItem('bookhub_token');
+      const token =
+        window.localStorage.getItem('bookhub_token') ||
+        window.sessionStorage.getItem('bookhub_token') ||
+        window.localStorage.getItem('access_token') ||
+        window.sessionStorage.getItem('access_token');
       if (!token) {
         setSubmitError('Authentication failed. Please login again.');
         setIsSubmitting(false);

@@ -6,6 +6,7 @@ import { getRoleName } from "./roleUtils";
 
 const SESSION_KEY = "bookhub_session";
 const TOKEN_KEY = "bookhub_token";
+const REFRESH_TOKEN_KEY = "bookhub_refresh_token";
 const REMEMBER_KEY = "bookhub_remember";
 const AUTH_UNAUTHORIZED_EVENT = "bookhub:unauthorized";
 const AUTHOR_PROFILE_KEY = "author_studio_profile";
@@ -29,7 +30,12 @@ function readSessionFromStorage(storage) {
 }
 
 function getTokenFromStorage() {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  return (
+    localStorage.getItem(TOKEN_KEY) ||
+    sessionStorage.getItem(TOKEN_KEY) ||
+    localStorage.getItem("access_token") ||
+    sessionStorage.getItem("access_token")
+  );
 }
 
 function setRememberPreference(remember) {
@@ -51,19 +57,51 @@ function saveSession(user, remember = false) {
   staleStorage.removeItem(SESSION_KEY);
 }
 
+function normalizeTokenValue(value) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (value && typeof value === "object") {
+    return (
+      value.token ||
+      value.access_token ||
+      value.accessToken ||
+      value.jwt ||
+      value.value ||
+      null
+    );
+  }
+  return null;
+}
+
 function saveToken(token, remember = false) {
-  if (!token) {
+  const normalizedToken = normalizeTokenValue(token);
+  if (!normalizedToken) {
     return;
   }
   const activeStorage = remember ? localStorage : sessionStorage;
   const staleStorage = remember ? sessionStorage : localStorage;
-  activeStorage.setItem(TOKEN_KEY, token);
+  activeStorage.setItem(TOKEN_KEY, normalizedToken);
   staleStorage.removeItem(TOKEN_KEY);
+}
+
+function saveRefreshToken(refreshToken, remember = false) {
+  const normalizedToken = normalizeTokenValue(refreshToken);
+  if (!normalizedToken) {
+    return;
+  }
+  const activeStorage = remember ? localStorage : sessionStorage;
+  const staleStorage = remember ? sessionStorage : localStorage;
+  activeStorage.setItem(REFRESH_TOKEN_KEY, normalizedToken);
+  staleStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 function clearSession() {
@@ -75,6 +113,26 @@ function clearAuthStorage() {
   clearSession();
   clearToken();
   localStorage.removeItem(REMEMBER_KEY);
+}
+
+function extractAuthTokens(data = {}) {
+  const sources = [data, data?.data, data?.tokens, data?.data?.tokens];
+  const pick = (...keys) => {
+    for (const source of sources) {
+      if (!source || typeof source !== "object") continue;
+      for (const key of keys) {
+        if (source[key] !== undefined && source[key] !== null && String(source[key]).trim() !== "") {
+          return source[key];
+        }
+      }
+    }
+    return null;
+  };
+
+  return {
+    accessToken: pick("token", "accessToken", "access_token", "jwt", "bearerToken", "bearer_token"),
+    refreshToken: pick("refreshToken", "refresh_token"),
+  };
 }
 
 function firstDefinedValue(values) {
@@ -459,19 +517,14 @@ export function AuthProvider({ children }) {
             role: resolvedRole,
           };
 
-          const token =
-            data.token ||
-            data.accessToken ||
-            data.access_token ||
-            data.data?.token ||
-            data.data?.accessToken ||
-            data.data?.access_token;
+          const { accessToken, refreshToken } = extractAuthTokens(data);
 
-          if (!token) {
+          if (!accessToken) {
             return { ok: false, error: "Login succeeded but no access token was returned by /api/auth/login." };
           }
           saveSession(sessionUser, Boolean(remember));
-          saveToken(token, Boolean(remember));
+          saveToken(accessToken, Boolean(remember));
+          saveRefreshToken(refreshToken, Boolean(remember));
           setRememberPreference(Boolean(remember));
           setUser(sessionUser);
           syncAuthorProfileFromAuth(sessionUser, backendUser);

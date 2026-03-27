@@ -11,7 +11,7 @@ import {
 } from "../roleUtils";
 
 export default function Login() {
-  const { isAuthenticated, isReady, user, login } = useAuth();
+  const { isAuthenticated, isReady, user, login, loginDemo } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const from = location.state?.from?.pathname;
@@ -72,6 +72,15 @@ export default function Login() {
         : null;
 
     navigate(safeFrom || homePath, { replace: true });
+  };
+
+  const onLoginAsAuthor = () => {
+    const result = loginDemo("Author");
+    if (!result.ok) {
+      setError(result.error);
+      return;
+    }
+    navigate("/author", { replace: true });
   };
 
   return (
@@ -183,6 +192,14 @@ export default function Login() {
                   className="flex h-12 w-full items-center justify-center gap-3 rounded-[14px] bg-[#56aeb9] px-5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(86,174,185,0.32)] transition hover:bg-[#4aa3ae] disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {isSubmitting ? "Signing in..." : "Sign In to Library"}
+                  <ArrowRight size={16} />
+                </button>
+                <button
+                  type="button"
+                  onClick={onLoginAsAuthor}
+                  className="flex h-12 w-full items-center justify-center gap-3 rounded-[14px] bg-[#6b7280] px-5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(107,114,128,0.32)] transition hover:bg-[#5a627d]"
+                >
+                  Login as Author (Static Data)
                   <ArrowRight size={16} />
                 </button>
                 <p className="text-center text-[15px] text-[#7d8793]">

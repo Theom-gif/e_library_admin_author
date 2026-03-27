@@ -5,7 +5,6 @@ import {
   Search,
   Filter, 
   Plus, 
-  MoreVertical, 
   Eye, 
   Edit3,
   Star,
@@ -13,9 +12,9 @@ import {
 } from 'lucide-react';
 import { searchBooks } from '../services/openLibraryService';
 import { deleteManuscriptFile } from '../services/manuscriptStorage';
-import { deleteBookRequest, getBooksRequest, importLocalBooksRequest } from '../services/bookService';
+import { deleteBookRequest, getBooksRequest } from '../services/bookService';
+import { readLocalBooks, removeLocalBook } from '../services/localBookStorage';
 
-const BOOKS_STORAGE_KEY = 'author_studio_books';
 const DEFAULT_COVER = 'https://picsum.photos/seed/new-book/300/450';
 const FALLBACK_COVER_URL = DEFAULT_COVER;
 const COVER_CACHE_KEY = 'author_book_covers';
@@ -67,14 +66,6 @@ const readCoverCache = () => {
   }
 };
 
-const mapLocalBookForImport = (book) => ({
-  title: book?.title || 'Untitled',
-  author: book?.author || '',
-  description: book?.description || '',
-  category: book?.genre || '',
-  cover_image_url: book?.img || '',
-});
-
 const MyBooks = () => {
   const MotionDiv = motion.div;
   const navigate = useNavigate();
@@ -86,41 +77,68 @@ const MyBooks = () => {
   const [books, setBooks] = React.useState([]);
   const [booksLoading, setBooksLoading] = React.useState(false);
   const [booksError, setBooksError] = React.useState('');
+  const [booksNotice, setBooksNotice] = React.useState('');
   const [deletingBookId, setDeletingBookId] = React.useState(null);
   const [recentCover, setRecentCover] = React.useState(null);
   const [coverCache, setCoverCache] = React.useState(() => readCoverCache());
 
+  const mapLocalDraftToUiBook = React.useCallback((book) => ({
+    bookId: Number(book?.bookId || book?.id) || Date.now(),
+    id: Number(book?.id) || Date.now(),
+    title: book?.title || 'Untitled',
+    author: book?.author || 'Unknown Author',
+    status: book?.status || 'Draft',
+    rating: 0,
+    reads: '0',
+    sales: '$0',
+    img: getSafeCoverUrl(book?.img || book?.coverUrl || ''),
+    description: book?.description || '',
+    genre: book?.genre || book?.category || '',
+    manuscriptUrl: '',
+    manuscriptName: book?.manuscriptName || '',
+    manuscriptType: book?.manuscriptType || '',
+    manuscriptSizeBytes: book?.manuscriptSizeBytes || 0,
+    source: 'local',
+  }), []);
+
   const loadBooks = React.useCallback(async () => {
     setBooksLoading(true);
     setBooksError('');
+    setBooksNotice('');
     try {
-      let dbBooks = await getBooksRequest();
+      let dbBooks = await getBooksRequest({ status: 'All' });
 
-      if (dbBooks.length === 0) {
-        const saved = window.localStorage.getItem(BOOKS_STORAGE_KEY);
-        if (saved) {
-          try {
-            const parsed = JSON.parse(saved);
-            const localBooks = Array.isArray(parsed) ? parsed : [];
-            if (localBooks.length > 0) {
-              await importLocalBooksRequest(localBooks.map(mapLocalBookForImport));
-              window.localStorage.removeItem(BOOKS_STORAGE_KEY);
-              dbBooks = await getBooksRequest();
-            }
-          } catch {
-            // Keep page loading from database only.
-          }
-        }
+      const localDrafts = readLocalBooks().map(mapLocalDraftToUiBook);
+      if (localDrafts.length > 0) {
+        setBooksNotice('Showing locally saved drafts plus any server books.');
       }
 
-      setBooks(dbBooks);
-    } catch {
-      setBooksError('Unable to load books from database.');
-      setBooks([]);
+      // Merge local drafts first so authors always see their work even if the server later fails.
+      setBooks([...localDrafts, ...dbBooks]);
+    } catch (error) {
+      const status = error?.response?.status;
+      const serverMessage = error?.response?.data?.message || error?.response?.data?.error || '';
+
+      if (error?.isCorsError) {
+        setBooksError('API blocked by CORS. Use /api proxy (VITE_API_BASE_URL=/api) or enable backend CORS.');
+      } else if (status) {
+        setBooksError(`Unable to load books (${status}). ${serverMessage || 'Please try again.'}`.trim());
+      } else {
+        setBooksError(`Unable to load books. ${error?.message || 'Please try again.'}`.trim());
+      }
+
+      // Frontend-only fallback when backend is down: show locally saved drafts.
+      const localDrafts = readLocalBooks().map(mapLocalDraftToUiBook);
+      setBooks(localDrafts);
+      if (localDrafts.length > 0) {
+        setBooksNotice('Backend is down. Showing locally saved drafts.');
+      } else {
+        setBooksNotice('Backend is down and no local drafts were found. Upload again to save a local draft.');
+      }
     } finally {
       setBooksLoading(false);
     }
-  }, []);
+  }, [mapLocalDraftToUiBook]);
 
   React.useEffect(() => {
     loadBooks();
@@ -132,6 +150,9 @@ const MyBooks = () => {
 
     if (state.refresh) {
       loadBooks();
+      if (state.localSaved) {
+        setBooksNotice('Saved locally because the server is unavailable.');
+      }
       navigate(location.pathname, { replace: true, state: null });
       return;
     }
@@ -247,7 +268,13 @@ const MyBooks = () => {
 
     try {
       setDeletingBookId(book.id);
-      await deleteBookRequest(book.id);
+      if (book.source === 'local') {
+        removeLocalBook(book.id);
+      } else {
+        await deleteBookRequest(book.id);
+      }
+
+      deleteManuscriptFile(book.id).catch(() => {});
       await loadBooks();
     } catch {
       window.alert('Unable to delete this book. Please try again.');
@@ -301,14 +328,15 @@ const MyBooks = () => {
       </div>
 
       {booksError && <p className="text-sm text-rose-400 mb-4">{booksError}</p>}
+      {booksNotice && <p className="text-sm text-sky-400 mb-4">{booksNotice}</p>}
       {booksLoading && <p className="text-sm text-slate-400 mb-4">Loading books from database...</p>}
       {!booksLoading && filteredLocalBooks.length === 0 && (
         <p className="text-sm text-slate-400 mb-8">
-          No approved books yet. Upload a book and it will appear here after an admin approves it.
+          No books yet. Upload a book and it will appear here.
         </p>
       )}
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
         {filteredLocalBooks.map((book, i) => {
           const coverKey = buildCoverKey(book.title, book.author);
           const cachedCover = coverCache?.[coverKey] || null;
@@ -325,13 +353,13 @@ const MyBooks = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.05 }}
-              className="group bg-card-dark border border-white/5 rounded-2xl overflow-hidden card-shadow hover:border-accent/30 transition-all duration-300"
+              className="group flex gap-6 bg-card-dark border border-white/5 rounded-2xl p-4 card-shadow hover:border-accent/30 transition-all duration-300"
             >
-              <div className="relative aspect-[2/3] overflow-hidden">
+              <div className="relative w-28 sm:w-32 shrink-0">
                 <img 
                   src={resolvedCoverUrl}
                   alt={book.title} 
-                  className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 cursor-pointer"
+                  className="w-full aspect-[2/3] rounded-2xl object-cover border border-white/5 group-hover:scale-[1.02] transition-transform duration-500 cursor-pointer"
                   onClick={() => navigate('/author/book-detail', { state: { book: toDetailBook(book) } })}
                   onError={(event) => {
                     if (event.currentTarget.src !== FALLBACK_COVER_URL) {
@@ -339,55 +367,85 @@ const MyBooks = () => {
                     }
                   }}
                 />
-              <div className="absolute top-3 left-3">
-                <span
-                  className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
-                    statusStyles[book.status] || 'bg-slate-500/90 text-white'
-                  }`}
-                >
-                  {book.status || 'Pending'}
-                </span>
-              </div>
-              <div className="absolute top-3 right-3">
-                <button
-                  onClick={() => handleDeleteBook(book)}
-                  className="p-2 bg-black/60 backdrop-blur-md rounded-lg text-white hover:bg-rose-600 transition-colors"
-                  aria-label={`Delete ${book.title}`}
-                  disabled={deletingBookId === book.id}
-                >
-
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-            </div>
-            <div className="p-5">
-              <div className="flex justify-between items-start mb-1">
-                <h3 className="font-bold text-[color:var(--text)] truncate pr-2">{book.title}</h3>
-                <div className="flex items-center gap-1">
-                  <Star className="size-3 text-yellow-500 fill-yellow-500" />
-                  <span className="text-xs font-bold">{book.rating || 'N/A'}</span>
+                <div className="absolute top-3 left-3">
+                  <span
+                    className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider ${
+                      statusStyles[book.status] || 'bg-slate-500/90 text-white'
+                    }`}
+                  >
+                    {book.status || 'Pending'}
+                  </span>
+                </div>
+                <div className="absolute top-3 right-3">
+                  <button
+                    onClick={() => handleDeleteBook(book)}
+                    className="p-2 bg-black/60 backdrop-blur-md rounded-lg text-white hover:bg-rose-600 transition-colors"
+                    aria-label={`Delete ${book.title}`}
+                    disabled={deletingBookId === book.id}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
                 </div>
               </div>
-              <p className="text-xs text-slate-500 mb-4">{book.author}</p>
 
-              <div className="flex gap-2 mb-4">
-                <button
-                  onClick={() => navigate('/author/book-detail', { state: { book: toDetailBook(book) } })}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:brightness-110 transition-colors"
-                >
-                  <Eye className="size-3.5" />
-                  <span>View Details</span>
-                </button>
-                <button
-                  onClick={() => navigate('/author/edit-book', { state: { book: toEditableBook(book) } })}
-                  className="flex-1 flex items-center justify-center gap-2 py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/80 transition-colors"
-                >
-                  <Edit3 className="size-3.5" />
-                  <span>Edit</span>
-                </button>
+              <div className="flex-1 min-w-0 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="text-lg font-extrabold text-[color:var(--text)] truncate">{book.title}</h3>
+                    <p className="text-sm text-slate-500 truncate">{book.author}</p>
+                  </div>
+                  <div className="flex items-center gap-1 shrink-0 pt-1">
+                    <Star className="size-4 text-yellow-500 fill-yellow-500" />
+                    <span className="text-sm font-bold">{book.rating || 'N/A'}</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 text-sm text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <Eye className="size-4" />
+                    {book.reads || '0'}
+                  </span>
+                  {book.genre ? <span className="truncate">{book.genre}</span> : null}
+                </div>
+
+                {book.description ? (
+                  <p className="text-sm text-slate-400 leading-relaxed max-h-[4.5rem] overflow-hidden">
+                    {book.description}
+                  </p>
+                ) : null}
+
+                <div className="flex flex-wrap gap-2">
+                  {book.genre ? (
+                    <span className="inline-flex items-center rounded-md bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
+                      {book.genre}
+                    </span>
+                  ) : null}
+                  {book.source === 'local' ? (
+                    <span className="inline-flex items-center rounded-md bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
+                      Local draft
+                    </span>
+                  ) : null}
+                </div>
+
+                <div className="flex gap-2 pt-1">
+                  <button
+                    onClick={() => navigate('/author/book-detail', { state: { book: toDetailBook(book) } })}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:brightness-110 transition-colors"
+                  >
+                    <Eye className="size-3.5" />
+                    <span>View Details</span>
+                  </button>
+                  <button
+                    onClick={() => navigate('/author/edit-book', { state: { book: toEditableBook(book) } })}
+                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/80 transition-colors"
+                  >
+                    <Edit3 className="size-3.5" />
+                    <span>Edit</span>
+                  </button>
+                </div>
               </div>
               
-              <div className="grid grid-cols-2 gap-4 pt-4 border-top border-white/5">
+              {/* <div className="grid grid-cols-2 gap-4 pt-4 border-top border-white/5">
                 <div>
                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Reads</p>
                   <p className="text-sm font-bold">{book.reads}</p>
@@ -396,8 +454,7 @@ const MyBooks = () => {
                   <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider">Sales</p>
                   <p className="text-sm font-bold">{book.sales}</p>
                 </div>
-              </div>
-              </div>
+              </div> */}
             </MotionDiv>
           );
         })}

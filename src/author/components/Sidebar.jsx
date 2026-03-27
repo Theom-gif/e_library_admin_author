@@ -5,11 +5,13 @@ import {
   BookOpen, 
   PlusSquare, 
   BarChart3, 
+  Filter,
   MessageSquare, 
   Settings, 
   LogOut
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 const PROFILE_STORAGE_KEY = 'author_studio_profile';
 const PROFILE_UPDATED_EVENT = 'author-profile-updated';
@@ -23,6 +25,7 @@ const defaultProfile = {
 
 const Sidebar = () => {
   const { logout } = useAuth();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const [profile, setProfile] = React.useState(() => {
     const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
@@ -35,12 +38,13 @@ const Sidebar = () => {
   });
 
   const navItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/author' },
-    { icon: BookOpen, label: 'My Books', path: '/author/my-books' },
-    { icon: PlusSquare, label: 'Upload New', path: '/author/upload' },
-    { icon: BarChart3, label: 'Analytics', path: '/author/analytics' },
-    { icon: MessageSquare, label: 'Feedback', path: '/author/feedback' },
-    { icon: Settings, label: 'Settings', path: '/author/settings' },
+    { icon: LayoutDashboard, label: t('Dashboard'), path: '/author' },
+    { icon: BookOpen, label: t('My Books'), path: '/author/my-books' },
+    // { icon: Filter, label: t('Categories'), path: '/author/category/technology' },
+    { icon: PlusSquare, label: t('Upload New'), path: '/author/upload' },
+    { icon: BarChart3, label: t('Analytics'), path: '/author/analytics' },
+    { icon: MessageSquare, label: t('Feedback'), path: '/author/feedback' },
+    { icon: Settings, label: t('Settings'), path: '/author/settings' },
   ];
 
   const handleLogout = () => {
@@ -74,7 +78,7 @@ const Sidebar = () => {
     <aside className="w-64 flex-shrink-0 border-r border-white/5 bg-card-dark flex flex-col h-screen sticky top-0">
       <div className="p-6 flex items-center gap-3">
         <div>
-          <h1 className="text-lg font-bold leading-none">Author Portal</h1>
+          <h1 className="text-lg font-bold leading-none">{t('Author Portal')}</h1>
         </div>
       </div>
 
@@ -126,7 +130,7 @@ const Sidebar = () => {
           className="flex items-center justify-center gap-2 w-full rounded-lg h-10 px-4 bg-primary/10 text-slate-400 text-sm font-bold hover:bg-red-500/10 hover:text-red-500 transition-all duration-200"
         >
           <LogOut className="size-4" />
-          <span>Log Out</span>
+          <span>{t('Logout')}</span>
         </button>
       </div>
     </aside>

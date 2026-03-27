@@ -1,7 +1,7 @@
 import { apiClient, API_BASE_URL } from '../../lib/apiClient';
 
-const BOOKS_ENDPOINT = '/auth/books';
-const UPLOAD_BOOK_ENDPOINT = '/auth/book';
+const BOOKS_ENDPOINTS = ['/auth/books', '/author/books'];
+const UPLOAD_BOOK_ENDPOINTS = ['/author/books/upload', '/author/upload', '/auth/book'];
 const IMPORT_BOOKS_ENDPOINT = '/auth/books/import-local';
 
 const toNumberId = (value, fallback = Date.now()) => {
@@ -37,6 +37,15 @@ const trimSlash = (value = '') => String(value || '').replace(/\/+$/, '');
 // Assets live at the site root (e.g., https://example.com/storage/...), not under /api.
 const stripApiSuffix = (value = '') => String(value || '').replace(/\/api(?:\/.*)?$/i, '');
 const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
+
+const buildCoverApiUrl = (id) => {
+  if (!id) return '';
+  const base = trimSlash(API_BASE_URL);
+  if (/\/api$/i.test(base)) {
+    return `${base}/books/${id}/cover`;
+  }
+  return `${base}/api/books/${id}/cover`;
+};
 
 const buildStorageUrl = (path = '') => {
   if (!path) return '';
@@ -135,6 +144,7 @@ export const mapApiBookToUiBook = (book) => ({
       book?.cover,
       book?.image,
       book?.thumbnail,
+      buildCoverApiUrl(book?.id),
     ) || 'https://picsum.photos/seed/new-book/300/450',
   description: book?.description || '',
   genre: book?.category || '',
@@ -149,7 +159,7 @@ export const mapApiBookToUiBook = (book) => ({
   source: 'database',
 });
 
-const buildBooksQuery = (filters = {}) => {
+const buildBooksQuery = (endpoint, filters = {}) => {
   const params = new URLSearchParams();
   const status = String(filters.status || 'approved').trim();
   if (status) {
@@ -159,43 +169,135 @@ const buildBooksQuery = (filters = {}) => {
   if (search) {
     params.set('search', search);
   }
-  return params.toString() ? `${BOOKS_ENDPOINT}?${params.toString()}` : BOOKS_ENDPOINT;
+  return params.toString() ? `${endpoint}?${params.toString()}` : endpoint;
 };
 
 export const getBooksRequest = async (filters = {}) => {
-  const response = await apiClient.get(buildBooksQuery(filters));
-  const payload = response?.data;
-  const rows =
-    (Array.isArray(payload?.data) && payload.data) ||
-    (Array.isArray(payload?.books) && payload.books) ||
-    (Array.isArray(payload) && payload) ||
-    [];
-  return rows.map(mapApiBookToUiBook);
+  let lastError = null;
+  for (const endpoint of BOOKS_ENDPOINTS) {
+    try {
+      const response = await apiClient.get(buildBooksQuery(endpoint, filters));
+      const payload = response?.data;
+      const rows =
+        (Array.isArray(payload?.data) && payload.data) ||
+        (Array.isArray(payload?.books) && payload.books) ||
+        (Array.isArray(payload) && payload) ||
+        [];
+      return rows.map(mapApiBookToUiBook);
+    } catch (error) {
+      lastError = error;
+      if (typeof window !== 'undefined') {
+        console.error('[Books] Failed endpoint:', endpoint, {
+          status: error?.response?.status,
+          message: error?.response?.data?.message || error?.message,
+          url: error?.config?.url,
+        });
+      }
+      const status = error?.response?.status;
+      const shouldRetry =
+        status === 401 ||
+        status === 403 ||
+        status === 404 ||
+        status === 405 ||
+        status === 500;
+      if (!shouldRetry) break;
+    }
+  }
+  if (lastError) {
+    throw lastError;
+  }
+  return [];
 };
 
-export const uploadBookRequest = (formData) =>
-  apiClient.post(UPLOAD_BOOK_ENDPOINT, formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+export const uploadBookRequest = async (formData) => {
+  let lastError = null;
+  for (const endpoint of UPLOAD_BOOK_ENDPOINTS) {
+    try {
+      return await apiClient.post(endpoint, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } catch (error) {
+      lastError = error;
+      const status = error?.response?.status;
+      const message =
+        error?.response?.data?.message ||
+        error?.response?.data?.error ||
+        '';
+      const errors = error?.response?.data?.errors || {};
+      const bookFileErrors = errors?.book_file || errors?.bookFile || errors?.file;
+      const hasBookFileError =
+        /book pdf file is required/i.test(String(message)) ||
+        /book[_\s-]?file/i.test(String(bookFileErrors));
+      const shouldRetry =
+        status === 401 ||
+        status === 403 ||
+        status === 404 ||
+        status === 405 ||
+        status === 422 ||
+        status === 500 ||
+        hasBookFileError;
+      if (!shouldRetry) break;
+    }
+  }
+  if (lastError) {
+    throw lastError;
+  }
+  return null;
+};
 
 export const importLocalBooksRequest = async (books = []) => {
   const response = await apiClient.post(IMPORT_BOOKS_ENDPOINT, { books });
   return response?.data?.data || {};
 };
 
-export const updateBookRequest = (id, formData) =>
-  apiClient.post(`${BOOKS_ENDPOINT}/${id}`, (() => {
-    const payload = formData instanceof FormData ? formData : new FormData();
-    if (!payload.has('_method')) {
-      payload.append('_method', 'PATCH');
+export const updateBookRequest = async (id, formData) => {
+  let lastError = null;
+  for (const endpoint of BOOKS_ENDPOINTS) {
+    try {
+      const payload = formData instanceof FormData ? formData : new FormData();
+      if (!payload.has('_method')) {
+        payload.append('_method', 'PATCH');
+      }
+      return await apiClient.post(`${endpoint}/${id}`, payload, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+    } catch (error) {
+      lastError = error;
+      const status = error?.response?.status;
+      const shouldRetry =
+        status === 401 ||
+        status === 403 ||
+        status === 404 ||
+        status === 405 ||
+        status === 500;
+      if (!shouldRetry) break;
     }
-    return payload;
-  })(), {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  }
+  if (lastError) throw lastError;
+  return null;
+};
 
-export const deleteBookRequest = (id) => apiClient.delete(`${BOOKS_ENDPOINT}/${id}`);
+export const deleteBookRequest = async (id) => {
+  let lastError = null;
+  for (const endpoint of BOOKS_ENDPOINTS) {
+    try {
+      return await apiClient.delete(`${endpoint}/${id}`);
+    } catch (error) {
+      lastError = error;
+      const status = error?.response?.status;
+      const shouldRetry =
+        status === 401 ||
+        status === 403 ||
+        status === 404 ||
+        status === 405 ||
+        status === 500;
+      if (!shouldRetry) break;
+    }
+  }
+  if (lastError) throw lastError;
+  return null;
+};

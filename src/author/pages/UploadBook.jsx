@@ -69,6 +69,22 @@ const isValidCoverUrl = (value) => {
   return trimmed.startsWith('data:image/') || /^https?:\/\//i.test(trimmed);
 };
 
+const dataUrlToBlob = (dataUrl) => {
+  try {
+    const [meta, data] = dataUrl.split(',');
+    const mimeMatch = /data:(.*?);/i.exec(meta || '');
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const binary = atob(data || '');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  } catch {
+    return null;
+  }
+};
+
 const UploadBook = () => {
   const MotionDiv = motion.div;
   const navigate = useNavigate();
@@ -219,6 +235,14 @@ const UploadBook = () => {
   const handleManuscriptSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isPdf = String(file.type || '').toLowerCase() === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setSubmitError('Please upload a PDF file for the book.');
+      setManuscriptFile(null);
+      e.target.value = '';
+      return;
+    }
+    setSubmitError('');
     setManuscriptFile(file);
     e.target.value = '';
   };
@@ -268,6 +292,12 @@ const UploadBook = () => {
         return;
       }
 
+      if (!manuscriptFile) {
+        setSubmitError('Book PDF file is required.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload = new FormData();
       payload.append('title', title.trim());
       payload.append('author', selectedAuthor?.name || authorQuery.trim());
@@ -280,6 +310,11 @@ const UploadBook = () => {
 
       if (coverFile instanceof File) {
         payload.append('cover_image', coverFile);
+      } else if (coverPreviewUrl?.startsWith('data:image/')) {
+        const blob = dataUrlToBlob(coverPreviewUrl);
+        if (blob) {
+          payload.append('cover_image', blob, 'cover-image');
+        }
       } else if (coverPreviewUrl) {
         payload.append('cover_image_url', coverPreviewUrl);
       }
@@ -615,13 +650,13 @@ const UploadBook = () => {
               </div>
               <div className="text-center px-6">
                 <p className="text-lg font-bold">Upload Manuscript</p>
-                <p className="text-sm text-slate-500 mt-1">Support for PDF, EPUB, DOCX (Max 50MB)</p>
+                <p className="text-sm text-slate-500 mt-1">PDF only (Max 50MB)</p>
               </div>
             </div>
             <input
               ref={manuscriptInputRef}
               type="file"
-              accept=".pdf,.epub,.docx"
+              accept=".pdf"
               onChange={handleManuscriptSelected}
               className="sr-only"
             />

@@ -36,6 +36,15 @@ const Settings = () => {
   });
   const [saveMessage, setSaveMessage] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
+  const [language, setLanguage] = useState('English (US)');
+  const [timeZone, setTimeZone] = useState('UTC-8');
+  const [profileVisible, setProfileVisible] = useState(true);
+  const [showEmailToReaders, setShowEmailToReaders] = useState(false);
+  const [showReadingStats, setShowReadingStats] = useState(true);
+  const [emailNotifications, setEmailNotifications] = useState(true);
+  const [pushNotifications, setPushNotifications] = useState(false);
+  const [inAppNotifications, setInAppNotifications] = useState(true);
   const sections = [
     {
       title: "Account",
@@ -231,7 +240,204 @@ const Settings = () => {
           </div>
         )}
 
-        {activeSetting && activeSetting.label !== 'Personal Information' && (
+        {activeSetting && activeSetting.label === 'Password & Security' && (
+          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Password & Security</p>
+              <button
+                type="button"
+                onClick={() => setActiveSetting(null)}
+                className="text-xs font-semibold text-accent hover:text-[color:var(--text)] transition-colors"
+              >
+                Back to Settings
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between p-4 bg-primary/5 border border-white/5 rounded-xl">
+                <div>
+                  <p className="text-sm font-bold">Password</p>
+                  <p className="text-xs text-slate-500">Change your password and keep your account secure.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => window.alert('Password change screen coming soon.')}
+                  className="px-4 py-2 bg-accent text-white rounded-lg text-xs font-bold hover:opacity-90 transition-all"
+                >
+                  Change Password
+                </button>
+              </div>
+              <label className="flex items-center justify-between p-4 bg-primary/5 border border-white/5 rounded-xl cursor-pointer">
+                <div>
+                  <p className="text-sm font-bold">Two-factor authentication</p>
+                  <p className="text-xs text-slate-500">Add an extra layer of security to your account.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={twoFactorEnabled}
+                  onChange={(e) => setTwoFactorEnabled(e.target.checked)}
+                  className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#56aeb9]"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {activeSetting && activeSetting.label === 'Language & Region' && (
+          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Language & Region</p>
+              <button
+                type="button"
+                onClick={() => setActiveSetting(null)}
+                className="text-xs font-semibold text-accent hover:text-[color:var(--text)] transition-colors"
+              >
+                Back to Settings
+              </button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Language
+                </label>
+                <select
+                  value={language}
+                  onChange={(e) => setLanguage(e.target.value)}
+                  className="w-full bg-primary/10 border border-white/5 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
+                >
+                  <option>English (US)</option>
+                  <option>English (UK)</option>
+                  <option>Khmer (KM)</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
+                  Time Zone
+                </label>
+                <select
+                  value={timeZone}
+                  onChange={(e) => setTimeZone(e.target.value)}
+                  className="w-full bg-primary/10 border border-white/5 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
+                >
+                  <option>UTC-8</option>
+                  <option>UTC+0</option>
+                  <option>UTC+7</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {activeSetting && activeSetting.label === 'Privacy Settings' && (
+          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Privacy Settings</p>
+              <button
+                type="button"
+                onClick={() => setActiveSetting(null)}
+                className="text-xs font-semibold text-accent hover:text-[color:var(--text)] transition-colors"
+              >
+                Back to Settings
+              </button>
+            </div>
+            <div className="space-y-4">
+              <label className="flex items-center justify-between p-4 bg-primary/5 border border-white/5 rounded-xl cursor-pointer">
+                <div>
+                  <p className="text-sm font-bold">Public profile</p>
+                  <p className="text-xs text-slate-500">Allow readers to see your author profile.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={profileVisible}
+                  onChange={(e) => setProfileVisible(e.target.checked)}
+                  className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#56aeb9]"
+                />
+              </label>
+              <label className="flex items-center justify-between p-4 bg-primary/5 border border-white/5 rounded-xl cursor-pointer">
+                <div>
+                  <p className="text-sm font-bold">Show email to readers</p>
+                  <p className="text-xs text-slate-500">Display your email on your public profile.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showEmailToReaders}
+                  onChange={(e) => setShowEmailToReaders(e.target.checked)}
+                  className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#56aeb9]"
+                />
+              </label>
+              <label className="flex items-center justify-between p-4 bg-primary/5 border border-white/5 rounded-xl cursor-pointer">
+                <div>
+                  <p className="text-sm font-bold">Show reading stats</p>
+                  <p className="text-xs text-slate-500">Share book performance with readers.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={showReadingStats}
+                  onChange={(e) => setShowReadingStats(e.target.checked)}
+                  className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#56aeb9]"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {activeSetting && activeSetting.label === 'Notifications' && (
+          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Notifications</p>
+              <button
+                type="button"
+                onClick={() => setActiveSetting(null)}
+                className="text-xs font-semibold text-accent hover:text-[color:var(--text)] transition-colors"
+              >
+                Back to Settings
+              </button>
+            </div>
+            <div className="space-y-4">
+              <label className="flex items-center justify-between p-4 bg-primary/5 border border-white/5 rounded-xl cursor-pointer">
+                <div>
+                  <p className="text-sm font-bold">Email alerts</p>
+                  <p className="text-xs text-slate-500">Receive updates and approvals by email.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={emailNotifications}
+                  onChange={(e) => setEmailNotifications(e.target.checked)}
+                  className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#56aeb9]"
+                />
+              </label>
+              <label className="flex items-center justify-between p-4 bg-primary/5 border border-white/5 rounded-xl cursor-pointer">
+                <div>
+                  <p className="text-sm font-bold">Push notifications</p>
+                  <p className="text-xs text-slate-500">Get instant alerts on your device.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={pushNotifications}
+                  onChange={(e) => setPushNotifications(e.target.checked)}
+                  className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#56aeb9]"
+                />
+              </label>
+              <label className="flex items-center justify-between p-4 bg-primary/5 border border-white/5 rounded-xl cursor-pointer">
+                <div>
+                  <p className="text-sm font-bold">In-app notifications</p>
+                  <p className="text-xs text-slate-500">Show alerts inside the portal.</p>
+                </div>
+                <input
+                  type="checkbox"
+                  checked={inAppNotifications}
+                  onChange={(e) => setInAppNotifications(e.target.checked)}
+                  className="h-4 w-4 rounded-[6px] border-[#c2c7ce] bg-white accent-[#56aeb9]"
+                />
+              </label>
+            </div>
+          </div>
+        )}
+
+        {activeSetting && activeSetting.label !== 'Personal Information' &&
+          activeSetting.label !== 'Password & Security' &&
+          activeSetting.label !== 'Language & Region' &&
+          activeSetting.label !== 'Privacy Settings' &&
+          activeSetting.label !== 'Notifications' && (
           <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
             <div className="flex items-center justify-between mb-2">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">Selected Setting</p>

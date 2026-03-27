@@ -260,7 +260,7 @@ function isRoleValidationError(error) {
   const text = getErrorMessageText(error).toLowerCase();
   const isClientValidationStatus = status >= 400 && status < 500;
   return (
-    isClientValidationStatus &&
+    isClientValidationStatus &&s
     (text.includes("role") ||
       text.includes("user, author, or admin") ||
       text.includes("selected role is invalid") ||
@@ -444,7 +444,7 @@ export function AuthProvider({ children }) {
       user,
       isReady,
       isAuthenticated: Boolean(user),
-      login: async ({ email, password, role, remember = false }) => {
+      login: async ({ email, password, remember = false, role } = {}) => {
         try {
           const response = await loginWithRoleFallbacks({ email, password, role });
           const data = response?.data || {};

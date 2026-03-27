@@ -1,5 +1,17 @@
 import React from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  Legend,
+} from 'recharts';
 import { getBooksRequest } from '../services/bookService';
 import { getBookReadAnalytics } from '../../lib/userActivityService';
 
@@ -81,6 +93,11 @@ const Analytics = () => {
 
   const totalReaders = rows.reduce((sum, row) => sum + row.totalReaders, 0);
   const totalBooks = rows.length;
+  const readerBookCompare = [
+    { name: 'Readers', value: totalReaders },
+    { name: 'Books', value: totalBooks },
+  ];
+  const pieColors = ['#4a868f', '#214046'];
 
   if (loading) {
     return (
@@ -121,35 +138,29 @@ const Analytics = () => {
 
       <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
         <div className="flex items-center justify-between mb-6">
-          <h2 className="text-lg font-bold">Reader Share by Book</h2>
-          <span className="text-xs text-slate-400">Percent of total readers</span>
+          <h2 className="text-lg font-bold">Readers vs. Books</h2>
+          <span className="text-xs text-slate-400">Share comparison</span>
         </div>
-        {rows.length === 0 ? (
-          <p className="text-slate-500">No book analytics available yet.</p>
+        {totalReaders === 0 && totalBooks === 0 ? (
+          <p className="text-slate-500">No data available yet.</p>
         ) : (
-          <div className="h-[320px] w-full">
+          <div className="h-[260px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rows} layout="vertical" margin={{ left: 10, right: 20 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#ffffff08" />
-                <XAxis
-                  type="number"
-                  domain={[0, 100]}
-                  tickFormatter={(value) => `${value}%`}
-                  tick={{ fill: '#94a3b8', fontSize: 12 }}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="title"
-                  width={140}
-                  tick={{ fill: '#e2e8f0', fontSize: 12 }}
-                  tickFormatter={(value) => (value.length > 18 ? `${value.slice(0, 18)}…` : value)}
-                />
+              <PieChart>
+                <Pie
+                  data={readerBookCompare}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius={60}
+                  outerRadius={95}
+                  paddingAngle={4}
+                >
+                  {readerBookCompare.map((entry, index) => (
+                    <Cell key={entry.name} fill={pieColors[index % pieColors.length]} />
+                  ))}
+                </Pie>
                 <Tooltip
-                  formatter={(value, name, props) => [
-                    formatPercent(value),
-                    'Reader Share',
-                  ]}
-                  labelFormatter={(label) => `Book: ${label}`}
+                  formatter={(value, name) => [formatNumber(value), name]}
                   contentStyle={{
                     backgroundColor: '#16282b',
                     border: '1px solid rgba(255,255,255,0.08)',
@@ -157,8 +168,8 @@ const Analytics = () => {
                     color: '#fff',
                   }}
                 />
-                <Bar dataKey="percent" fill="#4a868f" radius={[6, 6, 6, 6]} />
-              </BarChart>
+                <Legend />
+              </PieChart>
             </ResponsiveContainer>
           </div>
         )}
@@ -208,3 +219,7 @@ const Analytics = () => {
 };
 
 export default Analytics;
+
+
+
+

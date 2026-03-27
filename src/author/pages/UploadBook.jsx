@@ -18,6 +18,22 @@ const PROFILE_STORAGE_KEY = 'author_studio_profile';
 const GENRE_OPTIONS = ['Technology', 'Novel', 'Education', 'Business', 'History'];
 const NATIVE_OPTION_STYLE = { color: '#0f172a', backgroundColor: '#ffffff' };
 const FALLBACK_COVER_URL = 'https://picsum.photos/seed/new-book/300/450';
+const COVER_CACHE_KEY = 'author_book_covers';
+
+const buildCoverKey = (title, author) =>
+  `${String(title || '').trim().toLowerCase()}|${String(author || '').trim().toLowerCase()}`;
+
+const saveCoverToCache = (key, url) => {
+  if (!key || !url) return;
+  try {
+    const raw = window.localStorage.getItem(COVER_CACHE_KEY);
+    const current = raw ? JSON.parse(raw) : {};
+    const next = { ...current, [key]: url };
+    window.localStorage.setItem(COVER_CACHE_KEY, JSON.stringify(next));
+  } catch {
+    // Ignore storage errors.
+  }
+};
 
 const mapOpenLibrarySubjectToGenre = (subject = '') => {
   if (!subject || typeof subject !== 'string') return '';
@@ -51,6 +67,22 @@ const isValidCoverUrl = (value) => {
   if (typeof value !== 'string' || !value.trim()) return false;
   const trimmed = value.trim();
   return trimmed.startsWith('data:image/') || /^https?:\/\//i.test(trimmed);
+};
+
+const dataUrlToBlob = (dataUrl) => {
+  try {
+    const [meta, data] = dataUrl.split(',');
+    const mimeMatch = /data:(.*?);/i.exec(meta || '');
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const binary = atob(data || '');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  } catch {
+    return null;
+  }
 };
 
 const UploadBook = () => {
@@ -203,6 +235,14 @@ const UploadBook = () => {
   const handleManuscriptSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isPdf = String(file.type || '').toLowerCase() === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setSubmitError('Please upload a PDF file for the book.');
+      setManuscriptFile(null);
+      e.target.value = '';
+      return;
+    }
+    setSubmitError('');
     setManuscriptFile(file);
     e.target.value = '';
   };
@@ -252,6 +292,12 @@ const UploadBook = () => {
         return;
       }
 
+      if (!manuscriptFile) {
+        setSubmitError('Book PDF file is required.');
+        setIsSubmitting(false);
+        return;
+      }
+
       const payload = new FormData();
       payload.append('title', title.trim());
       payload.append('author', selectedAuthor?.name || authorQuery.trim());
@@ -264,6 +310,11 @@ const UploadBook = () => {
 
       if (coverFile instanceof File) {
         payload.append('cover_image', coverFile);
+      } else if (coverPreviewUrl?.startsWith('data:image/')) {
+        const blob = dataUrlToBlob(coverPreviewUrl);
+        if (blob) {
+          payload.append('cover_image', blob, 'cover-image');
+        }
       } else if (coverPreviewUrl) {
         payload.append('cover_image_url', coverPreviewUrl);
       }
@@ -280,9 +331,24 @@ const UploadBook = () => {
       
       console.log('Book uploaded successfully:', response?.data);
       
+      const resolvedAuthorName = selectedAuthor?.name || authorQuery.trim();
+      const coverState = coverPreviewUrl
+        ? {
+            key: buildCoverKey(title, resolvedAuthorName),
+            url: coverPreviewUrl,
+          }
+        : null;
+
+      if (coverState) {
+        saveCoverToCache(coverState.key, coverState.url);
+      }
+
       // Success - navigate to my books
       window.setTimeout(() => {
-        navigate('/author/my-books', { replace: true });
+        navigate('/author/my-books', {
+          replace: true,
+          state: coverState ? { uploadedCover: coverState } : null,
+        });
       }, 500);
       
     } catch (error) {
@@ -584,13 +650,13 @@ const UploadBook = () => {
               </div>
               <div className="text-center px-6">
                 <p className="text-lg font-bold">Upload Manuscript</p>
-                <p className="text-sm text-slate-500 mt-1">Support for PDF, EPUB, DOCX (Max 50MB)</p>
+                <p className="text-sm text-slate-500 mt-1">PDF only (Max 50MB)</p>
               </div>
             </div>
             <input
               ref={manuscriptInputRef}
               type="file"
-              accept=".pdf,.epub,.docx"
+              accept=".pdf"
               onChange={handleManuscriptSelected}
               className="sr-only"
             />

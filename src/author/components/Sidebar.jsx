@@ -7,7 +7,6 @@ import {
   BarChart3, 
   MessageSquare, 
   Settings, 
-  User,
   LogOut
 } from 'lucide-react';
 import { useAuth } from '../../auth/AuthContext';
@@ -42,7 +41,6 @@ const Sidebar = () => {
     { icon: BarChart3, label: 'Analytics', path: '/author/analytics' },
     { icon: MessageSquare, label: 'Feedback', path: '/author/feedback' },
     { icon: Settings, label: 'Settings', path: '/author/settings' },
-    { icon: User, label: 'Profile', path: '/author/profile' },
   ];
 
   const handleLogout = () => {

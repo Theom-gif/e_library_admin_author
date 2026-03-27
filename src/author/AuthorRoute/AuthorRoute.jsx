@@ -17,6 +17,7 @@ import EditBookPage from '../pages/EditBookPage';
 import BookDetailPage from '../pages/BookDetailPage';
 import Research from '../pages/Research';
 import Analytics from '../pages/Analytics';
+import CategoryBooks from '../pages/CategoryBooks';
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
         <Route path="feedback" element={<Feedback />} />
         <Route path="research" element={<Research />} />
         <Route path="analytics" element={<Analytics />} />
+        <Route path="category/:slug" element={<CategoryBooks />} />
         <Route path="edit-book" element={<EditBookPage />} />
         <Route path="book-detail" element={<BookDetailPage />} />
       </Route>

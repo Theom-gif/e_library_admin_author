@@ -1,10 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { 
-  Bell, 
-  Lock, 
-  User, 
-  Globe, 
-  Shield, 
+import {
+  Bell,
+  Lock,
+  User,
+  Globe,
+  Shield,
   HelpCircle,
   ChevronRight
 } from 'lucide-react';
@@ -288,24 +288,26 @@ const Settings = () => {
   }, [activeSettingId]);
 
   return (
+
     <div className="p-8 max-w-4xl mx-auto">
+
       <div className="mb-10">
         <h1 className="text-3xl font-bold tracking-tight">{t("Settings")}</h1>
         <p className="text-slate-400 mt-1">{t("Manage your account preferences and studio configuration.")}</p>
       </div>
 
       <div className="space-y-10">
+
         {!activeSettingId && sections.map((section, i) => (
           <div key={i}>
             <h2 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-4 px-4">{section.title}</h2>
             <div className="bg-card-dark border border-white/5 rounded-2xl overflow-hidden card-shadow">
               {section.items.map((item, j) => (
-                <button 
+                <button
                   key={item.id}
                   onClick={() => setActiveSettingId(item.id)}
-                  className={`w-full flex items-center justify-between p-4 hover:bg-primary/10 transition-colors group ${
-                    j !== section.items.length - 1 ? 'border-b border-white/5' : ''
-                  }`}
+                  className={`w-full flex items-center justify-between p-4 hover:bg-primary/10 transition-colors group ${j !== section.items.length - 1 ? 'border-b border-white/5' : ''
+                    }`}
                 >
                   <div className="flex items-center gap-4">
                     <div className="p-2 bg-primary/20 rounded-lg text-accent group-hover:scale-110 transition-transform">
@@ -324,6 +326,7 @@ const Settings = () => {
         ))}
 
         {activeSettingId === 'personal' && (
+
           <div ref={personalInfoRef} className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
             <div className="flex items-center justify-between mb-4">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Personal Information")}</p>
@@ -374,13 +377,12 @@ const Settings = () => {
               </div>
               <div className="flex items-center justify-between">
                 <p
-                  className={`text-xs ${
-                    profileMessage.type === 'error'
+                  className={`text-xs ${profileMessage.type === 'error'
                       ? 'text-rose-400'
                       : profileMessage.type === 'success'
                         ? 'text-emerald-400'
                         : 'text-slate-400'
-                  }`}
+                    }`}
                 >
                   {profileMessage.text}
                 </p>
@@ -449,11 +451,10 @@ const Settings = () => {
                 />
                 {passwordMessage.text && (
                   <p
-                    className={`text-xs ${
-                      passwordMessage.type === 'error'
+                    className={`text-xs ${passwordMessage.type === 'error'
                         ? 'text-rose-400'
                         : 'text-emerald-400'
-                    }`}
+                      }`}
                   >
                     {passwordMessage.text}
                   </p>
@@ -485,13 +486,12 @@ const Settings = () => {
               </label>
               <div className="flex items-center justify-between">
                 <p
-                  className={`text-xs ${
-                    securityMessage.type === 'error'
+                  className={`text-xs ${securityMessage.type === 'error'
                       ? 'text-rose-400'
                       : securityMessage.type === 'success'
                         ? 'text-emerald-400'
                         : 'text-slate-400'
-                  }`}
+                    }`}
                 >
                   {securityMessage.text}
                 </p>
@@ -541,13 +541,12 @@ const Settings = () => {
               </div>
               <div className="flex items-center justify-between">
                 <p
-                  className={`text-xs ${
-                    regionMessage.type === 'error'
+                  className={`text-xs ${regionMessage.type === 'error'
                       ? 'text-rose-400'
                       : regionMessage.type === 'success'
                         ? 'text-emerald-400'
                         : 'text-slate-400'
-                  }`}
+                    }`}
                 >
                   {regionMessage.text}
                 </p>
@@ -623,13 +622,12 @@ const Settings = () => {
               </label>
               <div className="flex items-center justify-between">
                 <p
-                  className={`text-xs ${
-                    privacyMessage.type === 'error'
+                  className={`text-xs ${privacyMessage.type === 'error'
                       ? 'text-rose-400'
                       : privacyMessage.type === 'success'
                         ? 'text-emerald-400'
                         : 'text-slate-400'
-                  }`}
+                    }`}
                 >
                   {privacyMessage.text}
                 </p>
@@ -705,13 +703,12 @@ const Settings = () => {
               </label>
               <div className="flex items-center justify-between">
                 <p
-                  className={`text-xs ${
-                    notificationMessage.type === 'error'
+                  className={`text-xs ${notificationMessage.type === 'error'
                       ? 'text-rose-400'
                       : notificationMessage.type === 'success'
                         ? 'text-emerald-400'
                         : 'text-slate-400'
-                  }`}
+                    }`}
                 >
                   {notificationMessage.text}
                 </p>
@@ -729,21 +726,21 @@ const Settings = () => {
 
         {activeSettingId &&
           !['personal', 'security', 'language', 'privacy', 'notifications'].includes(activeSettingId) && (
-          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Selected Setting")}</p>
-              <button
-                type="button"
-                onClick={() => setActiveSettingId(null)}
-                className="text-xs font-semibold text-accent hover:text-[color:var(--text)] transition-colors"
-              >
-                {t("Back to Settings")}
-              </button>
+            <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">{t("Selected Setting")}</p>
+                <button
+                  type="button"
+                  onClick={() => setActiveSettingId(null)}
+                  className="text-xs font-semibold text-accent hover:text-[color:var(--text)] transition-colors"
+                >
+                  {t("Back to Settings")}
+                </button>
+              </div>
+              <h3 className="text-lg font-bold">{selectedItem?.label}</h3>
+              <p className="text-sm text-slate-400 mt-1">{selectedItem?.desc}</p>
             </div>
-            <h3 className="text-lg font-bold">{selectedItem?.label}</h3>
-            <p className="text-sm text-slate-400 mt-1">{selectedItem?.desc}</p>
-          </div>
-        )}
+          )}
 
         {!activeSettingId && (
           <div className="bg-primary/5 rounded-2xl p-6 border border-white/5 flex items-center justify-between">

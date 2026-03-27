@@ -1,7 +1,8 @@
 import { apiClient, API_BASE_URL } from '../../lib/apiClient';
 
-const BOOKS_ENDPOINTS = ['/auth/books', '/author/books'];
-const UPLOAD_BOOK_ENDPOINTS = ['/author/books/upload', '/author/upload', '/auth/book'];
+// Backend contract uses /api/auth/* for author flows.
+const BOOKS_ENDPOINTS = ['/auth/books'];
+const UPLOAD_BOOK_ENDPOINTS = ['/auth/book'];
 const IMPORT_BOOKS_ENDPOINT = '/auth/books/import-local';
 
 const toNumberId = (value, fallback = Date.now()) => {
@@ -118,6 +119,17 @@ const normalizeStatus = (value) => {
   return text.charAt(0).toUpperCase() + text.slice(1);
 };
 
+const normalizeStatusFilter = (value) => {
+  const text = String(value ?? '').trim();
+  if (!text) return 'All';
+  const lower = text.toLowerCase();
+  if (lower === 'all') return 'All';
+  if (lower === 'approved') return 'Approved';
+  if (lower === 'pending') return 'Pending';
+  if (lower === 'rejected') return 'Rejected';
+  return text;
+};
+
 export const mapApiBookToUiBook = (book) => ({
   bookId: toNumberId(book?.id),
   id: toNumberId(book?.id),
@@ -161,9 +173,10 @@ export const mapApiBookToUiBook = (book) => ({
 
 const buildBooksQuery = (endpoint, filters = {}) => {
   const params = new URLSearchParams();
-  const status = String(filters.status || 'approved').trim();
-  if (status) {
-    params.set('status', status);
+  const normalizedStatus = normalizeStatusFilter(filters.status);
+  // Some backends treat "All" as an error; omit the param to mean "all statuses".
+  if (normalizedStatus && normalizedStatus !== 'All') {
+    params.set('status', normalizedStatus);
   }
   const search = String(filters.search || '').trim();
   if (search) {
@@ -180,6 +193,8 @@ export const getBooksRequest = async (filters = {}) => {
       const payload = response?.data;
       const rows =
         (Array.isArray(payload?.data) && payload.data) ||
+        (Array.isArray(payload?.data?.data) && payload.data.data) ||
+        (Array.isArray(payload?.data?.books) && payload.data.books) ||
         (Array.isArray(payload?.books) && payload.books) ||
         (Array.isArray(payload) && payload) ||
         [];
@@ -194,12 +209,8 @@ export const getBooksRequest = async (filters = {}) => {
         });
       }
       const status = error?.response?.status;
-      const shouldRetry =
-        status === 401 ||
-        status === 403 ||
-        status === 404 ||
-        status === 405 ||
-        status === 500;
+      // Only retry for route mismatch scenarios.
+      const shouldRetry = status === 404 || status === 405;
       if (!shouldRetry) break;
     }
   }
@@ -213,13 +224,17 @@ export const uploadBookRequest = async (formData) => {
   let lastError = null;
   for (const endpoint of UPLOAD_BOOK_ENDPOINTS) {
     try {
-      return await apiClient.post(endpoint, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Let Axios/browser set the correct multipart boundary automatically.
+      return await apiClient.post(endpoint, formData);
     } catch (error) {
       lastError = error;
+      if (typeof window !== 'undefined') {
+        console.error('[Books] Upload failed endpoint:', endpoint, {
+          status: error?.response?.status,
+          message: error?.response?.data?.message || error?.message,
+          url: error?.config?.url,
+        });
+      }
       const status = error?.response?.status;
       const message =
         error?.response?.data?.message ||
@@ -230,14 +245,8 @@ export const uploadBookRequest = async (formData) => {
       const hasBookFileError =
         /book pdf file is required/i.test(String(message)) ||
         /book[_\s-]?file/i.test(String(bookFileErrors));
-      const shouldRetry =
-        status === 401 ||
-        status === 403 ||
-        status === 404 ||
-        status === 405 ||
-        status === 422 ||
-        status === 500 ||
-        hasBookFileError;
+      // Only retry for route mismatch scenarios.
+      const shouldRetry = status === 404 || status === 405;
       if (!shouldRetry) break;
     }
   }
@@ -260,11 +269,8 @@ export const updateBookRequest = async (id, formData) => {
       if (!payload.has('_method')) {
         payload.append('_method', 'PATCH');
       }
-      return await apiClient.post(`${endpoint}/${id}`, payload, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
+      // Let Axios/browser set the correct multipart boundary automatically.
+      return await apiClient.post(`${endpoint}/${id}`, payload);
     } catch (error) {
       lastError = error;
       const status = error?.response?.status;

@@ -5,6 +5,7 @@ import {
   BookOpen, 
   PlusSquare, 
   BarChart3, 
+  Filter,
   MessageSquare, 
   Settings, 
   LogOut
@@ -39,6 +40,7 @@ const Sidebar = () => {
   const navItems = [
     { icon: LayoutDashboard, label: t('Dashboard'), path: '/author' },
     { icon: BookOpen, label: t('My Books'), path: '/author/my-books' },
+    // { icon: Filter, label: t('Categories'), path: '/author/category/technology' },
     { icon: PlusSquare, label: t('Upload New'), path: '/author/upload' },
     { icon: BarChart3, label: t('Analytics'), path: '/author/analytics' },
     { icon: MessageSquare, label: t('Feedback'), path: '/author/feedback' },

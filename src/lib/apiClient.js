@@ -17,17 +17,29 @@ export const API_BASE_URL = apiBaseFromEnv || DEFAULT_API_BASE_URL;
 export const API_TIMEOUT_MS =
   Number(import.meta.env.VITE_API_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
+function basePathEndsWithApi(baseUrl) {
+  const raw = String(baseUrl || "");
+  if (!raw) return false;
+
+  try {
+    const parsed = new URL(raw);
+    return /\/api$/i.test(trimTrailingSlash(parsed.pathname || ""));
+  } catch {
+    return /\/api$/i.test(trimTrailingSlash(raw));
+  }
+}
+
 function normalizeApiUrl(url) {
   if (!url || isAbsoluteUrl(url)) {
     return url;
   }
 
   const rawPath = `/${trimLeadingSlash(url)}`;
+  const baseEndsWithApi = basePathEndsWithApi(API_BASE_URL);
 
   try {
     const baseUrl = new URL(API_BASE_URL);
     const basePath = trimTrailingSlash(baseUrl.pathname || "");
-    const baseEndsWithApi = /\/api$/i.test(basePath);
 
     if (baseEndsWithApi && hasApiPrefix(rawPath)) {
       return `/${trimLeadingSlash(rawPath).replace(/^api\/?/i, "")}`;
@@ -37,7 +49,11 @@ function normalizeApiUrl(url) {
       return `/api${rawPath}`;
     }
   } catch {
-    if (!hasApiPrefix(rawPath)) {
+    if (baseEndsWithApi && hasApiPrefix(rawPath)) {
+      return `/${trimLeadingSlash(rawPath).replace(/^api\/?/i, "")}`;
+    }
+
+    if (!baseEndsWithApi && !hasApiPrefix(rawPath)) {
       return `/api${rawPath}`;
     }
   }

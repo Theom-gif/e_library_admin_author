@@ -191,6 +191,7 @@ function syncAuthorProfileFromAuth(sessionUser, backendUser) {
     !existingName ||
     (existingIsGeneric && !resolvedIsGeneric);
 
+
   const nextProfile = {
     ...(shouldResetProfile ? {} : existingProfile),
     ...(shouldUpdateName ? { name: resolvedName } : {}),
@@ -470,6 +471,7 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const storedSession = getSession();
     const storedToken = getTokenFromStorage();
+
 
     if (!storedSession || !storedToken) {
       clearAuthStorage();

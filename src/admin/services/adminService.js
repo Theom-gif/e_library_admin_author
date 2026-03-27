@@ -48,6 +48,15 @@ const stripApiSuffix = (value = "") =>
 
 const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
 
+const buildCoverApiUrl = (id) => {
+  if (!id) return "";
+  const base = trimSlash(API_BASE_URL);
+  if (/\/api$/i.test(base)) {
+    return `${base}/books/${id}/cover`;
+  }
+  return `${base}/api/books/${id}/cover`;
+};
+
 // const buildStorageUrl = (path = "") => {
 //   if (!path) return "";
 //   if (isAbsoluteUrl(path)) return path;
@@ -102,9 +111,18 @@ export const normalizeBook = (book = {}) => {
     book.cover_api_url,
     book.cover_image_url,
     book.cover_image_path,
+    book.cover_image,
+    book.coverImage,
+    book.cover_url,
+    book.coverUrl,
+    book.image_url,
+    book.imageUrl,
+    book.image_path,
+    book.imagePath,
     book.cover,
     book.image,
     book.thumbnail,
+    buildCoverApiUrl(book.id ?? book.bookId ?? book._id),
   );
   const filePath = resolveAssetUrl(
     book.book_file_url,
@@ -294,6 +312,19 @@ export const fetchAuthorFeedback = (limit = 10, filter = "all", config = {}) =>
 export const fetchAuthorDemographics = (config = {}) =>
   apiClient.get("/author/dashboard/demographics", config).then((res) => unwrapObjectPayload(res?.data));
 
+// ============================================
+// Notifications Endpoints
+// ============================================
+
+export const fetchAuthorNotifications = (config = {}) =>
+  apiClient.get("/author/notifications", config).then((res) => res?.data || {});
+
+export const fetchAdminNotifications = (config = {}) =>
+  apiClient.get("/admin/notifications", config).then((res) => res?.data || {});
+
+export const sendAdminNotification = (payload = {}, config = {}) =>
+  apiClient.post("/admin/notifications/send", payload, config).then((res) => res?.data || {});
+
 // Export as object for consistent naming
 export default {
   fetchAdminBooks,
@@ -316,6 +347,9 @@ export default {
   fetchAuthorTopBooks,
   fetchAuthorFeedback,
   fetchAuthorDemographics,
+  fetchAuthorNotifications,
+  fetchAdminNotifications,
+  sendAdminNotification,
   normalizeBook,
   buildStorageUrl,
 };

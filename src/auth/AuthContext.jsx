@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { DEMO_AUTH_USERS } from "../admin/data/mockData";
-import { loginRequest } from "./services/authService";
+import { loginRequest, registerRequest } from "./services/authService";
 import { API_BASE_URL } from "../lib/apiClient";
 import { getRoleName } from "./roleUtils";
 
 const SESSION_KEY = "bookhub_session";
 const TOKEN_KEY = "bookhub_token";
+const REFRESH_TOKEN_KEY = "bookhub_refresh_token";
 const REMEMBER_KEY = "bookhub_remember";
+const AUTH_UNAUTHORIZED_EVENT = "bookhub:unauthorized";
 const AUTHOR_PROFILE_KEY = "author_studio_profile";
 const AUTHOR_PROFILE_UPDATED_EVENT = "author-profile-updated";
 const DEFAULT_AUTHOR_NAME = "Alex Rivera";
@@ -28,7 +30,12 @@ function readSessionFromStorage(storage) {
 }
 
 function getTokenFromStorage() {
-  return localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+  return (
+    localStorage.getItem(TOKEN_KEY) ||
+    sessionStorage.getItem(TOKEN_KEY) ||
+    localStorage.getItem("access_token") ||
+    sessionStorage.getItem("access_token")
+  );
 }
 
 function setRememberPreference(remember) {
@@ -50,24 +57,82 @@ function saveSession(user, remember = false) {
   staleStorage.removeItem(SESSION_KEY);
 }
 
+function normalizeTokenValue(value) {
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (value && typeof value === "object") {
+    return (
+      value.token ||
+      value.access_token ||
+      value.accessToken ||
+      value.jwt ||
+      value.value ||
+      null
+    );
+  }
+  return null;
+}
+
 function saveToken(token, remember = false) {
-  if (!token) {
+  const normalizedToken = normalizeTokenValue(token);
+  if (!normalizedToken) {
     return;
   }
   const activeStorage = remember ? localStorage : sessionStorage;
   const staleStorage = remember ? sessionStorage : localStorage;
-  activeStorage.setItem(TOKEN_KEY, token);
+  activeStorage.setItem(TOKEN_KEY, normalizedToken);
   staleStorage.removeItem(TOKEN_KEY);
+}
+
+function saveRefreshToken(refreshToken, remember = false) {
+  const normalizedToken = normalizeTokenValue(refreshToken);
+  if (!normalizedToken) {
+    return;
+  }
+  const activeStorage = remember ? localStorage : sessionStorage;
+  const staleStorage = remember ? sessionStorage : localStorage;
+  activeStorage.setItem(REFRESH_TOKEN_KEY, normalizedToken);
+  staleStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
 }
 
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
+}
+
+function clearAuthStorage() {
+  clearSession();
+  clearToken();
+  localStorage.removeItem(REMEMBER_KEY);
+}
+
+function extractAuthTokens(data = {}) {
+  const sources = [data, data?.data, data?.tokens, data?.data?.tokens];
+  const pick = (...keys) => {
+    for (const source of sources) {
+      if (!source || typeof source !== "object") continue;
+      for (const key of keys) {
+        if (source[key] !== undefined && source[key] !== null && String(source[key]).trim() !== "") {
+          return source[key];
+        }
+      }
+    }
+    return null;
+  };
+
+  return {
+    accessToken: pick("token", "accessToken", "access_token", "jwt", "bearerToken", "bearer_token"),
+    refreshToken: pick("refreshToken", "refresh_token"),
+  };
 }
 
 function firstDefinedValue(values) {
@@ -160,12 +225,26 @@ function resolveSessionRole(backendUser, data, requestedRole) {
   return getRoleName(backendRole);
 }
 
-function resolveSessionUserId(backendUser) {
-  return backendUser?.id || backendUser?._id || backendUser?.userId || backendUser?.user_id || null;
-}
-
-function resolveSessionUserName(backendUser) {
-  return backendUser?.name || backendUser?.fullName || backendUser?.username || "User";
+function extractRoleNameFromAuthResponse(responseData) {
+  const data = responseData || {};
+  const backendUser = data.user || data.data?.user || data;
+  const backendRole = firstDefinedValue([
+    backendUser?.role_id,
+    backendUser?.roleId,
+    backendUser?.role,
+    backendUser?.role_name,
+    backendUser?.roleName,
+    backendUser?.user_role,
+    backendUser?.type,
+    data?.role_id,
+    data?.roleId,
+    data?.role,
+    data?.role_name,
+    data?.roleName,
+    data?.user_role,
+    data?.type,
+  ]);
+  return getRoleName(backendRole);
 }
 
 function toErrorMessage(error, fallbackMessage) {
@@ -197,6 +276,32 @@ function toErrorMessage(error, fallbackMessage) {
   return message || fallbackMessage;
 }
 
+function getRoleWord(role) {
+  return getRoleName(role);
+}
+
+function getRoleAliases(role) {
+  const roleWord = getRoleWord(role);
+  if (roleWord === "Admin") {
+    return ["Admin", "admin", "Administrator", "administrator", "1"];
+  }
+  if (roleWord === "Author") {
+    return ["Author", "author", "Writer", "writer", "2"];
+  }
+  return ["User", "user", "Reader", "reader", "Member", "member", "3"];
+}
+
+function getRoleIdByWord(role) {
+  const roleWord = getRoleWord(role);
+  if (roleWord === "Admin") {
+    return 1;
+  }
+  if (roleWord === "Author") {
+    return 2;
+  }
+  return 3;
+}
+
 function getErrorMessageText(error) {
   const validationErrors = error?.response?.data?.errors;
   const roleErrors = validationErrors?.role || validationErrors?.role_id || validationErrors?.Role;
@@ -214,7 +319,7 @@ function isRoleValidationError(error) {
   const text = getErrorMessageText(error).toLowerCase();
   const isClientValidationStatus = status >= 400 && status < 500;
   return (
-    isClientValidationStatus &&s
+    isClientValidationStatus &&
     (text.includes("role") ||
       text.includes("user, author, or admin") ||
       text.includes("selected role is invalid") ||
@@ -222,21 +327,141 @@ function isRoleValidationError(error) {
   );
 }
 
-async function loginWithRequestFallbacks({ email, password }) {
+async function loginWithRoleFallbacks({ email, password, role }) {
   const cleanEmail = String(email || "").trim().toLowerCase();
   const requestModes = ["urlencoded", "multipart", "json"];
+  const hasRequestedRole = String(role ?? "").trim() !== "";
 
-  for (const mode of requestModes) {
-    try {
-      return await loginRequest({ email: cleanEmail, password }, { mode });
-    } catch (error) {
-      if (!isRoleValidationError(error)) {
-        throw error;
+  if (!hasRequestedRole) {
+    const attempts = [
+      { email: cleanEmail, password },
+      { email: cleanEmail, password, role_id: 1 },
+      { email: cleanEmail, password, role_id: 2 },
+      { email: cleanEmail, password, role_id: 3 },
+      { email: cleanEmail, password, role: "Admin" },
+      { email: cleanEmail, password, role: "Author" },
+      { email: cleanEmail, password, role: "User" },
+    ];
+
+    let lastRoleError = null;
+    for (const payload of attempts) {
+      for (const mode of requestModes) {
+        try {
+          return await loginRequest(payload, { mode });
+        } catch (error) {
+          if (!isRoleValidationError(error)) {
+            throw error;
+          }
+          lastRoleError = error;
+        }
+      }
+    }
+
+    throw lastRoleError || new Error("Unable to authenticate. Please try again.");
+  }
+
+  const requestedRoleName = getRoleWord(role);
+  const roleId = getRoleIdByWord(requestedRoleName);
+  const roleAliases = getRoleAliases(requestedRoleName);
+
+  const attempts = [];
+  for (const alias of roleAliases) {
+    const numericAlias = Number(alias);
+    if (Number.isFinite(numericAlias) && numericAlias > 0) {
+      attempts.push({ email: cleanEmail, password, role_id: numericAlias });
+    } else {
+      attempts.push({ email: cleanEmail, password, role: alias, role_id: roleId });
+      attempts.push({ email: cleanEmail, password, role: alias });
+    }
+  }
+  attempts.push({ email: cleanEmail, password, role_id: roleId });
+  attempts.push({ email: cleanEmail, password });
+
+  let lastRoleError = null;
+  for (const payload of attempts) {
+    for (const mode of requestModes) {
+      try {
+        const response = await loginRequest(payload, { mode });
+        const responseRoleName = extractRoleNameFromAuthResponse(response?.data);
+
+        if (responseRoleName !== requestedRoleName) {
+          lastRoleError = new Error(
+            `This account logged in as ${responseRoleName}. Please choose ${responseRoleName} role to continue.`,
+          );
+          continue;
+        }
+
+        return response;
+      } catch (error) {
+        if (!isRoleValidationError(error)) {
+          throw error;
+        }
+        lastRoleError = error;
       }
     }
   }
 
-  throw new Error("Login failed because the backend still expects a role field.");
+  throw lastRoleError || new Error("Unable to authenticate with the selected role.");
+}
+
+async function registerWithRoleFallbacks({
+  firstname,
+  lastname,
+  email,
+  password,
+  password_confirmation,
+  role,
+  role_id,
+}) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  const roleName = getRoleWord(role ?? role_id);
+  const roleId = getRoleIdByWord(roleName);
+  const roleAliases = getRoleAliases(roleName);
+
+  const basePayload = {
+    firstname,
+    lastname,
+    first_name: firstname,
+    last_name: lastname,
+    email: cleanEmail,
+    password,
+    password_confirmation,
+  };
+
+  const attempts = [];
+  for (const alias of roleAliases) {
+    const numericAlias = Number(alias);
+    if (Number.isFinite(numericAlias) && numericAlias > 0) {
+      attempts.push({ ...basePayload, role_id: numericAlias });
+    } else {
+      attempts.push({ ...basePayload, role: alias, role_id: roleId });
+      attempts.push({ ...basePayload, role: alias });
+    }
+  }
+  attempts.push({ ...basePayload, role_id: roleId });
+
+  const requestModes = ["urlencoded", "multipart", "json"];
+
+  let lastRoleError = null;
+  let lastSpecificRoleError = null;
+  for (const payload of attempts) {
+    for (const mode of requestModes) {
+      try {
+        return await registerRequest(payload, { mode });
+      } catch (error) {
+        if (!isRoleValidationError(error)) {
+          throw error;
+        }
+        lastRoleError = error;
+        const roleText = getErrorMessageText(error).toLowerCase();
+        if (!roleText.includes("required")) {
+          lastSpecificRoleError = error;
+        }
+      }
+    }
+  }
+
+  throw lastSpecificRoleError || lastRoleError;
 }
 
 export function AuthProvider({ children }) {
@@ -244,15 +469,12 @@ export function AuthProvider({ children }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const shouldRemember = localStorage.getItem(REMEMBER_KEY) === "1";
-
     const storedSession = getSession();
     const storedToken = getTokenFromStorage();
 
 
     if (!storedSession || !storedToken) {
-      clearSession();
-      clearToken();
+      clearAuthStorage();
       setUser(null);
       setIsReady(true);
       return;
@@ -263,6 +485,20 @@ export function AuthProvider({ children }) {
     syncAuthorProfileFromAuth(storedSession, null);
     setIsReady(true);
   }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleUnauthorized = () => {
+      clearAuthStorage();
+      setUser(null);
+    };
+
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => {
+      window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    };
+  }, []);
   const value = useMemo(
     () => ({
       user,
@@ -270,7 +506,7 @@ export function AuthProvider({ children }) {
       isAuthenticated: Boolean(user),
       login: async ({ email, password, remember = false, role } = {}) => {
         try {
-          const response = await loginWithRequestFallbacks({ email, password });
+          const response = await loginWithRoleFallbacks({ email, password, role });
           const data = response?.data || {};
           const backendUser = data.user || data.data?.user || data;
           const resolvedRole = resolveSessionRole(backendUser, data, role);
@@ -283,19 +519,14 @@ export function AuthProvider({ children }) {
             role: resolvedRole,
           };
 
-          const token =
-            data.token ||
-            data.accessToken ||
-            data.access_token ||
-            data.data?.token ||
-            data.data?.accessToken ||
-            data.data?.access_token;
+          const { accessToken, refreshToken } = extractAuthTokens(data);
 
-          if (!token) {
+          if (!accessToken) {
             return { ok: false, error: "Login succeeded but no access token was returned by /api/auth/login." };
           }
           saveSession(sessionUser, Boolean(remember));
-          saveToken(token, Boolean(remember));
+          saveToken(accessToken, Boolean(remember));
+          saveRefreshToken(refreshToken, Boolean(remember));
           setRememberPreference(Boolean(remember));
           setUser(sessionUser);
           syncAuthorProfileFromAuth(sessionUser, backendUser);
@@ -325,10 +556,32 @@ export function AuthProvider({ children }) {
         syncAuthorProfileFromAuth(sessionUser, demoUser);
         return { ok: true, user: sessionUser };
       },
+      register: async ({
+        firstname,
+        lastname,
+        email,
+        password,
+        password_confirmation,
+        role,
+        role_id,
+      }) => {
+        try {
+          await registerWithRoleFallbacks({
+            firstname,
+            lastname,
+            email,
+            password,
+            password_confirmation,
+            role,
+            role_id,
+          });
+          return { ok: true };
+        } catch (error) {
+          return { ok: false, error: toErrorMessage(error, "Registration failed. Please try again.") };
+        }
+      },
       logout: () => {
-        clearSession();
-        clearToken();
-        localStorage.removeItem(REMEMBER_KEY);
+        clearAuthStorage();
         setUser(null);
       },
     }),

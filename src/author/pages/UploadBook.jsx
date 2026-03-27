@@ -13,6 +13,8 @@ import {
 } from 'lucide-react';
 import { searchAuthors, searchBooks } from '../services/openLibraryService';
 import { uploadBookRequest } from '../services/bookService';
+import { saveManuscriptFile } from '../services/manuscriptStorage';
+import { upsertLocalBook } from '../services/localBookStorage';
 
 const PROFILE_STORAGE_KEY = 'author_studio_profile';
 const GENRE_OPTIONS = ['Technology', 'Novel', 'Education', 'Business', 'History'];
@@ -67,6 +69,22 @@ const isValidCoverUrl = (value) => {
   if (typeof value !== 'string' || !value.trim()) return false;
   const trimmed = value.trim();
   return trimmed.startsWith('data:image/') || /^https?:\/\//i.test(trimmed);
+};
+
+const dataUrlToBlob = (dataUrl) => {
+  try {
+    const [meta, data] = dataUrl.split(',');
+    const mimeMatch = /data:(.*?);/i.exec(meta || '');
+    const mime = mimeMatch ? mimeMatch[1] : 'image/png';
+    const binary = atob(data || '');
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i += 1) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    return new Blob([bytes], { type: mime });
+  } catch {
+    return null;
+  }
 };
 
 const UploadBook = () => {
@@ -219,6 +237,21 @@ const UploadBook = () => {
   const handleManuscriptSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const isPdf = String(file.type || '').toLowerCase() === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
+    if (!isPdf) {
+      setSubmitError('Please upload a PDF file for the book.');
+      setManuscriptFile(null);
+      e.target.value = '';
+      return;
+    }
+    const maxSizeBytes = 50 * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      setSubmitError('PDF is too large. Maximum file size is 50MB.');
+      setManuscriptFile(null);
+      e.target.value = '';
+      return;
+    }
+    setSubmitError('');
     setManuscriptFile(file);
     e.target.value = '';
   };
@@ -261,16 +294,53 @@ const UploadBook = () => {
     setIsSubmitting(true);
     try {
       // Verify token exists before uploading
-      const token = window.localStorage.getItem('bookhub_token');
+      const token =
+        window.localStorage.getItem('bookhub_token') ||
+        window.sessionStorage.getItem('bookhub_token');
       if (!token) {
         setSubmitError('Authentication failed. Please login again.');
         setIsSubmitting(false);
         return;
       }
 
+      if (!manuscriptFile) {
+        setSubmitError('Book PDF file is required.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      const resolvedAuthorName = selectedAuthor?.name || authorQuery.trim();
+      const localClientKey = `${buildCoverKey(title, resolvedAuthorName)}|${manuscriptFile?.name || ''}|${
+        manuscriptFile?.size || 0
+      }`;
+
+      const draftCoverValue =
+        typeof coverPreviewUrl === 'string' && coverPreviewUrl.trim().startsWith('data:image/')
+          ? ''
+          : coverPreviewUrl || '';
+
+      // Frontend-only: always persist a local draft before the network call,
+      // so the author can still see their work if the backend is down.
+      const localDraft = upsertLocalBook({
+        clientKey: localClientKey,
+        title: title.trim(),
+        author: resolvedAuthorName,
+        genre: genre.trim(),
+        description: description.trim(),
+        img: draftCoverValue,
+        status: 'Draft',
+        manuscriptName: manuscriptFile?.name || '',
+        manuscriptType: manuscriptFile?.type || '',
+        manuscriptSizeBytes: manuscriptFile?.size || 0,
+      });
+
+      if (localDraft && manuscriptFile instanceof File) {
+        await saveManuscriptFile(localDraft.id, manuscriptFile);
+      }
+
       const payload = new FormData();
       payload.append('title', title.trim());
-      payload.append('author', selectedAuthor?.name || authorQuery.trim());
+      payload.append('author', resolvedAuthorName);
       payload.append('category', genre.trim());
       payload.append('description', description.trim());
 
@@ -280,6 +350,11 @@ const UploadBook = () => {
 
       if (coverFile instanceof File) {
         payload.append('cover_image', coverFile);
+      } else if (coverPreviewUrl?.startsWith('data:image/')) {
+        const blob = dataUrlToBlob(coverPreviewUrl);
+        if (blob) {
+          payload.append('cover_image', blob, 'cover-image');
+        }
       } else if (coverPreviewUrl) {
         payload.append('cover_image_url', coverPreviewUrl);
       }
@@ -296,7 +371,6 @@ const UploadBook = () => {
       
       console.log('Book uploaded successfully:', response?.data);
       
-      const resolvedAuthorName = selectedAuthor?.name || authorQuery.trim();
       const coverState = coverPreviewUrl
         ? {
             key: buildCoverKey(title, resolvedAuthorName),
@@ -312,7 +386,7 @@ const UploadBook = () => {
       window.setTimeout(() => {
         navigate('/author/my-books', {
           replace: true,
-          state: coverState ? { uploadedCover: coverState } : null,
+          state: coverState ? { uploadedCover: coverState, refresh: true } : { refresh: true },
         });
       }, 500);
       
@@ -326,8 +400,12 @@ const UploadBook = () => {
 
       let errorMessage = 'Unable to upload book. Please try again.';
       
-      if (error?.response?.status === 401 || error?.response?.status === 403) {
+      if (error?.isCorsError) {
+        errorMessage = 'API blocked by CORS. Use /api proxy (VITE_API_BASE_URL=/api) or enable backend CORS.';
+      } else if (error?.response?.status === 401 || error?.response?.status === 403) {
         errorMessage = 'Your session has expired. Please login again.';
+      } else if (typeof error?.response?.data === 'string' && error.response.data.trim()) {
+        errorMessage = `Unable to upload book (${error?.response?.status || 'Error'}).`;
       } else if (error?.response?.data?.message) {
         errorMessage = error.response.data.message;
       } else if (error?.response?.data?.errors) {
@@ -338,9 +416,31 @@ const UploadBook = () => {
           const firstError = Object.values(errors)[0];
           errorMessage = Array.isArray(firstError) ? firstError[0] : firstError;
         }
+      } else if (error?.response?.status) {
+        errorMessage = `Unable to upload book (${error.response.status}). Please try again.`;
+      } else if (error?.message) {
+        errorMessage = `Unable to upload book. ${error.message}`;
       }
 
       setSubmitError(errorMessage);
+
+      // Frontend-only fallback: save as local draft when backend is down.
+      try {
+        const status = error?.response?.status;
+        const shouldSaveLocal =
+          error?.isCorsError ||
+          !error?.response ||
+          (Number.isFinite(status) && status >= 500);
+
+        if (!shouldSaveLocal) {
+          return;
+        }
+
+        // Take the user to My Books so they can see the saved draft immediately.
+        navigate('/author/my-books', { replace: true, state: { refresh: true, localSaved: true } });
+      } catch {
+        // Ignore local draft failures.
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -359,18 +459,23 @@ const UploadBook = () => {
 
       <div className="flex items-center justify-between mb-12 relative">
         <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/5 -translate-y-1/2 z-0"></div>
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="relative z-10 flex flex-col items-center gap-2">
+        {[
+          { id: 1, label: 'Details', note: 'Title, author, genre' },
+          { id: 2, label: 'Content', note: 'PDF + cover image' },
+          { id: 3, label: 'Review & Submit', note: 'Check & publish' },
+        ].map((item) => (
+          <div key={item.id} className="relative z-10 flex flex-col items-center gap-2">
             <div
               className={`size-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
-                step >= i ? 'bg-accent text-white shadow-glow' : 'bg-card-dark border border-white/10 text-slate-500'
+                step >= item.id ? 'bg-accent text-white shadow-glow' : 'bg-card-dark border border-white/10 text-slate-500'
               }`}
             >
-              {step > i ? <CheckCircle2 className="size-5" /> : i}
+              {step > item.id ? <CheckCircle2 className="size-5" /> : item.id}
             </div>
-            <span className={`text-[10px] uppercase font-bold tracking-wider ${step >= i ? 'text-accent' : 'text-slate-500'}`}>
-              {i === 1 ? 'Details' : i === 2 ? 'Content' : 'Review'}
+            <span className={`text-[10px] uppercase font-bold tracking-wider ${step >= item.id ? 'text-accent' : 'text-slate-500'}`}>
+              {item.label}
             </span>
+            <span className="text-[10px] text-slate-500">{item.note}</span>
           </div>
         ))}
       </div>
@@ -615,13 +720,13 @@ const UploadBook = () => {
               </div>
               <div className="text-center px-6">
                 <p className="text-lg font-bold">Upload Manuscript</p>
-                <p className="text-sm text-slate-500 mt-1">Support for PDF, EPUB, DOCX (Max 50MB)</p>
+                <p className="text-sm text-slate-500 mt-1">PDF only (Max 50MB)</p>
               </div>
             </div>
             <input
               ref={manuscriptInputRef}
               type="file"
-              accept=".pdf,.epub,.docx"
+              accept=".pdf"
               onChange={handleManuscriptSelected}
               className="sr-only"
             />

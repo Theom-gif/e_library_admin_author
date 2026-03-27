@@ -9,10 +9,10 @@ export function isThemeValue(value) {
 
 export function getSystemTheme() {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
-    return DARK_THEME;
+    return LIGHT_THEME;
   }
 
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? DARK_THEME : LIGHT_THEME;
+  return LIGHT_THEME;
 }
 
 export function getStoredTheme() {
@@ -36,7 +36,7 @@ export function getStoredTheme() {
 }
 
 export function resolveInitialTheme() {
-  return getStoredTheme() || getSystemTheme();
+  return getStoredTheme() || LIGHT_THEME;
 }
 
 export function applyThemeToDocument(theme) {
@@ -44,7 +44,7 @@ export function applyThemeToDocument(theme) {
     return;
   }
 
-  const resolvedTheme = isThemeValue(theme) ? theme : DARK_THEME;
+  const resolvedTheme = isThemeValue(theme) ? theme : LIGHT_THEME;
   document.documentElement.setAttribute("data-theme", resolvedTheme);
   document.documentElement.style.colorScheme = resolvedTheme;
 }

@@ -1,6 +1,9 @@
 import axios from "axios";
 
 const TOKEN_KEY = "bookhub_token";
+const SESSION_KEY = "bookhub_session";
+const REMEMBER_KEY = "bookhub_remember";
+const AUTH_UNAUTHORIZED_EVENT = "bookhub:unauthorized";
 export const DEFAULT_API_BASE_URL = "https://elibrary.pncproject.site";
 const DEFAULT_TIMEOUT_MS = 8000;
 
@@ -14,17 +17,29 @@ export const API_BASE_URL = apiBaseFromEnv || DEFAULT_API_BASE_URL;
 export const API_TIMEOUT_MS =
   Number(import.meta.env.VITE_API_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
+function basePathEndsWithApi(baseUrl) {
+  const raw = String(baseUrl || "");
+  if (!raw) return false;
+
+  try {
+    const parsed = new URL(raw);
+    return /\/api$/i.test(trimTrailingSlash(parsed.pathname || ""));
+  } catch {
+    return /\/api$/i.test(trimTrailingSlash(raw));
+  }
+}
+
 function normalizeApiUrl(url) {
   if (!url || isAbsoluteUrl(url)) {
     return url;
   }
 
   const rawPath = `/${trimLeadingSlash(url)}`;
+  const baseEndsWithApi = basePathEndsWithApi(API_BASE_URL);
 
   try {
     const baseUrl = new URL(API_BASE_URL);
     const basePath = trimTrailingSlash(baseUrl.pathname || "");
-    const baseEndsWithApi = /\/api$/i.test(basePath);
 
     if (baseEndsWithApi && hasApiPrefix(rawPath)) {
       return `/${trimLeadingSlash(rawPath).replace(/^api\/?/i, "")}`;
@@ -34,7 +49,11 @@ function normalizeApiUrl(url) {
       return `/api${rawPath}`;
     }
   } catch {
-    if (!hasApiPrefix(rawPath)) {
+    if (baseEndsWithApi && hasApiPrefix(rawPath)) {
+      return `/${trimLeadingSlash(rawPath).replace(/^api\/?/i, "")}`;
+    }
+
+    if (!baseEndsWithApi && !hasApiPrefix(rawPath)) {
       return `/api${rawPath}`;
     }
   }
@@ -55,8 +74,7 @@ apiClient.interceptors.request.use((config) => {
   config.url = normalizeApiUrl(config.url);
 
   if (typeof window !== "undefined") {
-    const token =
-      localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+    const token = getStoredAccessToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -104,6 +122,10 @@ apiClient.interceptors.response.use(
       if (typeof window !== "undefined") {
         localStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(REMEMBER_KEY);
+        window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
       }
       
       // Redirect to login on 401

@@ -1,6 +1,9 @@
 import axios from "axios";
 
 const TOKEN_KEY = "bookhub_token";
+const SESSION_KEY = "bookhub_session";
+const REMEMBER_KEY = "bookhub_remember";
+const AUTH_UNAUTHORIZED_EVENT = "bookhub:unauthorized";
 export const DEFAULT_API_BASE_URL = "https://elibrary.pncproject.site";
 const DEFAULT_TIMEOUT_MS = 8000;
 
@@ -104,6 +107,10 @@ apiClient.interceptors.response.use(
       if (typeof window !== "undefined") {
         localStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(SESSION_KEY);
+        sessionStorage.removeItem(SESSION_KEY);
+        localStorage.removeItem(REMEMBER_KEY);
+        window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
       }
       
       // Redirect to login on 401

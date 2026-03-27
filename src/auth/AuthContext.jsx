@@ -7,6 +7,7 @@ import { getRoleName } from "./roleUtils";
 const SESSION_KEY = "bookhub_session";
 const TOKEN_KEY = "bookhub_token";
 const REMEMBER_KEY = "bookhub_remember";
+const AUTH_UNAUTHORIZED_EVENT = "bookhub:unauthorized";
 const AUTHOR_PROFILE_KEY = "author_studio_profile";
 const AUTHOR_PROFILE_UPDATED_EVENT = "author-profile-updated";
 const DEFAULT_AUTHOR_NAME = "Alex Rivera";
@@ -68,6 +69,12 @@ function clearToken() {
 function clearSession() {
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
+}
+
+function clearAuthStorage() {
+  clearSession();
+  clearToken();
+  localStorage.removeItem(REMEMBER_KEY);
 }
 
 function firstDefinedValue(values) {
@@ -263,10 +270,40 @@ function isRoleValidationError(error) {
 
 async function loginWithRoleFallbacks({ email, password, role }) {
   const cleanEmail = String(email || "").trim().toLowerCase();
+  const requestModes = ["urlencoded", "multipart", "json"];
+  const hasRequestedRole = String(role ?? "").trim() !== "";
+
+  if (!hasRequestedRole) {
+    const attempts = [
+      { email: cleanEmail, password },
+      { email: cleanEmail, password, role_id: 1 },
+      { email: cleanEmail, password, role_id: 2 },
+      { email: cleanEmail, password, role_id: 3 },
+      { email: cleanEmail, password, role: "Admin" },
+      { email: cleanEmail, password, role: "Author" },
+      { email: cleanEmail, password, role: "User" },
+    ];
+
+    let lastRoleError = null;
+    for (const payload of attempts) {
+      for (const mode of requestModes) {
+        try {
+          return await loginRequest(payload, { mode });
+        } catch (error) {
+          if (!isRoleValidationError(error)) {
+            throw error;
+          }
+          lastRoleError = error;
+        }
+      }
+    }
+
+    throw lastRoleError || new Error("Unable to authenticate. Please try again.");
+  }
+
   const requestedRoleName = getRoleWord(role);
   const roleId = getRoleIdByWord(requestedRoleName);
   const roleAliases = getRoleAliases(requestedRoleName);
-  const requestModes = ["urlencoded", "multipart", "json"];
 
   const attempts = [];
   for (const alias of roleAliases) {
@@ -373,14 +410,11 @@ export function AuthProvider({ children }) {
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
-    const shouldRemember = localStorage.getItem(REMEMBER_KEY) === "1";
-
     const storedSession = getSession();
     const storedToken = getTokenFromStorage();
 
     if (!storedSession || !storedToken) {
-      clearSession();
-      clearToken();
+      clearAuthStorage();
       setUser(null);
       setIsReady(true);
       return;
@@ -390,6 +424,20 @@ export function AuthProvider({ children }) {
     setUser(storedSession);
     syncAuthorProfileFromAuth(storedSession, null);
     setIsReady(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return undefined;
+
+    const handleUnauthorized = () => {
+      clearAuthStorage();
+      setUser(null);
+    };
+
+    window.addEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    return () => {
+      window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, handleUnauthorized);
+    };
   }, []);
   const value = useMemo(
     () => ({
@@ -478,9 +526,7 @@ export function AuthProvider({ children }) {
         }
       },
       logout: () => {
-        clearSession();
-        clearToken();
-        localStorage.removeItem(REMEMBER_KEY);
+        clearAuthStorage();
         setUser(null);
       },
     }),

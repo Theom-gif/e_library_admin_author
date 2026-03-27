@@ -294,6 +294,19 @@ export const fetchAuthorFeedback = (limit = 10, filter = "all", config = {}) =>
 export const fetchAuthorDemographics = (config = {}) =>
   apiClient.get("/author/dashboard/demographics", config).then((res) => unwrapObjectPayload(res?.data));
 
+// ============================================
+// Notifications Endpoints
+// ============================================
+
+export const fetchAuthorNotifications = (config = {}) =>
+  apiClient.get("/author/notifications", config).then((res) => res?.data || {});
+
+export const fetchAdminNotifications = (config = {}) =>
+  apiClient.get("/admin/notifications", config).then((res) => res?.data || {});
+
+export const sendAdminNotification = (payload = {}, config = {}) =>
+  apiClient.post("/admin/notifications/send", payload, config).then((res) => res?.data || {});
+
 // Export as object for consistent naming
 export default {
   fetchAdminBooks,
@@ -316,6 +329,9 @@ export default {
   fetchAuthorTopBooks,
   fetchAuthorFeedback,
   fetchAuthorDemographics,
+  fetchAuthorNotifications,
+  fetchAdminNotifications,
+  sendAdminNotification,
   normalizeBook,
   buildStorageUrl,
 };

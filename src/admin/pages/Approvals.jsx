@@ -74,7 +74,6 @@ const buildStorageUrl = (path = "") => {
   return `${assetBaseUrl}/storage/${clean}`;
 };
 
-const fallbackId = () => `book-${Math.random().toString(36).slice(2, 10)}`;
 const toUiBook = (book = {}) => {
   const coverPath =
     book.coverUrl ||
@@ -93,7 +92,7 @@ const toUiBook = (book = {}) => {
   const fileUrl = buildStorageUrl(filePath);
 
   return {
-    id: book.id ?? book._id ?? book.bookId ?? book.slug ?? fallbackId(),
+    id: book.id ?? book._id ?? book.bookId ?? book.slug ?? "",
     title: book.title ?? book.name ?? "Untitled",
     author: book.author ?? book.authorName ?? book.author_name ?? "Unknown",
     category: book.category ?? book.genre ?? book.genre_name ?? "Uncategorized",
@@ -253,6 +252,11 @@ const Approvals = () => {
   };
 
   const handleModeration = async (book, nextStatus) => {
+    if (!book?.id) {
+      setActionError(t("Cannot moderate this submission because ID is missing."));
+      return;
+    }
+
     setActionLoadingId(book.id);
     setActionError("");
     setActionSuccess("");
@@ -407,10 +411,12 @@ const Approvals = () => {
               )}
 
               {!isLoading && !error && filteredBooks.map((book) => {
-                const disabled = book.status !== "Pending" || actionLoadingId === book.id;
+                const hasValidId = String(book.id || "").trim() !== "";
+                const disabled =
+                  book.status !== "Pending" || actionLoadingId === book.id || !hasValidId;
                 const previewDisabled = !book.fileUrl;
                 return (
-                  <tr key={book.id} className="hover:bg-white/5 transition-colors">
+                  <tr key={book.id || `${book.title}-${book.author}`} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
                         <img
@@ -426,7 +432,7 @@ const Approvals = () => {
                         <div>
                           <p className="font-semibold leading-tight">{book.title}</p>
                           <p className="text-[11px] text-slate-500 mt-1">
-                            {t("ID")} #{book.id}
+                            {t("ID")} #{book.id || t("N/A")}
                           </p>
                         </div>
                       </div>

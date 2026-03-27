@@ -63,6 +63,58 @@ export const pauseBook = async (bookId, progress = 50, config = {}) => {
   return recordBookRead(bookId, { status: "paused", progress }, config);
 };
 
+/**
+ * Start a reading session.
+ * Maps to POST /api/reading/start
+ * @param {object} payload - Backend-defined reading start payload
+ * @param {object} config - Axios config
+ * @returns {Promise<object>} API response payload
+ */
+export const startReading = async (payload = {}, config = {}) => {
+  const response = await apiClient.post("/reading/start", payload, config);
+  return response?.data || {};
+};
+
+/**
+ * Finish a reading session.
+ * Maps to POST /api/reading/finish
+ * @param {object} payload - Backend-defined reading finish payload
+ * @param {object} config - Axios config
+ * @returns {Promise<object>} API response payload
+ */
+export const finishReading = async (payload = {}, config = {}) => {
+  const response = await apiClient.post("/reading/finish", payload, config);
+  return response?.data || {};
+};
+
+/**
+ * Get current user's notifications.
+ * Maps to GET /api/user/notifications
+ * @param {object} config - Axios config
+ * @returns {Promise<array|object>} Notification payload
+ */
+export const getUserNotifications = async (config = {}) => {
+  const response = await apiClient.get("/user/notifications", config);
+  const payload = response?.data;
+
+  if (Array.isArray(payload?.data)) return payload.data;
+  if (Array.isArray(payload)) return payload;
+  return payload || {};
+};
+
+/**
+ * Mark a user notification as read.
+ * Maps to POST /api/user/notifications/{id}/read
+ * @param {string|number} id - Notification ID
+ * @param {object} payload - Optional backend-defined payload
+ * @param {object} config - Axios config
+ * @returns {Promise<object>} API response payload
+ */
+export const markUserNotificationAsRead = async (id, payload = {}, config = {}) => {
+  const response = await apiClient.post(`/user/notifications/${id}/read`, payload, config);
+  return response?.data || {};
+};
+
 // ============================================================================
 // User Reading Statistics
 // ============================================================================

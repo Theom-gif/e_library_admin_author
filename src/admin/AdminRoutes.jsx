@@ -53,7 +53,14 @@ export default function AdminRoutes() {
   const useExternalUserPortal = isExternalUserPortal();
 
   if (!isReady) {
-    return <div>Loading...</div>;
+    return (
+      <main className="min-h-screen bg-bg-dark text-[color:var(--text)] flex items-center justify-center px-4">
+        <div className="glass-card w-full max-w-md p-6 text-center">
+          <div className="mx-auto mb-4 h-9 w-9 animate-spin rounded-full border-2 border-white/20 border-t-[color:var(--accent)]" />
+          <p className="text-sm text-slate-500">Preparing your workspace...</p>
+        </div>
+      </main>
+    );
   }
 
   return (
@@ -89,7 +96,7 @@ export default function AdminRoutes() {
       <Route
         path="/user/dashboard"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["User"]}>
             {roleName === "User" && useExternalUserPortal ? (
               <ExternalRedirect to={USER_PORTAL_URL} />
             ) : (
@@ -103,7 +110,7 @@ export default function AdminRoutes() {
         <Route
           path={userPortalPath}
           element={
-            <ProtectedRoute>
+            <ProtectedRoute allowedRoles={["User"]}>
               <UserDashboard />
             </ProtectedRoute>
           }
@@ -114,7 +121,7 @@ export default function AdminRoutes() {
       <Route
         path="/admin"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["Admin"]}>
             <AdminLayout />
           </ProtectedRoute>
         }
@@ -134,7 +141,7 @@ export default function AdminRoutes() {
       <Route
         path="/author"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={["Author"]}>
             <AuthorLayout />
           </ProtectedRoute>
         }

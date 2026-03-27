@@ -394,18 +394,23 @@ const UploadBook = () => {
 
       <div className="flex items-center justify-between mb-12 relative">
         <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/5 -translate-y-1/2 z-0"></div>
-        {[1, 2, 3].map((i) => (
-          <div key={i} className="relative z-10 flex flex-col items-center gap-2">
+        {[
+          { id: 1, label: 'Details', note: 'Title, author, genre' },
+          { id: 2, label: 'Content', note: 'PDF + cover image' },
+          { id: 3, label: 'Review & Submit', note: 'Check & publish' },
+        ].map((item) => (
+          <div key={item.id} className="relative z-10 flex flex-col items-center gap-2">
             <div
               className={`size-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
-                step >= i ? 'bg-accent text-white shadow-glow' : 'bg-card-dark border border-white/10 text-slate-500'
+                step >= item.id ? 'bg-accent text-white shadow-glow' : 'bg-card-dark border border-white/10 text-slate-500'
               }`}
             >
-              {step > i ? <CheckCircle2 className="size-5" /> : i}
+              {step > item.id ? <CheckCircle2 className="size-5" /> : item.id}
             </div>
-            <span className={`text-[10px] uppercase font-bold tracking-wider ${step >= i ? 'text-accent' : 'text-slate-500'}`}>
-              {i === 1 ? 'Details' : i === 2 ? 'Content' : 'Review'}
+            <span className={`text-[10px] uppercase font-bold tracking-wider ${step >= item.id ? 'text-accent' : 'text-slate-500'}`}>
+              {item.label}
             </span>
+            <span className="text-[10px] text-slate-500">{item.note}</span>
           </div>
         ))}
       </div>

@@ -1,7 +1,7 @@
 import { Eye, EyeOff, ArrowRight, Mail, Lock, BookOpen } from "lucide-react";
 import { useState } from "react";
 import { Navigate, useLocation, useNavigate } from "react-router-dom";
-import { useAuth } from "../AuthContext";
+import { useAuth } from "../useAuth";
 import {
   getInternalUserPortalPath,
   getHomePathByRole,

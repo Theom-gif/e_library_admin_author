@@ -10,7 +10,7 @@ import {
   Settings, 
   LogOut
 } from 'lucide-react';
-import { useAuth } from '../../auth/AuthContext';
+import { useAuth } from '../../auth/useAuth';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const PROFILE_STORAGE_KEY = 'author_studio_profile';

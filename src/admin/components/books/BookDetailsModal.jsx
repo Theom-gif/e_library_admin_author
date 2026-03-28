@@ -53,17 +53,17 @@ const BookDetailsModal = ({ t, selectedBook, isDark, onClose }) => {
           <div className="mb-6 rounded-2xl border border-white/10 bg-white/5 p-4 md:p-5">
             <div className="grid grid-cols-[80px_1fr] gap-4 md:gap-5">
               <div className="h-24 w-20 rounded-xl overflow-hidden border border-white/10 bg-white/5 flex-shrink-0">
-                {selectedBook.cover ? (
+                {(selectedBook.cover || selectedBook.coverUrl) ? (
                   <img
-                    src={selectedBook.cover}
+                    src={selectedBook.cover || selectedBook.coverUrl}
                     alt={selectedBook.title}
                     className="h-full w-full object-cover"
+                    onError={(e) => { e.currentTarget.style.display = "none"; e.currentTarget.nextSibling.style.display = "flex"; }}
                   />
-                ) : (
-                  <div className="h-full w-full flex items-center justify-center">
-                    <BookOpen size={24} className="text-slate-500" />
-                  </div>
-                )}
+                ) : null}
+                <div className="h-full w-full flex items-center justify-center" style={{ display: (selectedBook.cover || selectedBook.coverUrl) ? "none" : "flex" }}>
+                  <BookOpen size={24} className="text-slate-500" />
+                </div>
               </div>
 
               <div className="min-w-0">

@@ -17,6 +17,17 @@ export const API_BASE_URL = apiBaseFromEnv || DEFAULT_API_BASE_URL;
 export const API_TIMEOUT_MS =
   Number(import.meta.env.VITE_API_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
 
+export function getStoredAccessToken() {
+  if (typeof window === "undefined") return null;
+  return (
+    localStorage.getItem(TOKEN_KEY) ||
+    sessionStorage.getItem(TOKEN_KEY) ||
+    localStorage.getItem("access_token") ||
+    sessionStorage.getItem("access_token") ||
+    null
+  );
+}
+
 function basePathEndsWithApi(baseUrl) {
   const raw = String(baseUrl || "");
   if (!raw) return false;
@@ -78,8 +89,6 @@ apiClient.interceptors.request.use((config) => {
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      console.warn("[API Client] No authentication token found. Request may fail with 401.");
     }
   }
   return config;
@@ -114,30 +123,21 @@ apiClient.interceptors.response.use(
       return Promise.reject(corsError);
     }
 
-    // Handle 401 Unauthorized
+    // Handle 401 Unauthorized — skip auth routes (login/register returning 401 is expected)
     if (error.response?.status === 401) {
-      console.error("[API Client] 401 Unauthorized - Token may be invalid or expired");
-      
-      // Clear invalid tokens
-      if (typeof window !== "undefined") {
+      const url = String(error.config?.url || "");
+      const isAuthRoute = /\/auth\/(login|register)/i.test(url);
+      if (!isAuthRoute && typeof window !== "undefined") {
         localStorage.removeItem(TOKEN_KEY);
         sessionStorage.removeItem(TOKEN_KEY);
         localStorage.removeItem(SESSION_KEY);
         sessionStorage.removeItem(SESSION_KEY);
         localStorage.removeItem(REMEMBER_KEY);
         window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
       }
-      
-      // Redirect to login on 401
-      if (typeof window !== "undefined" && window.location.pathname !== "/login") {
-        console.log("[API Client] Redirecting to login...");
-        window.location.href = "/login";
-      }
-    }
-
-    // Handle 403 Forbidden
-    if (error.response?.status === 403) {
-      console.error("[API Client] 403 Forbidden - You don't have permission to access this resource");
     }
 
     // Handle 500+ Server Errors

@@ -75,29 +75,40 @@ const Dashboard = () => {
       setIsLoading(true);
       setError("");
       try {
-        // Try the unified endpoint first
+        // 1. Try unified endpoint first
         const unified = await fetchDashboard({ signal: controller.signal });
         if (unified?.stats) setStats(unified.stats);
         if (unified?.trends) setTrends(unified.trends);
-        if (unified?.activity) setActivity(toActivity(unified.activity));
+        if (Array.isArray(unified?.activity)) setActivity(toActivity(unified.activity));
         if (unified?.health) setHealth(unified.health);
 
-        // Fill gaps using split endpoints, if any data missing
+        // 2. Fill stats gap if unified didn't return them
         if (!unified?.stats || !unified?.trends) {
           const statsRes = await fetchDashboardStats({ signal: controller.signal });
           if (statsRes?.stats) setStats(statsRes.stats);
           if (statsRes?.trends) setTrends(statsRes.trends);
         }
 
+        // 3. Activity — { activity: [...], meta: { range, startDate, endDate, totalUsers } }
         const activityRes = await fetchDashboardActivity(range, { signal: controller.signal });
-        if (activityRes?.activity) setActivity(toActivity(activityRes.activity));
+        if (Array.isArray(activityRes?.activity)) {
+          setActivity(toActivity(activityRes.activity));
+        }
 
+        // 4. Health — response is the health object directly (no wrapper key)
+        // Shape: { uptimePercent, apiServer, database, fileStorage, emailService }
         const healthRes = await fetchDashboardHealth({ signal: controller.signal });
-        if (healthRes?.health) setHealth(healthRes.health);
+        if (healthRes?.apiServer || healthRes?.uptimePercent !== undefined) {
+          setHealth(healthRes);
+        } else if (healthRes?.health) {
+          setHealth(healthRes.health);
+        }
 
+        // 5. Top readers
         setTopReadersLoading(true);
         const readersRes = await fetchTopReaders(topReadersRange, 3, { signal: controller.signal });
-        if (readersRes?.data) setTopReaders(readersRes.data);
+        if (Array.isArray(readersRes?.data)) setTopReaders(readersRes.data);
+        else if (Array.isArray(readersRes)) setTopReaders(readersRes);
         setTopReadersLoading(false);
       } catch (err) {
         if (controller.signal.aborted) return;

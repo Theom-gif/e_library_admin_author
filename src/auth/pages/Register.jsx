@@ -1,7 +1,7 @@
 import { Eye, EyeOff, BookOpen, Mail, User as UserIcon, Shield, PenTool } from "lucide-react";
 import { useState } from "react";
 import { Link, Navigate, useNavigate } from "react-router-dom";
-import { useAuth } from "../AuthContext";
+import { useAuth } from "../useAuth";
 import {
   getInternalUserPortalPath,
   getHomePathByRole,

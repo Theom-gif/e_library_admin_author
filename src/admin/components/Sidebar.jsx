@@ -1,5 +1,6 @@
 import {
   BookOpen,
+  Bell,
   CheckSquare,
   Grid,
   LayoutDashboard,
@@ -20,9 +21,10 @@ export default function Sidebar() {
     { to: "/admin/approvals", label: t("Approvals"), icon: CheckSquare },
     { to: "/admin/categories", label: t("Categories"), icon: Grid },
     { to: "/admin/books", label: t("Books"), icon: BookOpen },
-    { to: "/admin/readers", label: t("Top Readers"), icon: Trophy },
-    { to: "/admin/monitor", label: t("System Monitor"), icon: Activity },
-    { to: "/admin/settings", label: t("Settings"), icon: Settings },
+    { to: "/admin/readers",       label: t("Top Readers"),    icon: Trophy },
+    { to: "/admin/notifications", label: t("Notifications"),  icon: Bell },
+    { to: "/admin/monitor",       label: t("System Monitor"), icon: Activity },
+    { to: "/admin/settings",      label: t("Settings"),       icon: Settings },
   ];
 
   return (

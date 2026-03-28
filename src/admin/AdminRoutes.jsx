@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
-import { useAuth } from "../auth/AuthContext";
+import { useAuth } from "../auth/useAuth";
 import ProtectedRoute from "../auth/ProtectedRoute";
 import AdminLayout from "./layouts/AdminLayout";
 
@@ -8,6 +8,7 @@ import Approvals from "./pages/Approvals";
 import Books from "./pages/Books";
 import Categories from "./pages/Categories";
 import Dashboard from "./pages/Dashboard";
+import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import SystemMonitor from "./pages/SystemMonitor";
 import TopReaders from "./pages/TopReaders";
@@ -134,6 +135,7 @@ export default function AdminRoutes() {
         <Route path="books" element={<Books />} />
         <Route path="readers" element={<TopReaders />} />
         <Route path="monitor" element={<SystemMonitor />} />
+        <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<Settings />} />
       </Route>
 

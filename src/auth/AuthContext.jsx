@@ -1,8 +1,9 @@
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { DEMO_AUTH_USERS } from "../admin/data/mockData";
 import { loginRequest, registerRequest } from "./services/authService";
 import { API_BASE_URL } from "../lib/apiClient";
 import { getRoleName } from "./roleUtils";
+import { AuthContext } from "./authContextStore";
 
 const SESSION_KEY = "bookhub_session";
 const TOKEN_KEY = "bookhub_token";
@@ -13,8 +14,6 @@ const AUTHOR_PROFILE_KEY = "author_studio_profile";
 const AUTHOR_PROFILE_UPDATED_EVENT = "author-profile-updated";
 const DEFAULT_AUTHOR_NAME = "Alex Rivera";
 const GENERIC_AUTHOR_NAMES = new Set(["User", "Author", DEFAULT_AUTHOR_NAME]);
-
-const AuthContext = createContext(null);
 
 function readSessionFromStorage(storage) {
   const raw = storage.getItem(SESSION_KEY);
@@ -327,37 +326,62 @@ function isRoleValidationError(error) {
   );
 }
 
+function isRetryableAuthError(error) {
+  const status = Number(error?.response?.status || 0);
+  const text = getErrorMessageText(error).toLowerCase();
+  const hasAuthStatus = status === 401 || status === 403 || status === 422;
+  return (
+    hasAuthStatus &&
+    (text.includes("invalid credential") ||
+      text.includes("invalid login") ||
+      text.includes("unauthorized") ||
+      text.includes("authentication failed") ||
+      text.includes("email or password"))
+  );
+}
+
 async function loginWithRoleFallbacks({ email, password, role }) {
-  const cleanEmail = String(email || "").trim().toLowerCase();
+  const rawEmail = String(email || "").trim();
+  const normalizedEmail = rawEmail.toLowerCase();
+  const emailCandidates = rawEmail === normalizedEmail ? [rawEmail] : [rawEmail, normalizedEmail];
   const requestModes = ["urlencoded", "multipart", "json"];
   const hasRequestedRole = String(role ?? "").trim() !== "";
 
   if (!hasRequestedRole) {
-    const attempts = [
-      { email: cleanEmail, password },
-      { email: cleanEmail, password, role_id: 1 },
-      { email: cleanEmail, password, role_id: 2 },
-      { email: cleanEmail, password, role_id: 3 },
-      { email: cleanEmail, password, role: "Admin" },
-      { email: cleanEmail, password, role: "Author" },
-      { email: cleanEmail, password, role: "User" },
-    ];
+    const attempts = [];
+    for (const candidateEmail of emailCandidates) {
+      attempts.push(
+        { email: candidateEmail, password },
+        { email: candidateEmail, password, role_id: 1 },
+        { email: candidateEmail, password, role_id: 2 },
+        { email: candidateEmail, password, role_id: 3 },
+        { email: candidateEmail, password, role: "Admin" },
+        { email: candidateEmail, password, role: "Author" },
+        { email: candidateEmail, password, role: "User" },
+      );
+    }
 
     let lastRoleError = null;
+    let lastAuthError = null;
     for (const payload of attempts) {
       for (const mode of requestModes) {
         try {
           return await loginRequest(payload, { mode });
         } catch (error) {
-          if (!isRoleValidationError(error)) {
-            throw error;
+          if (isRoleValidationError(error)) {
+            lastRoleError = error;
+            continue;
           }
-          lastRoleError = error;
+          if (isRetryableAuthError(error)) {
+            lastAuthError = error;
+            continue;
+          }
+          throw error;
         }
       }
     }
 
-    throw lastRoleError || new Error("Unable to authenticate. Please try again.");
+    throw lastRoleError || lastAuthError || new Error("Unable to authenticate. Please try again.");
   }
 
   const requestedRoleName = getRoleWord(role);
@@ -365,19 +389,22 @@ async function loginWithRoleFallbacks({ email, password, role }) {
   const roleAliases = getRoleAliases(requestedRoleName);
 
   const attempts = [];
-  for (const alias of roleAliases) {
-    const numericAlias = Number(alias);
-    if (Number.isFinite(numericAlias) && numericAlias > 0) {
-      attempts.push({ email: cleanEmail, password, role_id: numericAlias });
-    } else {
-      attempts.push({ email: cleanEmail, password, role: alias, role_id: roleId });
-      attempts.push({ email: cleanEmail, password, role: alias });
+  for (const candidateEmail of emailCandidates) {
+    for (const alias of roleAliases) {
+      const numericAlias = Number(alias);
+      if (Number.isFinite(numericAlias) && numericAlias > 0) {
+        attempts.push({ email: candidateEmail, password, role_id: numericAlias });
+      } else {
+        attempts.push({ email: candidateEmail, password, role: alias, role_id: roleId });
+        attempts.push({ email: candidateEmail, password, role: alias });
+      }
     }
+    attempts.push({ email: candidateEmail, password, role_id: roleId });
+    attempts.push({ email: candidateEmail, password });
   }
-  attempts.push({ email: cleanEmail, password, role_id: roleId });
-  attempts.push({ email: cleanEmail, password });
 
   let lastRoleError = null;
+  let lastAuthError = null;
   for (const payload of attempts) {
     for (const mode of requestModes) {
       try {
@@ -393,15 +420,20 @@ async function loginWithRoleFallbacks({ email, password, role }) {
 
         return response;
       } catch (error) {
-        if (!isRoleValidationError(error)) {
-          throw error;
+        if (isRoleValidationError(error)) {
+          lastRoleError = error;
+          continue;
         }
-        lastRoleError = error;
+        if (isRetryableAuthError(error)) {
+          lastAuthError = error;
+          continue;
+        }
+        throw error;
       }
     }
   }
 
-  throw lastRoleError || new Error("Unable to authenticate with the selected role.");
+  throw lastRoleError || lastAuthError || new Error("Unable to authenticate with the selected role.");
 }
 
 async function registerWithRoleFallbacks({
@@ -589,12 +621,4 @@ export function AuthProvider({ children }) {
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
-}
-
-export function useAuth() {
-  const context = useContext(AuthContext);
-  if (!context) {
-    throw new Error("useAuth must be used inside AuthProvider");
-  }
-  return context;
 }

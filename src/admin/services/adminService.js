@@ -51,6 +51,7 @@ const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
 const buildCoverApiUrl = (id) => {
   if (!id) return "";
   const base = trimSlash(API_BASE_URL);
+  // base = "/api" (relative) or "https://domain.com/api" (absolute)
   if (/\/api$/i.test(base)) {
     return `${base}/books/${id}/cover`;
   }
@@ -137,6 +138,7 @@ export const normalizeBook = (book = {}) => {
     category: book.category ?? book.genre ?? book.genre_name ?? "",
     status: book.status ?? "Pending",
     downloads: Number(book.downloads ?? 0),
+    cover: coverPath,
     coverUrl: coverPath,
     fileUrl: filePath,
     description: book.description ?? "",
@@ -316,14 +318,50 @@ export const fetchAuthorDemographics = (config = {}) =>
 // Notifications Endpoints
 // ============================================
 
-export const fetchAuthorNotifications = (config = {}) =>
-  apiClient.get("/author/notifications", config).then((res) => res?.data || {});
+const unwrapNotifications = (res) => {
+  const raw = res?.data;
+  const rows =
+    (Array.isArray(raw?.data) && raw.data) ||
+    (Array.isArray(raw?.notifications) && raw.notifications) ||
+    (Array.isArray(raw) && raw) ||
+    [];
+  return rows.map((n) => ({
+    id:          n.id ?? n._id ?? "",
+    type:        n.type ?? n.notification_type ?? "",
+    message:     n.message ?? n.title ?? n.body ?? "",
+    description: n.description ?? n.body ?? "",
+    read:        Boolean(n.read ?? n.is_read ?? n.read_at),
+    created_at:  n.created_at ?? n.createdAt ?? "",
+  }));
+};
 
+// GET /api/admin/notifications
 export const fetchAdminNotifications = (config = {}) =>
-  apiClient.get("/admin/notifications", config).then((res) => res?.data || {});
+  apiClient.get("/admin/notifications", config).then(unwrapNotifications);
 
+// POST /api/admin/notifications/send
 export const sendAdminNotification = (payload = {}, config = {}) =>
   apiClient.post("/admin/notifications/send", payload, config).then((res) => res?.data || {});
+
+// GET /api/author/notifications
+export const fetchAuthorNotifications = (config = {}) =>
+  apiClient.get("/author/notifications", config).then(unwrapNotifications);
+
+// GET /api/user/notifications
+export const fetchUserNotifications = (config = {}) =>
+  apiClient.get("/user/notifications", config).then(unwrapNotifications);
+
+// POST /api/user/notifications/{id}/read
+export const markUserNotificationRead = (id, config = {}) =>
+  apiClient.post(`/user/notifications/${id}/read`, null, config).then((res) => res?.data || {});
+
+// POST /api/reading/start
+export const startReading = (payload = {}, config = {}) =>
+  apiClient.post("/reading/start", payload, config).then((res) => res?.data || {});
+
+// POST /api/reading/finish
+export const finishReading = (payload = {}, config = {}) =>
+  apiClient.post("/reading/finish", payload, config).then((res) => res?.data || {});
 
 // Export as object for consistent naming
 export default {
@@ -349,7 +387,11 @@ export default {
   fetchAuthorDemographics,
   fetchAuthorNotifications,
   fetchAdminNotifications,
+  fetchUserNotifications,
+  markUserNotificationRead,
   sendAdminNotification,
+  startReading,
+  finishReading,
   normalizeBook,
   buildStorageUrl,
 };

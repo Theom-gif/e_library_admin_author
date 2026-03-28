@@ -10,7 +10,6 @@ import {
   formatMemberSince,
   getUserHandle,
 } from "../components/topreader/helpers";
-import SurfaceCard from "../components/topreader/SurfaceCard";
 import SummaryCard from "../components/topreader/SummaryCard";
 import TopReadersHeader from "../components/topreader/TopReadersHeader";
 import TopReadersLoading from "../components/topreader/TopReadersLoading";
@@ -84,7 +83,13 @@ const TopReaders = () => {
               first_name: user.first_name ?? user.firstName ?? "Unknown",
               last_name: user.last_name ?? user.lastName ?? "",
               email: user.email ?? "",
-              avatar_url: user.avatar_url || user.avatarUrl || null,
+              avatar_url:
+                user.avatar_url ||
+                user.avatarUrl ||
+                user.profile_photo_url ||
+                user.profile_image ||
+                user.photo ||
+                null,
               created_at: user.created_at ?? user.createdAt ?? "",
             },
             booksRead: Number(row.booksRead ?? row.books_read ?? 0),
@@ -209,73 +214,70 @@ const TopReaders = () => {
   };
 
   return (
-    <div className="mx-auto max-w-[1280px] space-y-8 px-4 py-2 font-['Inter',sans-serif] sm:px-6 lg:px-8">
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <SummaryCard
-          icon={Users}
-          label={t("Total Readers")}
-          value={formatCompactNumber(totalReaders)}
-          hint={<><ArrowUpRight size={14} className="text-emerald-500" />+{formatCompactNumber(Math.max(1, totalReaders * 0.12))} {t("this period")}</>}
-          iconTone="indigo"
-        />
-
-        <SummaryCard
-          icon={BookOpen}
-          label={t("Books Read")}
-          value={formatCompactNumber(totalBooksRead)}
-          hint={<><TrendingUp size={14} className="text-emerald-500" />+{(rankedLeaders[0]?.trend || 0).toFixed(1)}% {t("trend")}</>}
-          iconTone="emerald"
-        />
-
-        <SurfaceCard className="p-6">
-          <div className="flex items-start justify-between gap-6">
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold uppercase tracking-[0.08em] text-slate-500 dark:text-slate-400">{t("Weekly Reading Goal")}</p>
-              <p className="mt-2 text-sm text-slate-500 dark:text-slate-400">{t("Community reading challenge progress")}</p>
-              <div className="mt-5 h-3 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
-                <div className="h-full rounded-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-700 ease-out" style={{ width: `${goalPct}%` }} />
-              </div>
-            </div>
-            <div className="shrink-0 text-right">
-              <p className="text-3xl font-bold tabular-nums text-slate-900 dark:text-slate-100">{goalPct}%</p>
-              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{t("Target")}: {formatCompactNumber(goalTarget)}</p>
-            </div>
-          </div>
-        </SurfaceCard>
-      </div>
-
-      <TopReadersHeader
-        t={t}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
-        range={range}
-        onRangeChange={setRange}
-        sortBy={sortBy}
-        onSortByChange={setSortBy}
-        onExport={handleExportData}
-      />
-
-      {error && !isLoading && (
-        <SurfaceCard className="border-rose-200 bg-rose-50/70 p-4 text-sm text-rose-600 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
-          {error}
-        </SurfaceCard>
-      )}
-
-      {isLoading ? (
-        <TopReadersLoading />
-      ) : (
-        <>
-          <TopReadersPodium t={t} podium={podium} getActivityScore={getActivityScore} />
-          <TopReadersTable
-            t={t}
-            rankedLeaders={rankedLeaders}
-            rangeLabel={getRangeLabel(range)}
-            maxScore={maxScore}
-            getActivityScore={getActivityScore}
-            getStatus={getStatus}
+    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1280px] space-y-8 font-['Inter',sans-serif]">
+        {/* Stats cards */}
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+          <SummaryCard
+            icon={Users}
+            label={t("Total Readers")}
+            value={formatCompactNumber(totalReaders)}
+            hint={<><ArrowUpRight size={12} />+{formatCompactNumber(Math.max(1, Math.round(totalReaders * 0.12)))} {t("this period")}</>}
+            iconTone="indigo"
           />
-        </>
-      )}
+          <SummaryCard
+            icon={BookOpen}
+            label={t("Books Read")}
+            value={formatCompactNumber(totalBooksRead)}
+            hint={<><TrendingUp size={12} />+{(rankedLeaders[0]?.trend || 0).toFixed(1)}% {t("trend")}</>}
+            iconTone="emerald"
+          />
+          <SummaryCard
+            icon={TrendingUp}
+            label={t("Weekly Reading Goal")}
+            value={`${goalPct}%`}
+            hint={t("Community reading challenge")}
+            iconTone="violet"
+            progress={goalPct}
+          />
+        </div>
+
+        {/* Header + controls */}
+        <TopReadersHeader
+          t={t}
+          searchQuery={searchQuery}
+          onSearchQueryChange={setSearchQuery}
+          range={range}
+          onRangeChange={setRange}
+          sortBy={sortBy}
+          onSortByChange={setSortBy}
+          onExport={handleExportData}
+        />
+
+        {/* Error */}
+        {error && !isLoading && (
+          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-600">
+            {error}
+          </div>
+        )}
+
+        {/* Content */}
+        {isLoading ? (
+          <TopReadersLoading />
+        ) : (
+          <>
+            <TopReadersPodium t={t} podium={podium} getActivityScore={getActivityScore} />
+            <TopReadersTable
+              t={t}
+              rankedLeaders={rankedLeaders}
+              rangeLabel={getRangeLabel(range)}
+              maxScore={maxScore}
+              getActivityScore={getActivityScore}
+              getStatus={getStatus}
+            />
+          </>
+        )}
+      </div>
     </div>
   );
 };

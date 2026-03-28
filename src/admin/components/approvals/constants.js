@@ -5,4 +5,4 @@ export const statusStyles = {
 };
 
 export const statusFilters = ["Pending"];
-export const FALLBACK_BOOK_COVER = "https://via.placeholder.com/64x96?text=Book";
+export const FALLBACK_BOOK_COVER = "https://placehold.co/64x96/1e293b/475569?text=Book";

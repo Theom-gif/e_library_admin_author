@@ -66,11 +66,43 @@ const Notifications = () => {
   }, {});
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-[var(--bg)] px-4 py-6 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-[1280px] space-y-6">
+
+        {/* Page header */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-[var(--text)]">{t("Notifications")}</h1>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              {t("Manage system alerts, user activity, and book events")}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {unreadCount > 0 && (
+              <button
+                type="button"
+                onClick={markAllRead}
+                className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--text)] transition hover:border-indigo-400 hover:text-indigo-400"
+              >
+                <CheckCircle size={14} />
+                {t("Mark all read")}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={load}
+              className="inline-flex h-9 items-center gap-2 rounded-xl border border-[var(--border)] bg-[var(--surface)] px-4 text-sm font-medium text-[var(--text)] transition hover:border-indigo-400 hover:text-indigo-400"
+            >
+              <RefreshCw size={14} className={isLoading ? "animate-spin" : ""} />
+              {t("Refresh")}
+            </button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_340px]">
           {/* Left — inbox */}
           <div className="space-y-4">
+
             {/* Category tabs */}
             <div className="flex flex-wrap gap-2">
               {CATEGORIES.map(({ key, label, icon: Icon }) => (
@@ -81,15 +113,17 @@ const Notifications = () => {
                   className={cn(
                     "inline-flex h-9 items-center gap-2 rounded-xl border px-4 text-sm font-semibold transition",
                     activeCategory === key
-                      ? "border-indigo-300 bg-indigo-600 text-white shadow-sm"
-                      : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-600",
+                      ? "border-indigo-500 bg-indigo-600 text-white shadow-sm"
+                      : "border-[var(--border)] bg-[var(--surface)] text-[var(--text)] hover:border-indigo-400 hover:text-indigo-400",
                   )}
                 >
                   <Icon size={14} />
                   {t(label)}
                   <span className={cn(
                     "rounded-full px-1.5 py-0.5 text-[10px] font-bold",
-                    activeCategory === key ? "bg-white/20 text-white" : "bg-slate-100 text-slate-500",
+                    activeCategory === key
+                      ? "bg-white/20 text-white"
+                      : "bg-[var(--surface-overlay-10)] text-[var(--muted)]",
                   )}>
                     {categoryCounts[key] || 0}
                   </span>
@@ -98,9 +132,9 @@ const Notifications = () => {
             </div>
 
             {/* Notification list */}
-            <div className="rounded-2xl border border-slate-100 bg-white shadow-sm">
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <h3 className="font-bold text-slate-800">
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] shadow-sm">
+              <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+                <h3 className="font-bold text-[var(--text)]">
                   {t(CATEGORIES.find((c) => c.key === activeCategory)?.label || "All")}
                 </h3>
                 {unreadCount > 0 && (
@@ -112,19 +146,19 @@ const Notifications = () => {
 
               <div className="p-4">
                 {isLoading && (
-                  <div className="flex items-center justify-center gap-2 py-12 text-slate-400">
+                  <div className="flex items-center justify-center gap-2 py-12 text-[var(--muted)]">
                     <Loader2 size={18} className="animate-spin" />
                     <span className="text-sm">{t("Loading notifications...")}</span>
                   </div>
                 )}
                 {!isLoading && error && (
-                  <div className="rounded-xl border border-rose-100 bg-rose-50 px-4 py-3 text-sm text-rose-600">
+                  <div className="rounded-xl border border-rose-500/20 bg-rose-500/10 px-4 py-3 text-sm text-rose-400">
                     {error}
                   </div>
                 )}
                 {!isLoading && !error && filtered.length === 0 && (
-                  <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-400">
-                    <Bell size={36} className="text-slate-200" />
+                  <div className="flex flex-col items-center justify-center gap-3 py-16 text-[var(--muted)]">
+                    <Bell size={36} className="opacity-20" />
                     <p className="text-sm font-medium">{t("No notifications here")}</p>
                   </div>
                 )}

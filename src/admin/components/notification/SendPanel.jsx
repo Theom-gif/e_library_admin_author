@@ -34,17 +34,18 @@ const SendPanel = ({ t, onSent }) => {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-6 shadow-sm">
       <div className="mb-5 flex items-center gap-2">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-400">
           <Send size={15} />
         </div>
-        <h3 className="font-bold text-slate-800">{t("Send Notification")}</h3>
+        <h3 className="font-bold text-[var(--text)]">{t("Send Notification")}</h3>
       </div>
 
       <form onSubmit={handleSend} className="space-y-4">
+        {/* Target */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
             {t("Send To")}
           </label>
           <div className="flex flex-wrap gap-2">
@@ -56,8 +57,8 @@ const SendPanel = ({ t, onSent }) => {
                 className={cn(
                   "rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
                   form.target === opt.value
-                    ? "border-indigo-300 bg-indigo-600 text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:border-indigo-200 hover:text-indigo-600",
+                    ? "border-indigo-500 bg-indigo-600 text-white"
+                    : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:border-indigo-400 hover:text-indigo-400",
                 )}
               >
                 {t(opt.label)}
@@ -66,8 +67,9 @@ const SendPanel = ({ t, onSent }) => {
           </div>
         </div>
 
+        {/* Type */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
             {t("Type")}
           </label>
           <div className="flex flex-wrap gap-2">
@@ -79,8 +81,8 @@ const SendPanel = ({ t, onSent }) => {
                 className={cn(
                   "rounded-lg border px-3 py-1.5 text-xs font-semibold transition",
                   form.type === opt.value
-                    ? "border-slate-300 bg-slate-800 text-white"
-                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
+                    ? "border-[var(--border)] bg-[var(--surface-overlay-20)] text-[var(--text)]"
+                    : "border-[var(--border)] bg-[var(--surface-2)] text-[var(--text)] hover:bg-[var(--surface-overlay-5)]",
                 )}
               >
                 <span className={opt.color}>{t(opt.label)}</span>
@@ -89,8 +91,9 @@ const SendPanel = ({ t, onSent }) => {
           </div>
         </div>
 
+        {/* Title */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
             {t("Title")}
           </label>
           <input
@@ -99,12 +102,13 @@ const SendPanel = ({ t, onSent }) => {
             onChange={(e) => set("title", e.target.value)}
             placeholder={t("Notification title...")}
             required
-            className="h-10 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="h-10 w-full rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20"
           />
         </div>
 
+        {/* Message */}
         <div>
-          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-slate-400">
+          <label className="mb-1.5 block text-xs font-semibold uppercase tracking-widest text-[var(--muted)]">
             {t("Message")}
           </label>
           <textarea
@@ -113,7 +117,7 @@ const SendPanel = ({ t, onSent }) => {
             placeholder={t("Write your message...")}
             required
             rows={4}
-            className="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm text-slate-800 outline-none transition focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+            className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2.5 text-sm text-[var(--text)] outline-none transition placeholder:text-[var(--muted)] focus:border-indigo-400 focus:ring-2 focus:ring-indigo-500/20"
           />
         </div>
 
@@ -121,8 +125,8 @@ const SendPanel = ({ t, onSent }) => {
           <div className={cn(
             "flex items-center gap-2 rounded-xl border px-4 py-3 text-sm font-medium",
             result.ok
-              ? "border-emerald-100 bg-emerald-50 text-emerald-700"
-              : "border-rose-100 bg-rose-50 text-rose-700",
+              ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-400"
+              : "border-rose-500/20 bg-rose-500/10 text-rose-400",
           )}>
             {result.ok ? <CheckCircle size={14} /> : <X size={14} />}
             {result.text}

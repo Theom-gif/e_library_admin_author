@@ -3,8 +3,8 @@ import { cn } from "../../../lib/utils";
 import { TYPE_META } from "./constants";
 
 const NotificationTypesLegend = ({ t }) => (
-  <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm">
-    <h4 className="mb-4 text-sm font-bold text-slate-700">{t("Notification Types")}</h4>
+  <div className="rounded-2xl border border-[var(--border)] bg-[var(--surface)] p-5 shadow-sm">
+    <h4 className="mb-4 text-sm font-bold text-[var(--text)]">{t("Notification Types")}</h4>
     <div className="space-y-2">
       {Object.entries(TYPE_META).map(([key, meta]) => {
         const Icon = meta.icon;
@@ -14,10 +14,10 @@ const NotificationTypesLegend = ({ t }) => (
               <Icon size={12} />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-semibold text-slate-700">{meta.label}</p>
-              <p className="text-[10px] capitalize text-slate-400">{meta.category}</p>
+              <p className="text-xs font-semibold text-[var(--text)]">{meta.label}</p>
+              <p className="text-[10px] capitalize text-[var(--muted)]">{meta.category}</p>
             </div>
-            <ChevronRight size={12} className="text-slate-300" />
+            <ChevronRight size={12} className="text-[var(--muted)] opacity-40" />
           </div>
         );
       })}

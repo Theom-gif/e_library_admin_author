@@ -1,6 +1,6 @@
 const DB_NAME = 'authorStudio';
-const STORE_NAME = 'manuscripts';
-const COVER_STORE_NAME = 'covers';
+const MANUSCRIPT_STORE_NAME = 'manuscripts';
+const STORE_NAME = 'covers';
 const DB_VERSION = 2;
 
 const openDatabase = () =>
@@ -11,11 +11,11 @@ const openDatabase = () =>
     request.onsuccess = () => resolve(request.result);
     request.onupgradeneeded = () => {
       const db = request.result;
+      if (!db.objectStoreNames.contains(MANUSCRIPT_STORE_NAME)) {
+        db.createObjectStore(MANUSCRIPT_STORE_NAME);
+      }
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         db.createObjectStore(STORE_NAME);
-      }
-      if (!db.objectStoreNames.contains(COVER_STORE_NAME)) {
-        db.createObjectStore(COVER_STORE_NAME);
       }
     };
   });
@@ -49,7 +49,7 @@ const runTransaction = async (mode, runner) => {
   });
 };
 
-export const saveManuscriptFile = async (bookId, file) => {
+export const saveCoverFile = async (bookId, file) => {
   if (!bookId || !file) return;
   await runTransaction('readwrite', (store, resolve, reject) => {
     const request = store.put(file, String(bookId));
@@ -58,7 +58,7 @@ export const saveManuscriptFile = async (bookId, file) => {
   });
 };
 
-export const getManuscriptFile = async (bookId) => {
+export const getCoverFile = async (bookId) => {
   if (!bookId) return null;
   return runTransaction('readonly', (store, resolve, reject) => {
     const request = store.get(String(bookId));
@@ -67,7 +67,7 @@ export const getManuscriptFile = async (bookId) => {
   });
 };
 
-export const deleteManuscriptFile = async (bookId) => {
+export const deleteCoverFile = async (bookId) => {
   if (!bookId) return;
   await runTransaction('readwrite', (store, resolve, reject) => {
     const request = store.delete(String(bookId));
@@ -76,7 +76,7 @@ export const deleteManuscriptFile = async (bookId) => {
   });
 };
 
-export const clearAllManuscriptFiles = async () => {
+export const clearAllCoverFiles = async () => {
   await runTransaction('readwrite', (store, resolve, reject) => {
     const request = store.clear();
     request.onsuccess = () => resolve(true);

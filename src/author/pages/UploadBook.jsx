@@ -13,17 +13,31 @@ import {
 } from 'lucide-react';
 import { searchAuthors, searchBooks } from '../services/openLibraryService';
 import { uploadBookRequest } from '../services/bookService';
-import { saveManuscriptFile } from '../services/manuscriptStorage';
-import { upsertLocalBook } from '../services/localBookStorage';
 
 const PROFILE_STORAGE_KEY = 'author_studio_profile';
 const GENRE_OPTIONS = ['Technology', 'Novel', 'Education', 'Business', 'History'];
 const NATIVE_OPTION_STYLE = { color: '#0f172a', backgroundColor: '#ffffff' };
 const FALLBACK_COVER_URL = 'https://picsum.photos/seed/new-book/300/450';
 const COVER_CACHE_KEY = 'author_book_covers';
+const MAX_MANUSCRIPT_SIZE_BYTES = 100 * 1024 * 1024;
 
 const buildCoverKey = (title, author) =>
   `${String(title || '').trim().toLowerCase()}|${String(author || '').trim().toLowerCase()}`;
+
+const slugify = (value = '') =>
+  String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[^\w\s-]/g, '')
+    .trim()
+    .replace(/[-\s]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+const buildUniqueBookSlug = (title = '') => {
+  const base = slugify(title) || 'book';
+  const suffix = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+  return `${base}-${suffix}`;
+};
 
 const saveCoverToCache = (key, url) => {
   if (!key || !url) return;
@@ -237,16 +251,8 @@ const UploadBook = () => {
   const handleManuscriptSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const isPdf = String(file.type || '').toLowerCase() === 'application/pdf' || file.name?.toLowerCase().endsWith('.pdf');
-    if (!isPdf) {
-      setSubmitError('Please upload a PDF file for the book.');
-      setManuscriptFile(null);
-      e.target.value = '';
-      return;
-    }
-    const maxSizeBytes = 50 * 1024 * 1024;
-    if (file.size > maxSizeBytes) {
-      setSubmitError('PDF is too large. Maximum file size is 50MB.');
+    if (file.size > MAX_MANUSCRIPT_SIZE_BYTES) {
+      setSubmitError('File is too large. Maximum file size is 100MB.');
       setManuscriptFile(null);
       e.target.value = '';
       return;
@@ -304,42 +310,16 @@ const UploadBook = () => {
       }
 
       if (!manuscriptFile) {
-        setSubmitError('Book PDF file is required.');
+        setSubmitError('Book file is required.');
         setIsSubmitting(false);
         return;
       }
 
       const resolvedAuthorName = selectedAuthor?.name || authorQuery.trim();
-      const localClientKey = `${buildCoverKey(title, resolvedAuthorName)}|${manuscriptFile?.name || ''}|${
-        manuscriptFile?.size || 0
-      }`;
-
-      const draftCoverValue =
-        typeof coverPreviewUrl === 'string' && coverPreviewUrl.trim().startsWith('data:image/')
-          ? ''
-          : coverPreviewUrl || '';
-
-      // Frontend-only: always persist a local draft before the network call,
-      // so the author can still see their work if the backend is down.
-      const localDraft = upsertLocalBook({
-        clientKey: localClientKey,
-        title: title.trim(),
-        author: resolvedAuthorName,
-        genre: genre.trim(),
-        description: description.trim(),
-        img: draftCoverValue,
-        status: 'Draft',
-        manuscriptName: manuscriptFile?.name || '',
-        manuscriptType: manuscriptFile?.type || '',
-        manuscriptSizeBytes: manuscriptFile?.size || 0,
-      });
-
-      if (localDraft && manuscriptFile instanceof File) {
-        await saveManuscriptFile(localDraft.id, manuscriptFile);
-      }
 
       const payload = new FormData();
       payload.append('title', title.trim());
+      payload.append('slug', buildUniqueBookSlug(title.trim()));
       payload.append('author', resolvedAuthorName);
       payload.append('category', genre.trim());
       payload.append('description', description.trim());
@@ -402,8 +382,12 @@ const UploadBook = () => {
       
       if (error?.isCorsError) {
         errorMessage = 'API blocked by CORS. Use /api proxy (VITE_API_BASE_URL=/api) or enable backend CORS.';
+      } else if (error?.code === 'ECONNABORTED') {
+        errorMessage = 'Upload took too long. The frontend timeout was increased, so please try again with the same file.';
       } else if (error?.response?.status === 401 || error?.response?.status === 403) {
         errorMessage = 'Your session has expired. Please login again.';
+      } else if (/books_slug_unique|duplicate entry/i.test(String(error?.response?.data?.message || ''))) {
+        errorMessage = 'This title already exists in the database. The frontend now sends a unique slug, so please try publishing again.';
       } else if (typeof error?.response?.data === 'string' && error.response.data.trim()) {
         errorMessage = `Unable to upload book (${error?.response?.status || 'Error'}).`;
       } else if (error?.response?.data?.message) {
@@ -424,23 +408,6 @@ const UploadBook = () => {
 
       setSubmitError(errorMessage);
 
-      // Frontend-only fallback: save as local draft when backend is down.
-      try {
-        const status = error?.response?.status;
-        const shouldSaveLocal =
-          error?.isCorsError ||
-          !error?.response ||
-          (Number.isFinite(status) && status >= 500);
-
-        if (!shouldSaveLocal) {
-          return;
-        }
-
-        // Take the user to My Books so they can see the saved draft immediately.
-        navigate('/author/my-books', { replace: true, state: { refresh: true, localSaved: true } });
-      } catch {
-        // Ignore local draft failures.
-      }
     } finally {
       setIsSubmitting(false);
     }
@@ -677,7 +644,7 @@ const UploadBook = () => {
                       <div className="text-center px-6">
                         <p className="text-sm font-bold">Upload Cover</p>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. JPG, PNG (Max 5MB)'}
+                          {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. Any image file'}
                         </p>
                       </div>
                     </>
@@ -687,7 +654,7 @@ const UploadBook = () => {
                 <input
                   ref={coverInputRef}
                   type="file"
-                  accept="image/png,image/jpeg,image/jpg"
+                  accept="image/*"
                   onChange={handleCoverSelected}
                   className="sr-only"
                 />
@@ -720,13 +687,13 @@ const UploadBook = () => {
               </div>
               <div className="text-center px-6">
                 <p className="text-lg font-bold">Upload Manuscript</p>
-                <p className="text-sm text-slate-500 mt-1">PDF only (Max 50MB)</p>
+                <p className="text-sm text-slate-500 mt-1">PDF, EPUB, DOC, DOCX, TXT and more (Max 100MB)</p>
               </div>
             </div>
             <input
               ref={manuscriptInputRef}
               type="file"
-              accept=".pdf"
+              accept=".pdf,.epub,.doc,.docx,.txt,.rtf"
               onChange={handleManuscriptSelected}
               className="sr-only"
             />

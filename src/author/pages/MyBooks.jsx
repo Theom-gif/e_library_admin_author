@@ -11,9 +11,10 @@ import {
   Trash2
 } from 'lucide-react';
 import { searchBooks } from '../services/openLibraryService';
-import { deleteManuscriptFile } from '../services/manuscriptStorage';
 import { deleteBookRequest, getBooksRequest } from '../services/bookService';
-import { readLocalBooks, removeLocalBook } from '../services/localBookStorage';
+import { clearAllManuscriptFiles } from '../services/manuscriptStorage';
+import { clearAllCoverFiles } from '../services/coverStorage';
+import { clearLocalBooks } from '../services/localBookStorage';
 
 const DEFAULT_COVER = 'https://picsum.photos/seed/new-book/300/450';
 const FALLBACK_COVER_URL = DEFAULT_COVER;
@@ -31,7 +32,7 @@ const statusStyles = {
 
 const getSafeCoverUrl = (value) => {
   const text = String(value || '').trim();
-  if (text.startsWith('data:image/') || /^https?:\/\//i.test(text)) {
+  if (text.startsWith('data:image/') || text.startsWith('blob:') || /^https?:\/\//i.test(text)) {
     return text;
   }
   return FALLBACK_COVER_URL;
@@ -77,44 +78,24 @@ const MyBooks = () => {
   const [books, setBooks] = React.useState([]);
   const [booksLoading, setBooksLoading] = React.useState(false);
   const [booksError, setBooksError] = React.useState('');
-  const [booksNotice, setBooksNotice] = React.useState('');
   const [deletingBookId, setDeletingBookId] = React.useState(null);
   const [recentCover, setRecentCover] = React.useState(null);
   const [coverCache, setCoverCache] = React.useState(() => readCoverCache());
 
-  const mapLocalDraftToUiBook = React.useCallback((book) => ({
-    bookId: Number(book?.bookId || book?.id) || Date.now(),
-    id: Number(book?.id) || Date.now(),
-    title: book?.title || 'Untitled',
-    author: book?.author || 'Unknown Author',
-    status: book?.status || 'Draft',
-    rating: 0,
-    reads: '0',
-    sales: '$0',
-    img: getSafeCoverUrl(book?.img || book?.coverUrl || ''),
-    description: book?.description || '',
-    genre: book?.genre || book?.category || '',
-    manuscriptUrl: '',
-    manuscriptName: book?.manuscriptName || '',
-    manuscriptType: book?.manuscriptType || '',
-    manuscriptSizeBytes: book?.manuscriptSizeBytes || 0,
-    source: 'local',
-  }), []);
+  React.useEffect(() => {
+    clearLocalBooks();
+    window.localStorage.removeItem(COVER_CACHE_KEY);
+    setCoverCache({});
+    clearAllCoverFiles().catch(() => {});
+    clearAllManuscriptFiles().catch(() => {});
+  }, []);
 
   const loadBooks = React.useCallback(async () => {
     setBooksLoading(true);
     setBooksError('');
-    setBooksNotice('');
     try {
-      let dbBooks = await getBooksRequest({ status: 'All' });
-
-      const localDrafts = readLocalBooks().map(mapLocalDraftToUiBook);
-      if (localDrafts.length > 0) {
-        setBooksNotice('Showing locally saved drafts plus any server books.');
-      }
-
-      // Merge local drafts first so authors always see their work even if the server later fails.
-      setBooks([...localDrafts, ...dbBooks]);
+      const dbBooks = await getBooksRequest({ status: 'All' });
+      setBooks(dbBooks);
     } catch (error) {
       const status = error?.response?.status;
       const serverMessage = error?.response?.data?.message || error?.response?.data?.error || '';
@@ -126,19 +107,11 @@ const MyBooks = () => {
       } else {
         setBooksError(`Unable to load books. ${error?.message || 'Please try again.'}`.trim());
       }
-
-      // Frontend-only fallback when backend is down: show locally saved drafts.
-      const localDrafts = readLocalBooks().map(mapLocalDraftToUiBook);
-      setBooks(localDrafts);
-      if (localDrafts.length > 0) {
-        setBooksNotice('Backend is down. Showing locally saved drafts.');
-      } else {
-        setBooksNotice('Backend is down and no local drafts were found. Upload again to save a local draft.');
-      }
+      setBooks([]);
     } finally {
       setBooksLoading(false);
     }
-  }, [mapLocalDraftToUiBook]);
+  }, []);
 
   React.useEffect(() => {
     loadBooks();
@@ -150,9 +123,6 @@ const MyBooks = () => {
 
     if (state.refresh) {
       loadBooks();
-      if (state.localSaved) {
-        setBooksNotice('Saved locally because the server is unavailable.');
-      }
       navigate(location.pathname, { replace: true, state: null });
       return;
     }
@@ -163,10 +133,6 @@ const MyBooks = () => {
         ...current,
         [state.uploadedCover.key]: state.uploadedCover.url,
       }));
-    }
-
-    if (typeof state.deletedBookId === 'number') {
-      deleteManuscriptFile(state.deletedBookId).catch(() => {});
     }
 
     loadBooks();
@@ -227,6 +193,10 @@ const MyBooks = () => {
     coverUrl: getSafeCoverUrl(book.img),
     description: book.description || `${book.title} by ${book.author}.`,
     category: book.genre || 'Fantasy & Mystery',
+    manuscriptName: book.manuscriptName || '',
+    manuscriptType: book.manuscriptType || '',
+    manuscriptSizeBytes: book.manuscriptSizeBytes || 0,
+    source: 'database',
     tags: ['fiction', book.status.toLowerCase()],
   });
 
@@ -268,13 +238,7 @@ const MyBooks = () => {
 
     try {
       setDeletingBookId(book.id);
-      if (book.source === 'local') {
-        removeLocalBook(book.id);
-      } else {
-        await deleteBookRequest(book.id);
-      }
-
-      deleteManuscriptFile(book.id).catch(() => {});
+      await deleteBookRequest(book.id);
       await loadBooks();
     } catch {
       window.alert('Unable to delete this book. Please try again.');
@@ -288,7 +252,7 @@ const MyBooks = () => {
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">My Books</h1>
-          <p className="text-slate-400 mt-1">Manage and track your published works and drafts.</p>
+          <p className="text-slate-400 mt-1">Manage and track your published books.</p>
         </div>
         <button
           onClick={() => navigate('/author/upload')}
@@ -306,7 +270,7 @@ const MyBooks = () => {
             type="text" 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search local and Open Library books..." 
+            placeholder="Search your uploaded books..." 
             className="w-full bg-card-dark border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
           />
         </div>
@@ -328,7 +292,6 @@ const MyBooks = () => {
       </div>
 
       {booksError && <p className="text-sm text-rose-400 mb-4">{booksError}</p>}
-      {booksNotice && <p className="text-sm text-sky-400 mb-4">{booksNotice}</p>}
       {booksLoading && <p className="text-sm text-slate-400 mb-4">Loading books from database...</p>}
       {!booksLoading && filteredLocalBooks.length === 0 && (
         <p className="text-sm text-slate-400 mb-8">
@@ -341,10 +304,10 @@ const MyBooks = () => {
           const coverKey = buildCoverKey(book.title, book.author);
           const cachedCover = coverCache?.[coverKey] || null;
           const coverOverride =
-            recentCover &&
-            (recentCover.id === book.id || recentCover.key === coverKey)
+            ((recentCover &&
+              (recentCover.id === book.id || recentCover.key === coverKey))
               ? recentCover.url
-              : cachedCover;
+              : cachedCover);
           const resolvedCoverUrl = resolveCoverUrl(book, coverOverride);
 
           return (
@@ -418,11 +381,6 @@ const MyBooks = () => {
                   {book.genre ? (
                     <span className="inline-flex items-center rounded-md bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
                       {book.genre}
-                    </span>
-                  ) : null}
-                  {book.source === 'local' ? (
-                    <span className="inline-flex items-center rounded-md bg-white/5 px-3 py-1 text-xs font-semibold text-slate-300">
-                      Local draft
                     </span>
                   ) : null}
                 </div>

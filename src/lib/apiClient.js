@@ -6,6 +6,7 @@ const REMEMBER_KEY = "bookhub_remember";
 const AUTH_UNAUTHORIZED_EVENT = "bookhub:unauthorized";
 export const DEFAULT_API_BASE_URL = "https://elibrary.pncproject.site";
 const DEFAULT_TIMEOUT_MS = 8000;
+const DEFAULT_LONG_TIMEOUT_MS = 120000;
 
 const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
 const trimLeadingSlash = (value) => String(value || "").replace(/^\/+/, "");
@@ -16,6 +17,8 @@ const apiBaseFromEnv = trimTrailingSlash(import.meta.env.VITE_API_BASE_URL || ""
 export const API_BASE_URL = apiBaseFromEnv || DEFAULT_API_BASE_URL;
 export const API_TIMEOUT_MS =
   Number(import.meta.env.VITE_API_TIMEOUT_MS) || DEFAULT_TIMEOUT_MS;
+export const API_LONG_TIMEOUT_MS =
+  Number(import.meta.env.VITE_API_LONG_TIMEOUT_MS) || DEFAULT_LONG_TIMEOUT_MS;
 
 export function getStoredAccessToken() {
   if (typeof window === "undefined") return null;

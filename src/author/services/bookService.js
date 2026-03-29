@@ -1,9 +1,10 @@
-import { apiClient, API_BASE_URL } from '../../lib/apiClient';
+import { apiClient, API_BASE_URL, API_LONG_TIMEOUT_MS } from '../../lib/apiClient';
 
 // Backend contract uses /api/auth/* for author flows.
 const BOOKS_ENDPOINTS = ['/auth/books'];
 const UPLOAD_BOOK_ENDPOINTS = ['/auth/book'];
 const IMPORT_BOOKS_ENDPOINT = '/auth/books/import-local';
+const FILE_UPLOAD_CONFIG = { timeout: API_LONG_TIMEOUT_MS };
 
 const toNumberId = (value, fallback = Date.now()) => {
   const parsed = Number(value);
@@ -24,6 +25,8 @@ const inferFileType = (fileName = '') => {
   if (lower.endsWith('.epub')) return 'application/epub+zip';
   if (lower.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
   if (lower.endsWith('.doc')) return 'application/msword';
+  if (lower.endsWith('.txt')) return 'text/plain';
+  if (lower.endsWith('.rtf')) return 'application/rtf';
   return '';
 };
 
@@ -133,17 +136,17 @@ const normalizeStatusFilter = (value) => {
 export const mapApiBookToUiBook = (book) => ({
   bookId: toNumberId(book?.id),
   id: toNumberId(book?.id),
-  title: book?.title || 'Untitled',
-  author: book?.author || 'Unknown Author',
+  title: String(book?.title || 'Untitled').trim(),
+  author: book?.author_name || (typeof book?.author === 'string' ? book?.author : book?.author?.name) || 'Unknown Author',
   status: normalizeStatus(book?.status),
   rating: 0,
   reads: '0',
   sales: '$0',
   img:
     resolveAssetUrl(
+      book?.cover_image_url,
       book?.cover_view_url,
       book?.cover_api_url,
-      book?.cover_image_url,
       book?.cover_image_path,
       book?.cover_image,
       book?.coverImage,
@@ -158,15 +161,16 @@ export const mapApiBookToUiBook = (book) => ({
       book?.thumbnail,
       buildCoverApiUrl(book?.id),
     ) || 'https://picsum.photos/seed/new-book/300/450',
-  description: book?.description || '',
-  genre: book?.category || '',
+  description: String(book?.description || '').trim(),
+  genre: (typeof book?.category === 'string' ? book?.category : book?.category?.name) || book?.genre || '',
   manuscriptUrl: resolveAssetUrl(
+    book?.pdf_path,
     book?.book_file_path,
     book?.book_file_url,
     book?.file,
   ),
-  manuscriptName: getFileName(book?.book_file_url || book?.book_file_path || ''),
-  manuscriptType: book?.manuscript_type || inferFileType(getFileName(book?.book_file_url || book?.book_file_path || '')),
+  manuscriptName: getFileName(book?.pdf_path || book?.book_file_url || book?.book_file_path || ''),
+  manuscriptType: book?.manuscript_type || book?.pdf_mime_type || inferFileType(getFileName(book?.pdf_path || book?.book_file_url || book?.book_file_path || '')),
   manuscriptSizeBytes: book?.manuscript_size_bytes || 0,
   source: 'database',
 });
@@ -225,7 +229,7 @@ export const uploadBookRequest = async (formData) => {
   for (const endpoint of UPLOAD_BOOK_ENDPOINTS) {
     try {
       // Let Axios/browser set the correct multipart boundary automatically.
-      return await apiClient.post(endpoint, formData);
+      return await apiClient.post(endpoint, formData, FILE_UPLOAD_CONFIG);
     } catch (error) {
       lastError = error;
       if (typeof window !== 'undefined') {
@@ -270,7 +274,7 @@ export const updateBookRequest = async (id, formData) => {
         payload.append('_method', 'PATCH');
       }
       // Let Axios/browser set the correct multipart boundary automatically.
-      return await apiClient.post(`${endpoint}/${id}`, payload);
+      return await apiClient.post(`${endpoint}/${id}`, payload, FILE_UPLOAD_CONFIG);
     } catch (error) {
       lastError = error;
       const status = error?.response?.status;

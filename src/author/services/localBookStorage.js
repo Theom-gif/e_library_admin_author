@@ -93,3 +93,19 @@ export const removeLocalBook = (bookId) => {
   const books = readLocalBooks();
   writeLocalBooks(books.filter((item) => Number(item?.id) !== id));
 };
+
+export const removeLocalBookByClientKey = (clientKey) => {
+  if (typeof window === 'undefined') return;
+  const normalizedKey = String(clientKey || '').trim();
+  if (!normalizedKey) return;
+  const books = readLocalBooks();
+  writeLocalBooks(
+    books.filter((item) => String(item?.clientKey || '').trim() !== normalizedKey),
+  );
+};
+
+export const clearLocalBooks = () => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.removeItem(BOOKS_STORAGE_KEY);
+  window.sessionStorage.removeItem(BOOKS_STORAGE_KEY);
+};

@@ -14,7 +14,6 @@ import {
 } from 'recharts';
 import { getBooksRequest } from '../services/bookService';
 import { getBookReadAnalytics } from '../../lib/userActivityService';
-import { readLocalBooks } from '../services/localBookStorage';
 
 const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 const formatNumber = (value) => Number(value || 0).toLocaleString();
@@ -46,25 +45,10 @@ const buildAnalyticsRows = (books = [], analyticsByIndex = []) => {
     .sort((a, b) => b.percent - a.percent);
 };
 
-const buildLocalAnalyticsRows = (localBooks = []) => {
-  const rows = (Array.isArray(localBooks) ? localBooks : []).map((book) => ({
-    id: Number(book?.id) || Date.now(),
-    title: book?.title || 'Untitled',
-    totalReaders: 0,
-    completionRate: 0,
-    monthlyReads: 0,
-    coverUrl: book?.img || 'https://picsum.photos/seed/local-analytics/300/450',
-    percent: 0,
-  }));
-
-  return rows;
-};
-
 const Analytics = () => {
   const [rows, setRows] = React.useState([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState('');
-  const [notice, setNotice] = React.useState('');
 
   React.useEffect(() => {
     let mounted = true;
@@ -74,7 +58,7 @@ const Analytics = () => {
       try {
         setLoading(true);
         setError('');
-        setNotice('');
+        
 
         const books = await getBooksRequest({ status: 'approved' });
         const analyticsResults = await Promise.allSettled(
@@ -103,11 +87,6 @@ const Analytics = () => {
             setError(`Unable to load analytics. ${err?.message || 'Please try again.'}`.trim());
           }
 
-          const localBooks = readLocalBooks();
-          if (localBooks.length > 0) {
-            setNotice('Backend is down. Showing locally saved drafts only.');
-            setRows(buildLocalAnalyticsRows(localBooks));
-          }
         }
       } finally {
         if (mounted) {
@@ -155,12 +134,6 @@ const Analytics = () => {
       {error && (
         <div className="p-4 rounded-xl border border-rose-500/20 bg-rose-500/10 text-rose-400">
           {error}
-        </div>
-      )}
-
-      {notice && (
-        <div className="p-4 rounded-xl border border-sky-500/20 bg-sky-500/10 text-sky-300">
-          {notice}
         </div>
       )}
 

@@ -14,8 +14,13 @@ export const EditBookForm = ({ book, onSave, onCancel, isSaving = false, isDelet
       return;
     }
 
-    const objectUrl = URL.createObjectURL(file);
-    setFormData((prev) => ({ ...prev, coverUrl: objectUrl, coverFile: file }));
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        setFormData((prev) => ({ ...prev, coverUrl: reader.result, coverFile: file }));
+      }
+    };
+    reader.readAsDataURL(file);
     event.target.value = '';
   };
 
@@ -69,7 +74,7 @@ export const EditBookForm = ({ book, onSave, onCancel, isSaving = false, isDelet
             <input
               ref={coverInputRef}
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp"
+              accept="image/*"
               onChange={handleCoverImageSelected}
               className="sr-only"
             />

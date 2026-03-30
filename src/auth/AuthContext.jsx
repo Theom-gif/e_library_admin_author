@@ -148,7 +148,7 @@ function extractAuthTokens(data = {}) {
 
   return {
     accessToken: pick("token", "accessToken", "access_token", "jwt", "bearerToken", "bearer_token"),
-    refreshToken: pick("refreshToken", "refresh_token", "refreshTokenValue"),
+    refreshToken: pick("refreshToken", "refresh_token", "refreshTokenValue", "reset_token", "resetToken"),
   };
 }
 
@@ -638,7 +638,7 @@ export function AuthProvider({ children }) {
         const currentToken = getTokenFromStorage();
         const refreshToken = getRefreshTokenFromStorage();
         const remember = localStorage.getItem(REMEMBER_KEY) === "1";
-        const tokenForRefresh = currentToken || refreshToken;
+        const tokenForRefresh = refreshToken || currentToken;
 
         if (!tokenForRefresh) {
           return { ok: false, error: "Missing login token. Please login again." };

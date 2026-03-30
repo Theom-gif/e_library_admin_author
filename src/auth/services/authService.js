@@ -85,7 +85,11 @@ export function registerRequest(payload, options = {}) {
 export function refreshTokenRequest(token) {
   return axios.post(
     joinBaseAndPath(resolveBase(), "/api/auth/refresh"),
-    {},
+    {
+      refresh_token: token || undefined,
+      refreshToken: token || undefined,
+      token: token || undefined,
+    },
     {
       timeout: API_TIMEOUT_MS,
       headers: {

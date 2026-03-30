@@ -98,7 +98,9 @@ function extractTokenFromPayload(data = {}) {
     const refreshToken =
       source.refreshToken ||
       source.refresh_token ||
-      source.refreshTokenValue;
+      source.refreshTokenValue ||
+      source.reset_token ||
+      source.resetToken;
 
     if (accessToken || refreshToken) {
       return { accessToken, refreshToken };
@@ -169,7 +171,7 @@ async function requestTokenRefresh() {
 
   const currentToken = getStoredAccessToken();
   const refreshToken = getStoredRefreshToken();
-  const tokenForRefresh = currentToken || refreshToken;
+  const tokenForRefresh = refreshToken || currentToken;
 
   if (!tokenForRefresh) {
     throw new Error("Missing refresh token.");
@@ -178,7 +180,11 @@ async function requestTokenRefresh() {
   refreshPromise = axios
     .post(
       normalizeApiUrl("/auth/refresh"),
-      {},
+      {
+        refresh_token: refreshToken || undefined,
+        refreshToken: refreshToken || undefined,
+        token: refreshToken || currentToken || undefined,
+      },
       {
         baseURL: API_BASE_URL,
         timeout: API_TIMEOUT_MS,

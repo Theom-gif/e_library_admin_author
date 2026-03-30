@@ -57,6 +57,25 @@ const getStoredAuthorName = () => {
   }
 };
 
+// Fallback/Mock data when API calls fail
+const FALLBACK_STATS = {
+  authorName: '',
+  totalSales: 0,
+  totalReaders: 0,
+  totalReads: 0,
+  averageRating: 0,
+  salesTrend: '+0%',
+  readersTrend: '+0%',
+  readsTrend: '+0%',
+  ratingTrend: '+0.0',
+};
+
+const FALLBACK_PERFORMANCE = [
+  { label: 'No data', sales: 0, reads: 0 },
+];
+
+const FALLBACK_TOP_BOOKS = [];
+
 const normalizeAuthorStats = (payload = {}) => ({
   authorName: payload.authorName || payload.author?.name || payload.name || '',
   totalSales: getMetricValue(payload.totalSales ?? payload.sales, 0),
@@ -191,18 +210,29 @@ const Dashboard = () => {
 
         if (statsRes.status === 'fulfilled') {
           setStats(normalizeAuthorStats(statsRes.value));
+        } else {
+          const fallbackStats = { ...FALLBACK_STATS, authorName: storedAuthorName };
+          setStats(normalizeAuthorStats(fallbackStats));
         }
 
         if (perfRes.status === 'fulfilled') {
           setPerformanceData(normalizePerformanceData(perfRes.value));
+        } else {
+          setPerformanceData(FALLBACK_PERFORMANCE);
         }
 
         if (booksRes.status === 'fulfilled') {
           setTopBooks(normalizeTopBooks(booksRes.value));
+        } else {
+          setTopBooks(FALLBACK_TOP_BOOKS);
         }
       } catch (err) {
         if (controller.signal.aborted || !mounted) return;
         console.error('Error fetching dashboard data:', err);
+        // Set fallback data on error
+        setStats(normalizeAuthorStats({ ...FALLBACK_STATS, authorName: storedAuthorName }));
+        setPerformanceData(FALLBACK_PERFORMANCE);
+        setTopBooks(FALLBACK_TOP_BOOKS);
       } finally {
         if (mounted) {
           setLoading(false);
@@ -248,7 +278,7 @@ const Dashboard = () => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard 
-          title="Total Books" 
+          title="Total Sales" 
           value={stats ? `$${stats.totalSales?.toFixed(2) || '0.00'}` : '$0.00'} 
           change={stats?.salesTrend || '+0%'} 
           icon={TrendingUp} 

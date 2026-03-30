@@ -1,381 +1,720 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
-import { 
-  Mail, 
-  Globe, 
-  Twitter, 
-  Instagram, 
-  Github,
-  Edit3,
-  MapPin,
-  Calendar,
-  Award,
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import {
+  AlertCircle,
   BookOpen,
-  Users
-} from 'lucide-react';
+  Camera,
+  ExternalLink,
+  KeyRound,
+  Mail,
+  RefreshCw,
+  Save,
+  ShieldCheck,
+  User2,
+} from "lucide-react";
+import { useLanguage } from "../../i18n/LanguageContext";
+import { useUserProfile } from "../hooks/useUserProfile";
 
-const PROFILE_STORAGE_KEY = 'author_studio_profile';
-const PROFILE_UPDATED_EVENT = 'author-profile-updated';
+const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png"];
 
-const defaultProfile = {
-  name: 'Alex Rivera',
-  username: 'arivera_author',
-  tier: 'Pro Author',
-  bio: "Bestselling author of speculative fiction and contemporary thrillers. Obsessed with world-building and complex character arcs. When I'm not writing, you can find me hiking in the Pacific Northwest or lost in a local bookstore.",
-  location: 'Seattle, WA',
-  joined: 'March 2021',
-  email: 'alex.rivera@inkwell.com',
-  website: 'https://example.com',
-  avatarUrl: 'https://lh3.googleusercontent.com/aida-public/AB6AXuAlEVr580N1MAJKB6IPshOgAds-VzQi3M2D3hifRUqDV9JCX-_nULM_zGDb8dVGBYdz4V2CWOYIDkgMI50DEppkE9po92vlp4lfaOQBhpFnndWtWiBrNG2jHQEjunra1G4Svlwf1l2aVjKI9saVSU3euiXQES0MBV-vqptGLQsJ6Y2WNNR3w4DKAGSLfRf_mU_mG2Yh5-_Yxf-cTJN17JAE-4nfmHaWUXvfDosDc3doTApg4pT9ebRdhc885FOqbg9HS_UjNGNPGg',
-  coverUrl: 'https://picsum.photos/seed/cover/1200/400',
+const EMPTY_FORM = {
+  firstname: "",
+  lastname: "",
+  bio: "",
+  facebook_url: "",
 };
+
+const EMPTY_PASSWORD_FORM = {
+  current_password: "",
+  new_password: "",
+  confirm_password: "",
+};
+
+function trimValue(value) {
+  return String(value || "").trim();
+}
+
+function getProfileFormFromProfile(profile) {
+  return {
+    firstname: profile?.firstname || "",
+    lastname: profile?.lastname || "",
+    bio: profile?.bio || "",
+    facebook_url: profile?.facebook_url || "",
+  };
+}
+
+function getFieldErrors(error) {
+  const source = error?.response?.data?.errors;
+  if (!source || typeof source !== "object") {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(source).map(([key, value]) => [
+      key,
+      Array.isArray(value) ? String(value[0] || "") : String(value || ""),
+    ]),
+  );
+}
+
+function validateProfileForm(form, t) {
+  const errors = {};
+
+  if (!trimValue(form.firstname)) {
+    errors.firstname = t("First name is required.");
+  }
+
+  if (!trimValue(form.lastname)) {
+    errors.lastname = t("Last name is required.");
+  }
+
+  const facebookUrl = trimValue(form.facebook_url);
+  if (facebookUrl) {
+    try {
+      const parsed = new URL(facebookUrl);
+      if (!/^https?:$/i.test(parsed.protocol)) {
+        errors.facebook_url = t("Please enter a valid URL.");
+      }
+    } catch {
+      errors.facebook_url = t("Please enter a valid URL.");
+    }
+  }
+
+  return errors;
+}
+
+function validatePhotoFile(file, t) {
+  if (!file) return "";
+
+  if (!ACCEPTED_IMAGE_TYPES.includes(file.type)) {
+    return t("Please choose a PNG or JPEG image.");
+  }
+
+  if (file.size > MAX_PHOTO_SIZE_BYTES) {
+    return t("Image size must be 5MB or less.");
+  }
+
+  return "";
+}
+
+function ProfileField({ id, label, value, onChange, error, placeholder, textarea = false }) {
+  const baseClassName =
+    "w-full rounded-2xl border bg-primary/5 px-4 py-3 text-sm text-[color:var(--text)] transition focus:outline-none focus:ring-2 focus:ring-accent/40";
+  const className = `${baseClassName} ${
+    error ? "border-rose-400/60" : "border-white/8 focus:border-accent/40"
+  }`;
+
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </label>
+      {textarea ? (
+        <textarea
+          id={id}
+          rows={5}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          className={className}
+        />
+      ) : (
+        <input
+          id={id}
+          value={value}
+          onChange={onChange}
+          placeholder={placeholder}
+          className={className}
+        />
+      )}
+      {error ? <p className="mt-2 text-xs text-rose-400">{error}</p> : null}
+    </div>
+  );
+}
+
+function PasswordField({ id, label, value, onChange, placeholder }) {
+  return (
+    <div>
+      <label htmlFor={id} className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+        {label}
+      </label>
+      <input
+        id={id}
+        type="password"
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        className="w-full rounded-2xl border border-white/8 bg-primary/5 px-4 py-3 text-sm text-[color:var(--text)] transition focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
+      />
+    </div>
+  );
+}
 
 const Profile = () => {
   const navigate = useNavigate();
-  const avatarInputRef = React.useRef(null);
-  const coverInputRef = React.useRef(null);
-  const [isEditing, setIsEditing] = React.useState(false);
-  const [profile, setProfile] = React.useState(() => {
-    const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
-    if (!raw) return defaultProfile;
-    try {
-      return { ...defaultProfile, ...JSON.parse(raw) };
-    } catch {
-      return defaultProfile;
-    }
-  });
-  const [draft, setDraft] = React.useState(profile);
+  const { t } = useLanguage();
+  const { profile, loading, error, refreshProfile, updateProfile, uploadAvatar, changePassword } =
+    useUserProfile();
 
-  React.useEffect(() => {
-    if (!isEditing) {
-      setDraft(profile);
-    }
-  }, [isEditing, profile]);
+  const [form, setForm] = useState(EMPTY_FORM);
+  const [formErrors, setFormErrors] = useState({});
+  const [profileMessage, setProfileMessage] = useState({ type: "", text: "" });
+  const [passwordForm, setPasswordForm] = useState(EMPTY_PASSWORD_FORM);
+  const [passwordMessage, setPasswordMessage] = useState({ type: "", text: "" });
+  const [selectedPhoto, setSelectedPhoto] = useState(null);
+  const [selectedPhotoError, setSelectedPhotoError] = useState("");
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState("");
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
-  const saveProfile = () => {
-    setProfile(draft);
-    window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(draft));
-    window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
-    setIsEditing(false);
-  };
-
-  const cancelEdit = () => {
-    setDraft(profile);
-    setIsEditing(false);
-  };
-
-  const updateImageFromFile = (file, key) => {
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') return;
-      setDraft((prev) => ({ ...prev, [key]: reader.result }));
-      if (!isEditing) {
-        const updated = { ...profile, [key]: reader.result };
-        setProfile(updated);
-        window.localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(updated));
-        window.dispatchEvent(new Event(PROFILE_UPDATED_EVENT));
-      }
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const activeProfile = isEditing ? draft : profile;
-  const writingHeights = React.useMemo(
-    () => Array.from({ length: 30 }, (_, i) => 20 + ((i * 37) % 80)),
-    [],
+  const baselineForm = useMemo(() => getProfileFormFromProfile(profile), [profile]);
+  const hasTextChanges = useMemo(
+    () =>
+      trimValue(form.firstname) !== trimValue(baselineForm.firstname) ||
+      trimValue(form.lastname) !== trimValue(baselineForm.lastname) ||
+      trimValue(form.bio) !== trimValue(baselineForm.bio) ||
+      trimValue(form.facebook_url) !== trimValue(baselineForm.facebook_url),
+    [baselineForm, form],
   );
+  const hasUnsavedChanges = hasTextChanges || Boolean(selectedPhoto);
+  const currentPhotoSrc = photoPreviewUrl || profile?.avatarUrl;
+
+  useEffect(() => {
+    if (hasUnsavedChanges) return;
+    setForm(getProfileFormFromProfile(profile));
+  }, [hasUnsavedChanges, profile]);
+
+  useEffect(() => {
+    if (!selectedPhoto) {
+      setPhotoPreviewUrl("");
+      return undefined;
+    }
+
+    const nextUrl = URL.createObjectURL(selectedPhoto);
+    setPhotoPreviewUrl(nextUrl);
+
+    return () => URL.revokeObjectURL(nextUrl);
+  }, [selectedPhoto]);
+
+  useEffect(() => {
+    if (!hasUnsavedChanges) return undefined;
+
+    const handleBeforeUnload = (event) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => window.removeEventListener("beforeunload", handleBeforeUnload);
+  }, [hasUnsavedChanges]);
+
+  const handleFieldChange = (key, value) => {
+    setForm((current) => ({ ...current, [key]: value }));
+    setFormErrors((current) => ({ ...current, [key]: "" }));
+    setProfileMessage({ type: "", text: "" });
+  };
+
+  const handleSelectPhoto = (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+
+    const validationMessage = validatePhotoFile(file, t);
+    if (validationMessage) {
+      setSelectedPhoto(null);
+      setSelectedPhotoError(validationMessage);
+      setProfileMessage({ type: "", text: "" });
+      return;
+    }
+
+    setSelectedPhoto(file);
+    setSelectedPhotoError("");
+    setProfileMessage({ type: "", text: "" });
+  };
+
+  const handleResetChanges = () => {
+    setForm(getProfileFormFromProfile(profile));
+    setFormErrors({});
+    setSelectedPhoto(null);
+    setSelectedPhotoError("");
+    setProfileMessage({ type: "", text: "" });
+  };
+
+  const handleSaveProfile = async (event) => {
+    event.preventDefault();
+
+    const nextErrors = validateProfileForm(form, t);
+    const photoError = validatePhotoFile(selectedPhoto, t);
+
+    if (photoError) {
+      setSelectedPhotoError(photoError);
+    }
+
+    if (Object.keys(nextErrors).length > 0 || photoError) {
+      setFormErrors(nextErrors);
+      setProfileMessage({
+        type: "error",
+        text: t("Please fix the highlighted fields and try again."),
+      });
+      return;
+    }
+
+    if (!hasUnsavedChanges) {
+      setProfileMessage({ type: "success", text: t("Your profile is already up to date.") });
+      return;
+    }
+
+    setSavingProfile(true);
+    setProfileMessage({ type: "", text: "" });
+
+    try {
+      if (selectedPhoto) {
+        await uploadAvatar(selectedPhoto);
+      }
+
+      if (hasTextChanges) {
+        await updateProfile({
+          firstname: trimValue(form.firstname),
+          lastname: trimValue(form.lastname),
+          bio: trimValue(form.bio),
+          facebook_url: trimValue(form.facebook_url),
+        });
+      } else if (selectedPhoto) {
+        await refreshProfile();
+      }
+
+      setSelectedPhoto(null);
+      setSelectedPhotoError("");
+      setFormErrors({});
+      setProfileMessage({
+        type: "success",
+        text: selectedPhoto && hasTextChanges
+          ? t("Profile and photo updated successfully.")
+          : selectedPhoto
+            ? t("Photo updated successfully.")
+            : t("Profile updated successfully."),
+      });
+    } catch (requestError) {
+      const serverFieldErrors = getFieldErrors(requestError);
+      const nextErrors = {
+        firstname: serverFieldErrors.firstname || "",
+        lastname: serverFieldErrors.lastname || "",
+        bio: serverFieldErrors.bio || "",
+        facebook_url: serverFieldErrors.facebook_url || "",
+      };
+
+      setFormErrors((current) => ({ ...current, ...nextErrors }));
+      setSelectedPhotoError(
+        serverFieldErrors.photo ||
+          serverFieldErrors.avatar ||
+          serverFieldErrors.avatar_file ||
+          serverFieldErrors.photo_file ||
+          selectedPhotoError,
+      );
+      setProfileMessage({
+        type: "error",
+        text: requestError.message || t("Unable to update your profile right now."),
+      });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handlePasswordChange = async (event) => {
+    event.preventDefault();
+    setPasswordMessage({ type: "", text: "" });
+
+    if (
+      !trimValue(passwordForm.current_password) ||
+      !trimValue(passwordForm.new_password) ||
+      !trimValue(passwordForm.confirm_password)
+    ) {
+      setPasswordMessage({ type: "error", text: t("Please fill in all password fields.") });
+      return;
+    }
+
+    if (passwordForm.new_password !== passwordForm.confirm_password) {
+      setPasswordMessage({
+        type: "error",
+        text: t("New password and confirmation do not match."),
+      });
+      return;
+    }
+
+    if (trimValue(passwordForm.new_password).length < 8) {
+      setPasswordMessage({
+        type: "error",
+        text: t("New password must be at least 8 characters."),
+      });
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      const response = await changePassword({
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      });
+
+      setPasswordForm(EMPTY_PASSWORD_FORM);
+      setPasswordMessage({
+        type: "success",
+        text: response?.message || t("Password updated successfully."),
+      });
+    } catch (requestError) {
+      setPasswordMessage({
+        type: "error",
+        text: requestError.message || t("Unable to update your password."),
+      });
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
+  const messageClassName = (messageType) =>
+    messageType === "error"
+      ? "text-rose-400"
+      : messageType === "success"
+        ? "text-emerald-400"
+        : "text-slate-400";
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      <div className="relative mb-24">
-        <div className="h-48 w-full rounded-2xl overflow-hidden bg-gradient-to-r from-primary to-accent/50 relative">
-          <img src={activeProfile.coverUrl} alt="Cover" className="w-full h-full object-cover opacity-40" />
-          <button
-            onClick={() => coverInputRef.current?.click()}
-            className="absolute top-4 right-4 p-2 bg-black/30 backdrop-blur-md rounded-lg text-white hover:bg-black/50 transition-colors"
-          >
-            <Edit3 className="size-4" />
-          </button>
-          <input
-            ref={coverInputRef}
-            type="file"
-            accept="image/png,image/jpeg,image/jpg,image/webp"
-            className="sr-only"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              updateImageFromFile(file, 'coverUrl');
-              e.target.value = '';
-            }}
-          />
-        </div>
-        
-        <div className="absolute -bottom-16 left-8 flex items-end gap-6">
-          <div className="relative group">
-            <img 
-              src={activeProfile.avatarUrl} 
-              alt={activeProfile.name} 
-              className="size-32 rounded-2xl border-4 border-background-dark object-cover shadow-2xl"
+    <div className="mx-auto max-w-6xl p-6 md:p-8">
+      <div className="mb-8 flex flex-col gap-6 rounded-[32px] border border-white/6 bg-[linear-gradient(135deg,rgba(74,134,143,0.22),rgba(13,18,29,0.95))] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.28)] lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+          <div className="relative">
+            <img
+              src={currentPhotoSrc}
+              alt={profile?.fullName || t("Author profile photo")}
+              className="h-28 w-28 rounded-[28px] border border-white/15 object-cover shadow-2xl"
             />
-            <button
-              onClick={() => avatarInputRef.current?.click()}
-              className="absolute inset-0 bg-black/50 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white"
+            <label
+              htmlFor="profile-photo"
+              className="absolute -bottom-2 -right-2 inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-black/70 px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
             >
-              <Edit3 className="size-6" />
-            </button>
+              <Camera className="size-3.5" />
+              {t("Change")}
+            </label>
             <input
-              ref={avatarInputRef}
+              id="profile-photo"
               type="file"
-              accept="image/png,image/jpeg,image/jpg,image/webp"
+              accept="image/png,image/jpeg"
               className="sr-only"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (!file) return;
-                updateImageFromFile(file, 'avatarUrl');
-                e.target.value = '';
-              }}
+              onChange={handleSelectPhoto}
             />
           </div>
-          <div className="mb-2">
-            {isEditing ? (
-              <input
-                value={draft.name}
-                onChange={(e) => setDraft((prev) => ({ ...prev, name: e.target.value }))}
-                className="text-3xl font-bold bg-transparent border-b border-white/20 focus:outline-none"
-              />
-            ) : (
-              <h1 className="text-3xl font-bold">{activeProfile.name}</h1>
-            )}
-            <p className="text-slate-400 flex items-center gap-2">
-              {isEditing ? (
-                <input
-                  value={draft.username}
-                  onChange={(e) => setDraft((prev) => ({ ...prev, username: e.target.value }))}
-                  className="text-sm bg-transparent border-b border-white/20 focus:outline-none"
-                />
-              ) : (
-                <span>@{activeProfile.username}</span>
-              )}
-              <span className="size-1 bg-slate-600 rounded-full"></span>
-              <span className="text-accent font-bold">{activeProfile.tier}</span>
+
+          <div>
+            <p className="mb-2 text-xs font-bold uppercase tracking-[0.24em] text-accent/90">
+              {t("Author Profile")}
+            </p>
+            <h1 className="text-3xl font-bold tracking-tight">{profile?.fullName || t("Author")}</h1>
+            <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-300">
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1">
+                <Mail className="size-4" />
+                {profile?.email || t("No email available")}
+              </span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1">
+                <ShieldCheck className="size-4 text-emerald-400" />
+                {profile?.tier || t("Pro Author")}
+              </span>
+            </div>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300">
+              {trimValue(profile?.bio) || t("Keep your public author profile fresh so readers see the right name, bio, and social link everywhere in the portal.")}
             </p>
           </div>
         </div>
-        
-        <div className="absolute -bottom-12 right-0 flex gap-3">
-          {!isEditing ? (
-            <button
-              onClick={() => setIsEditing(true)}
-              className="px-6 py-2.5 bg-accent text-white rounded-xl text-sm font-bold shadow-glow hover:opacity-90 transition-all"
-            >
-              Edit Profile
-            </button>
-          ) : (
-            <>
-              <button
-                onClick={cancelEdit}
-                className="px-6 py-2.5 bg-card-dark border border-white/10 rounded-xl text-sm font-bold text-slate-300 hover:text-[color:var(--text)] transition-all"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={saveProfile}
-                className="px-6 py-2.5 bg-accent text-white rounded-xl text-sm font-bold shadow-glow hover:opacity-90 transition-all"
-              >
-                Save Profile
-              </button>
-            </>
-          )}
+
+        <div className="grid gap-3 sm:grid-cols-2">
           <button
-            onClick={() => window.open(activeProfile.website || 'https://example.com', '_blank', 'noopener,noreferrer')}
-            className="p-2.5 bg-card-dark border border-white/5 rounded-xl text-slate-400 hover:text-[color:var(--text)] transition-colors"
+            type="button"
+            onClick={() => navigate("/author/my-books")}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/12"
           >
-            <Globe className="size-5" />
+            <BookOpen className="size-4" />
+            {t("My Books")}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              refreshProfile().catch(() => {});
+            }}
+            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-slate-200"
+          >
+            <RefreshCw className="size-4" />
+            {t("Refresh")}
           </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="space-y-8">
-          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
-            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-6">About Me</h2>
-            {isEditing ? (
-              <textarea
-                value={draft.bio}
-                onChange={(e) => setDraft((prev) => ({ ...prev, bio: e.target.value }))}
-                rows={5}
-                className="w-full text-sm text-slate-300 leading-relaxed mb-6 bg-primary/10 border border-white/10 rounded-lg p-3 focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
-            ) : (
-              <p className="text-sm text-slate-300 leading-relaxed mb-6">{activeProfile.bio}</p>
-            )}
-            <div className="space-y-4">
-              <div className="flex items-center gap-3 text-sm text-slate-400">
-                <MapPin className="size-4" />
-                {isEditing ? (
-                  <input
-                    value={draft.location}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, location: e.target.value }))}
-                    className="bg-transparent border-b border-white/20 focus:outline-none"
-                  />
-                ) : (
-                  <span>{activeProfile.location}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-400">
-                <Calendar className="size-4" />
-                {isEditing ? (
-                  <input
-                    value={draft.joined}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, joined: e.target.value }))}
-                    className="bg-transparent border-b border-white/20 focus:outline-none"
-                  />
-                ) : (
-                  <span>Joined {activeProfile.joined}</span>
-                )}
-              </div>
-              <div className="flex items-center gap-3 text-sm text-slate-400">
-                <Mail className="size-4" />
-                {isEditing ? (
-                  <input
-                    value={draft.email}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, email: e.target.value }))}
-                    className="bg-transparent border-b border-white/20 focus:outline-none"
-                  />
-                ) : (
-                  <span>{activeProfile.email}</span>
-                )}
-              </div>
-              {isEditing && (
-                <div className="flex items-center gap-3 text-sm text-slate-400">
-                  <Globe className="size-4" />
-                  <input
-                    value={draft.website}
-                    onChange={(e) => setDraft((prev) => ({ ...prev, website: e.target.value }))}
-                    className="bg-transparent border-b border-white/20 focus:outline-none w-full"
-                    placeholder="https://your-site.com"
-                  />
-                </div>
-              )}
-            </div>
-            
-            <div className="flex gap-4 mt-8 pt-8 border-t border-white/5">
-              <a
-                href="https://twitter.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open Twitter profile"
-                className="text-slate-500 hover:text-sky-400 transition-colors"
-              >
-                <Twitter className="size-5" />
-              </a>
-              <a
-                href="https://instagram.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open Instagram profile"
-                className="text-slate-500 hover:text-pink-400 transition-colors"
-              >
-                <Instagram className="size-5" />
-              </a>
-              <a
-                href="https://github.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Open GitHub profile"
-                className="text-slate-500 hover:text-[color:var(--text)] transition-colors"
-              >
-                <Github className="size-5" />
-              </a>
-            </div>
-          </div>
-
-          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
-            <h2 className="text-sm font-bold text-slate-500 uppercase tracking-wider mb-6">Achievements</h2>
-            <div className="space-y-4">
-              {[
-                { title: "Bestseller", desc: "Top 10 for 4 consecutive weeks", icon: Award, color: "text-yellow-500" },
-                { title: "Prolific Writer", desc: "Published 5+ books in one year", icon: BookOpen, color: "text-accent" },
-                { title: "Community Star", desc: "Over 1,000 positive reader reviews", icon: Users, color: "text-emerald-500" },
-              ].map((ach, i) => (
-                <div key={i} className="flex gap-4">
-                  <div className={`p-2 bg-white/5 rounded-lg ${ach.color}`}>
-                    <ach.icon className="size-5" />
-                  </div>
-                  <div>
-                    <p className="text-sm font-bold">{ach.title}</p>
-                    <p className="text-[10px] text-slate-500">{ach.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
+      {error ? (
+        <div className="mb-6 flex items-start gap-3 rounded-2xl border border-rose-400/30 bg-rose-400/10 p-4 text-sm text-rose-200">
+          <AlertCircle className="mt-0.5 size-4 shrink-0" />
+          <div>
+            <p className="font-semibold">{t("Unable to load profile")}</p>
+            <p>{error}</p>
           </div>
         </div>
+      ) : null}
 
-        <div className="lg:col-span-2 space-y-8">
-          <div className="grid grid-cols-3 gap-4">
-            {[
-              { label: "Total Books", value: "12", icon: BookOpen },
-              { label: "Followers", value: "24.5k", icon: Users },
-              { label: "Avg. Rating", value: "4.8", icon: Award },
-            ].map((stat, i) => (
-              <div key={i} className="bg-card-dark border border-white/5 p-6 rounded-2xl card-shadow text-center">
-                <p className="text-[10px] text-slate-500 uppercase font-bold tracking-wider mb-2">{stat.label}</p>
-                <p className="text-2xl font-bold">{stat.value}</p>
-              </div>
-            ))}
+      <div className="grid gap-6 lg:grid-cols-[1.45fr_0.95fr]">
+        <form
+          onSubmit={handleSaveProfile}
+          className="rounded-[28px] border border-white/6 bg-card-dark p-6 shadow-[0_20px_70px_rgba(0,0,0,0.16)]"
+        >
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold">{t("Public details")}</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                {t("These fields sync with")} <code>/api/me/profile</code>.
+              </p>
+            </div>
+            {hasUnsavedChanges ? (
+              <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300">
+                {t("Unsaved changes")}
+              </span>
+            ) : (
+              <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1 text-xs font-semibold text-emerald-300">
+                {t("All changes saved")}
+              </span>
+            )}
           </div>
 
-          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
-            <div className="flex justify-between items-center mb-8">
-              <h2 className="text-lg font-bold">Latest Works</h2>
-              <button
-                onClick={() => navigate('/author/my-books')}
-                className="text-sm font-bold text-accent hover:text-[color:var(--text)] transition-colors"
+          <div className="grid gap-4 md:grid-cols-2">
+            <ProfileField
+              id="firstname"
+              label={t("First Name")}
+              value={form.firstname}
+              onChange={(event) => handleFieldChange("firstname", event.target.value)}
+              error={formErrors.firstname}
+              placeholder={t("First name")}
+            />
+            <ProfileField
+              id="lastname"
+              label={t("Last Name")}
+              value={form.lastname}
+              onChange={(event) => handleFieldChange("lastname", event.target.value)}
+              error={formErrors.lastname}
+              placeholder={t("Last name")}
+            />
+          </div>
+
+          <div className="mt-4 grid gap-4">
+            <div>
+              <label
+                htmlFor="profile-email"
+                className="mb-2 block text-xs font-bold uppercase tracking-[0.18em] text-slate-400"
               >
-                View All
+                {t("Email")}
+              </label>
+              <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-primary/5 px-4 py-3 text-sm text-slate-300">
+                <Mail className="size-4 text-slate-500" />
+                <input
+                  id="profile-email"
+                  type="email"
+                  readOnly
+                  value={profile?.email || ""}
+                  className="w-full bg-transparent outline-none"
+                />
+              </div>
+            </div>
+
+            <ProfileField
+              id="facebook_url"
+              label={t("Facebook URL")}
+              value={form.facebook_url}
+              onChange={(event) => handleFieldChange("facebook_url", event.target.value)}
+              error={formErrors.facebook_url}
+              placeholder="https://facebook.com/your-page"
+            />
+
+            <ProfileField
+              id="bio"
+              label={t("Bio")}
+              value={form.bio}
+              onChange={(event) => handleFieldChange("bio", event.target.value)}
+              error={formErrors.bio}
+              placeholder={t("Tell readers a little about your work and interests.")}
+              textarea
+            />
+          </div>
+
+          <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-primary/5 p-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm font-semibold">{t("Profile photo")}</p>
+                <p className="mt-1 text-xs text-slate-400">
+                  {t("PNG or JPEG, up to 5MB. Uploads use")} <code>POST /api/me/avatar</code>.
+                </p>
+              </div>
+              <label
+                htmlFor="profile-photo-inline"
+                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+              >
+                <Camera className="size-4" />
+                {selectedPhoto ? t("Replace photo") : t("Choose photo")}
+              </label>
+              <input
+                id="profile-photo-inline"
+                type="file"
+                accept="image/png,image/jpeg"
+                className="sr-only"
+                onChange={handleSelectPhoto}
+              />
+            </div>
+            {selectedPhoto ? (
+              <p className="mt-3 text-xs text-slate-300">
+                {t("Selected file")}: {selectedPhoto.name}
+              </p>
+            ) : null}
+            {selectedPhotoError ? (
+              <p className="mt-3 text-xs text-rose-400">{selectedPhotoError}</p>
+            ) : null}
+          </div>
+
+          <div className="mt-6 flex flex-col gap-3 border-t border-white/6 pt-5 sm:flex-row sm:items-center sm:justify-between">
+            <p className={`text-sm ${messageClassName(profileMessage.type)}`}>{profileMessage.text || " "}</p>
+            <div className="flex flex-wrap justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleResetChanges}
+                disabled={savingProfile || (!hasUnsavedChanges && !profileMessage.text)}
+                className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/6 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {t("Reset")}
+              </button>
+              <button
+                type="submit"
+                disabled={savingProfile || loading}
+                className="inline-flex items-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingProfile ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {savingProfile ? t("Saving...") : t("Save Profile")}
               </button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {[
-                { title: "The Midnight Library", genre: "Fantasy", rating: 4.8, img: "https://picsum.photos/seed/work1/300/450" },
-                { title: "Project Hail Mary", genre: "Sci-Fi", rating: 4.9, img: "https://picsum.photos/seed/work2/300/450" },
-              ].map((work, i) => (
-                <div key={i} className="flex gap-4 p-4 bg-primary/5 rounded-xl border border-white/5 group cursor-pointer hover:border-accent/30 transition-all">
-                  <img src={work.img} alt={work.title} className="w-20 h-28 rounded-lg object-cover shadow-lg group-hover:scale-105 transition-transform" />
-                  <div className="flex flex-col justify-center">
-                    <h3 className="font-bold text-sm mb-1">{work.title}</h3>
-                    <p className="text-xs text-slate-500 mb-3">{work.genre}</p>
-                    <div className="flex items-center gap-1">
-                      <Award className="size-3 text-yellow-500" />
-                      <span className="text-xs font-bold">{work.rating}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
+        </form>
 
-          <div className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow">
-            <h2 className="text-lg font-bold mb-6">Writing Activity</h2>
-            <div className="flex items-end gap-1 h-32">
-              {writingHeights.map((height, i) => {
-                return (
-                  <div 
-                    key={i} 
-                    className="flex-1 bg-accent/20 rounded-t-sm hover:bg-accent transition-colors cursor-pointer group relative"
-                    style={{ height: `${height}%` }}
-                  >
-                    <div className="absolute -top-8 left-1/2 -translate-x-1/2 bg-black text-white text-[10px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                      {Math.floor(height * 20)} words
-                    </div>
-                  </div>
-                );
-              })}
+        <div className="space-y-6">
+          <form
+            onSubmit={handlePasswordChange}
+            className="rounded-[28px] border border-white/6 bg-card-dark p-6 shadow-[0_20px_70px_rgba(0,0,0,0.16)]"
+          >
+            <div className="mb-5 flex items-start gap-3">
+              <div className="rounded-2xl bg-accent/15 p-3 text-accent">
+                <KeyRound className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">{t("Change password")}</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  {t("This form submits to")} <code>POST /api/auth/change-password</code>.
+                </p>
+              </div>
             </div>
-            <div className="flex justify-between mt-4 text-[10px] text-slate-500 uppercase font-bold tracking-wider">
-              <span>30 Days Ago</span>
-              <span>Today</span>
+
+            <div className="space-y-4">
+              <PasswordField
+                id="current-password"
+                label={t("Current password")}
+                value={passwordForm.current_password}
+                onChange={(event) => {
+                  setPasswordForm((current) => ({
+                    ...current,
+                    current_password: event.target.value,
+                  }));
+                  setPasswordMessage({ type: "", text: "" });
+                }}
+                placeholder={t("Current password")}
+              />
+              <PasswordField
+                id="new-password"
+                label={t("New password")}
+                value={passwordForm.new_password}
+                onChange={(event) => {
+                  setPasswordForm((current) => ({
+                    ...current,
+                    new_password: event.target.value,
+                  }));
+                  setPasswordMessage({ type: "", text: "" });
+                }}
+                placeholder={t("New password")}
+              />
+              <PasswordField
+                id="confirm-password"
+                label={t("Confirm new password")}
+                value={passwordForm.confirm_password}
+                onChange={(event) => {
+                  setPasswordForm((current) => ({
+                    ...current,
+                    confirm_password: event.target.value,
+                  }));
+                  setPasswordMessage({ type: "", text: "" });
+                }}
+                placeholder={t("Confirm new password")}
+              />
+            </div>
+
+            <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/6 pt-4">
+              <p className={`text-sm ${messageClassName(passwordMessage.type)}`}>{passwordMessage.text || " "}</p>
+              <button
+                type="submit"
+                disabled={changingPassword}
+                className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {changingPassword ? <RefreshCw className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
+                {changingPassword ? t("Updating...") : t("Update Password")}
+              </button>
+            </div>
+          </form>
+
+          <div className="rounded-[28px] border border-white/6 bg-card-dark p-6 shadow-[0_20px_70px_rgba(0,0,0,0.16)]">
+            <div className="mb-5 flex items-start gap-3">
+              <div className="rounded-2xl bg-white/8 p-3 text-slate-200">
+                <User2 className="size-5" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold">{t("Profile summary")}</h2>
+                <p className="mt-1 text-sm text-slate-400">
+                  {t("A quick snapshot of the profile data currently cached in the client.")}
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-4 text-sm">
+              <div className="rounded-2xl border border-white/8 bg-primary/5 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{t("Display name")}</p>
+                <p className="mt-2 text-base font-semibold">{profile?.fullName || t("Author")}</p>
+              </div>
+              <div className="rounded-2xl border border-white/8 bg-primary/5 p-4">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{t("Photo source")}</p>
+                <p className="mt-2 break-all text-slate-300">
+                  {profile?.photo_url || profile?.photo || t("No photo uploaded yet")}
+                </p>
+              </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => navigate("/author/settings")}
+                  className="rounded-2xl border border-white/10 bg-primary/5 px-4 py-3 text-left text-sm font-semibold transition hover:bg-white/6"
+                >
+                  {t("Open settings")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (profile?.facebook_url) {
+                      window.open(profile.facebook_url, "_blank", "noopener,noreferrer");
+                    }
+                  }}
+                  disabled={!profile?.facebook_url}
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-primary/5 px-4 py-3 text-sm font-semibold transition hover:bg-white/6 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <ExternalLink className="size-4" />
+                  {t("Open Facebook")}
+                </button>
+              </div>
             </div>
           </div>
         </div>

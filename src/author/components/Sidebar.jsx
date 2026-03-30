@@ -5,37 +5,25 @@ import {
   BookOpen, 
   PlusSquare, 
   BarChart3, 
-  Filter,
+  Bell,
   MessageSquare, 
   Settings, 
   LogOut
 } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useLanguage } from '../../i18n/LanguageContext';
-
-const PROFILE_STORAGE_KEY = 'author_studio_profile';
-const PROFILE_UPDATED_EVENT = 'author-profile-updated';
-
-const defaultProfile = {
-  name: 'Alex Rivera',
-  tier: 'Pro Author',
-  avatarUrl:
-    'https://lh3.googleusercontent.com/aida-public/AB6AXuAlEVr580N1MAJKB6IPshOgAds-VzQi3M2D3hifRUqDV9JCX-_nULM_zGDb8dVGBYdz4V2CWOYIDkgMI50DEppkE9po92vlp4lfaOQBhpFnndWtWiBrNG2jHQEjunra1G4Svlwf1l2aVjKI9saVSU3euiXQES0MBV-vqptGLQsJ6Y2WNNR3w4DKAGSLfRf_mU_mG2Yh5-_Yxf-cTJN17JAE-4nfmHaWUXvfDosDc3doTApg4pT9ebRdhc885FOqbg9HS_UjNGNPGg',
-};
+import {
+  AUTHOR_PROFILE_KEY,
+  AUTHOR_PROFILE_UPDATED_EVENT,
+  normalizeAuthorProfile,
+  readAuthorProfileStorage,
+} from '../services/profileStorage';
 
 const Sidebar = () => {
   const { logout } = useAuth();
   const { t } = useLanguage();
   const navigate = useNavigate();
-  const [profile, setProfile] = React.useState(() => {
-    const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
-    if (!raw) return defaultProfile;
-    try {
-      return { ...defaultProfile, ...JSON.parse(raw) };
-    } catch {
-      return defaultProfile;
-    }
-  });
+  const [profile, setProfile] = React.useState(() => readAuthorProfileStorage());
 
   const navItems = [
     { icon: LayoutDashboard, label: t('Dashboard'), path: '/author' },
@@ -43,6 +31,7 @@ const Sidebar = () => {
     // { icon: Filter, label: t('Categories'), path: '/author/category/technology' },
     { icon: PlusSquare, label: t('Upload New'), path: '/author/upload' },
     { icon: BarChart3, label: t('Analytics'), path: '/author/analytics' },
+    { icon: Bell, label: t('Notifications'), path: '/author/notifications' },
     { icon: MessageSquare, label: t('Feedback'), path: '/author/feedback' },
     { icon: Settings, label: t('Settings'), path: '/author/settings' },
   ];
@@ -54,22 +43,22 @@ const Sidebar = () => {
 
   React.useEffect(() => {
     const syncProfile = () => {
-      const raw = window.localStorage.getItem(PROFILE_STORAGE_KEY);
+      const raw = window.localStorage.getItem(AUTHOR_PROFILE_KEY);
       if (!raw) {
-        setProfile(defaultProfile);
+        setProfile(readAuthorProfileStorage());
         return;
       }
       try {
-        setProfile({ ...defaultProfile, ...JSON.parse(raw) });
+        setProfile(normalizeAuthorProfile(JSON.parse(raw)));
       } catch {
-        setProfile(defaultProfile);
+        setProfile(readAuthorProfileStorage());
       }
     };
 
-    window.addEventListener(PROFILE_UPDATED_EVENT, syncProfile);
+    window.addEventListener(AUTHOR_PROFILE_UPDATED_EVENT, syncProfile);
     window.addEventListener('storage', syncProfile);
     return () => {
-      window.removeEventListener(PROFILE_UPDATED_EVENT, syncProfile);
+      window.removeEventListener(AUTHOR_PROFILE_UPDATED_EVENT, syncProfile);
       window.removeEventListener('storage', syncProfile);
     };
   }, []);

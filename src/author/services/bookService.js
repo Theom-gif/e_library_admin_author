@@ -169,6 +169,8 @@ export const mapApiBookToUiBook = (book) => ({
     book?.book_file_url,
     book?.file,
   ),
+  createdAt: book?.created_at || book?.createdAt || '',
+  updatedAt: book?.updated_at || book?.updatedAt || '',
   manuscriptName: getFileName(book?.pdf_path || book?.book_file_url || book?.book_file_path || ''),
   manuscriptType: book?.manuscript_type || book?.pdf_mime_type || inferFileType(getFileName(book?.pdf_path || book?.book_file_url || book?.book_file_path || '')),
   manuscriptSizeBytes: book?.manuscript_size_bytes || 0,

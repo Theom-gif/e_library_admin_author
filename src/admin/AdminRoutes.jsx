@@ -23,6 +23,7 @@ import AuthorDashboard from "../author/pages/Dashboard";
 import MyBooks from "../author/pages/MyBooks";
 import UploadBook from "../author/pages/UploadBook";
 import Profile from "../author/pages/Profile";
+import AuthorNotifications from "../author/pages/Notifications";
 import AuthorSettings from "../author/pages/Setting";
 import Feedback from "../author/pages/Feedback";
 import Research from "../author/pages/Research";
@@ -161,6 +162,7 @@ export default function AdminRoutes() {
         <Route path="my-books" element={<MyBooks />} />
         <Route path="upload" element={<UploadBook />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="notifications" element={<AuthorNotifications />} />
         <Route path="settings" element={<AuthorSettings />} />
         <Route path="feedback" element={<Feedback />} />
         <Route path="research" element={<Research />} />

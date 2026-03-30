@@ -11,6 +11,7 @@ import Dashboard from '../pages/Dashboard';
 import MyBooks from '../pages/MyBooks';
 import UploadBook from '../pages/UploadBook';
 import Profile from '../pages/Profile';
+import Notifications from '../pages/Notifications';
 import Settings from '../pages/Setting';
 import Feedback from '../pages/Feedback';
 import EditBookPage from '../pages/EditBookPage';
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="my-books" element={<MyBooks />} />
         <Route path="upload" element={<UploadBook />} />
         <Route path="profile" element={<Profile />} />
+        <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<Settings />} />
         <Route path="feedback" element={<Feedback />} />
         <Route path="research" element={<Research />} />

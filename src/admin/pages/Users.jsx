@@ -142,6 +142,7 @@ const Users = () => {
       <div className={cn("transition duration-200", selectedUser || reportUser ? "blur-[1px] pointer-events-none select-none" : "")}>
         <UsersTable
           t={t}
+          isDark={isDark}
           users={users}
           loading={loading}
           error={error}

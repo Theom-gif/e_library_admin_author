@@ -134,10 +134,19 @@ export default function AdminRoutes() {
         <Route path="categories" element={<Categories />} />
         <Route path="books" element={<Books />} />
         <Route path="readers" element={<TopReaders />} />
-        <Route path="monitor" element={<SystemMonitor />} />
         <Route path="notifications" element={<Notifications />} />
         <Route path="settings" element={<Settings />} />
       </Route>
+
+      {/* System Monitor — full-viewport, outside AdminLayout */}
+      <Route
+        path="/admin/monitor"
+        element={
+          <ProtectedRoute allowedRoles={["Admin"]}>
+            <SystemMonitor />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Author Routes */}
       <Route

@@ -6,9 +6,6 @@ const PreferencesCard = ({
   language,
   onLanguageChange,
   languageOptions,
-  themeOptions,
-  theme,
-  onThemeChange,
 }) => (
   <div className="glass-card p-6 border border-white/10">
     <h3 className="text-xl font-bold mb-6">{t("Preferences")}</h3>
@@ -30,7 +27,7 @@ const PreferencesCard = ({
         </select>
       </div>
 
-      <div className="space-y-3">
+      {/* <div className="space-y-3">
         <label className="block text-sm font-medium text-slate-400">
           {t("Theme")}
         </label>
@@ -52,7 +49,7 @@ const PreferencesCard = ({
             </button>
           ))}
         </div>
-      </div>
+      </div> */}
     </div>
   </div>
 );

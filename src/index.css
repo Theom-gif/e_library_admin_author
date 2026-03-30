@@ -345,6 +345,16 @@ a:focus-visible {
   width: 6px;
 }
 
+/* Sysmon animations */
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: .3; }
+}
+
 ::-webkit-scrollbar-track {
   background: var(--bg);
 }

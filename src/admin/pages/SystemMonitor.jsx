@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../theme/ThemeContext";
-import {
-  generateDisks, generateHealth, generateLogs,
-  generateNetworkInterfaces, generateProcesses, generateStats, getHistory, pushHistory,
-} from "../components/system/helpers";
+import { generateStats } from "../components/system/helpers";
+import { useSystemMonitor } from "../hooks/useSystemMonitor";
 import SysmonSidebar   from "../components/system/sysmon/SysmonSidebar";
 import OverviewPage    from "../components/system/sysmon/OverviewPage";
 import PerformancePage from "../components/system/sysmon/PerformancePage";
@@ -19,17 +17,23 @@ const PAGES = ["overview", "performance", "processes", "disks", "network", "logs
 export default function SystemMonitor() {
   const { isDark } = useTheme();
   const navigate = useNavigate();
-  const [page, setPage]           = useState("overview");
-  const [health, setHealth]       = useState(null);
-  const [history, setHistory]     = useState([]);
-  const [logs, setLogs]           = useState([]);
-  const [processes, setProcesses] = useState([]);
-  const [procSort, setProcSort]   = useState("cpu");
-  const [disks, setDisks]         = useState([]);
-  const [network, setNetwork]     = useState([]);
-  const [stats, setStats]         = useState(null);
-  const [toasts, setToasts]       = useState([]);
-  const prevAlertIds              = useRef(new Set());
+  const [page, setPage]         = useState("overview");
+  const [procSort, setProcSort] = useState("cpu");
+  const [toasts, setToasts]     = useState([]);
+  const prevAlertIds            = useRef(new Set());
+
+  // Get real-time system monitoring data from WebSocket
+  const { health, history, logs, processes: allProcesses, disks, interfaces: network, stats, connected, error } = useSystemMonitor();
+
+  // Filter processes by sort order
+  const processes = allProcesses.length > 0 
+    ? allProcesses.sort((a, b) => {
+        if (procSort === "cpu") return (b.cpu || 0) - (a.cpu || 0);
+        if (procSort === "memory") return (b.memory || 0) - (a.memory || 0);
+        if (procSort === "name") return (a.name || "").localeCompare(b.name || "");
+        return 0;
+      }).slice(0, 50)
+    : [];
 
   const addToast = useCallback((level, title, msg) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -37,51 +41,26 @@ export default function SystemMonitor() {
     setTimeout(() => setToasts((t) => t.filter((x) => x.id !== id)), 5000);
   }, []);
 
-  const tick = useCallback(() => {
-    const h = generateHealth();
-    pushHistory(h);
-    setHealth(h);
-    setHistory(getHistory(48));
+  // Toast new alerts from real-time data
+  useEffect(() => {
+    if (!health?.alerts) return;
 
-    // Toast new alerts
-    const newIds = new Set(h.alerts.map((a) => a.id));
-    h.alerts.forEach((a) => {
-      if (!prevAlertIds.current.has(a.id))
+    const newIds = new Set(health.alerts.map((a) => a.id));
+    health.alerts.forEach((a) => {
+      if (!prevAlertIds.current.has(a.id)) {
         addToast(a.level, a.metric.toUpperCase(), a.message);
+      }
     });
     prevAlertIds.current = newIds;
-  }, [addToast]);
+  }, [health?.alerts, addToast]);
 
-  // Boot
+  // Compute stats when data changes
+  const [computedStats, setComputedStats] = useState(null);
   useEffect(() => {
-    tick();
-    setLogs(generateLogs(80));
-    setDisks(generateDisks());
-    setNetwork(generateNetworkInterfaces());
-  }, [tick]);
-
-  // 5s live ticker
-  useEffect(() => {
-    const id = setInterval(tick, 5000);
-    return () => clearInterval(id);
-  }, [tick]);
-
-  // Refresh processes when sort changes or page opens
-  useEffect(() => {
-    if (page === "processes") setProcesses(generateProcesses(50, procSort));
-  }, [page, procSort]);
-
-  // Refresh disks / network / stats on page open
-  useEffect(() => {
-    if (page === "disks")   setDisks(generateDisks());
-    if (page === "network") setNetwork(generateNetworkInterfaces());
-    if (page === "stats" && health) setStats(generateStats(logs, health));
-  }, [page]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Recompute stats whenever logs or health update (if on stats page)
-  useEffect(() => {
-    if (page === "stats" && health) setStats(generateStats(logs, health));
-  }, [logs, health, page]);
+    if (page === "stats" && health) {
+      setComputedStats(generateStats(logs, health));
+    }
+  }, [page, logs, health]);
 
   const theme = isDark ? "dark" : "light";
 
@@ -132,7 +111,7 @@ export default function SystemMonitor() {
         <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 9, color: "var(--sm-text-3)" }}>
           poll: 5s health · 10s history · 15s logs
         </span>
-        <WsBadge />
+        <WsBadge connected={connected} error={error} />
       </div>
 
       {/* Shell */}
@@ -152,7 +131,7 @@ export default function SystemMonitor() {
           {page === "disks"        && <DisksPage       disks={disks} />}
           {page === "network"      && <NetworkPage     interfaces={network} />}
           {page === "logs"         && <LogsPage        logs={logs} />}
-          {page === "stats"        && <StatsPage       stats={stats} isDark={isDark} />}
+          {page === "stats"        && <StatsPage       stats={computedStats} isDark={isDark} />}
         </div>
       </div>
 
@@ -228,10 +207,33 @@ function HostBadge({ health }) {
   );
 }
 
-function WsBadge() {
+function WsBadge({ connected, error }) {
+  if (error) {
+    return (
+      <div 
+        className="rounded px-2 py-1 text-[10px] flex items-center gap-1.5" 
+        style={{ fontFamily: "'IBM Plex Mono',monospace", background: "var(--sm-red-dim)", border: "1px solid rgba(232,65,74,.3)", color: "var(--sm-red)" }}
+        title={error}
+      >
+        <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" />
+        error
+      </div>
+    );
+  }
+
   return (
-    <div className="rounded px-2 py-1 text-[10px]" style={{ fontFamily: "'IBM Plex Mono',monospace", background: "var(--sm-green-dim)", border: "1px solid rgba(39,201,143,.3)", color: "var(--sm-green)" }}>
-      live
+    <div 
+      className="rounded px-2 py-1 text-[10px] flex items-center gap-1.5" 
+      style={{ 
+        fontFamily: "'IBM Plex Mono',monospace", 
+        background: connected ? "var(--sm-green-dim)" : "var(--sm-amber-dim)", 
+        border: connected ? "1px solid rgba(39,201,143,.3)" : "1px solid rgba(240,165,0,.3)", 
+        color: connected ? "var(--sm-green)" : "var(--sm-amber)" 
+      }}
+      title={connected ? "Connected to system monitor" : "Connecting..."}
+    >
+      <span className="inline-block h-1.5 w-1.5 rounded-full bg-current" style={{ animation: connected ? "none" : "pulse 2s ease-in-out infinite" }} />
+      {connected ? "live" : "connecting"}
     </div>
   );
 }

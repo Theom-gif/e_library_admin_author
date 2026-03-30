@@ -62,10 +62,13 @@ export const fetchAuthors = async (filters = {}, config = {}) => {
     }
 
     const query = params.toString();
-    const url = `/admin/authors${query ? `?${query}` : ""}`;
+    const url = `/api/admin/authors${query ? `?${query}` : ""}`;
 
+    console.log(`[AuthorService] Fetching from: ${url}`);
     const response = await apiClient.get(url, config);
     const payload = response?.data;
+
+    console.log("[AuthorService] fetchAuthors response:", payload);
 
     // Extract authors array from response
     const authors = (Array.isArray(payload?.data) && payload.data) ||
@@ -87,9 +90,15 @@ export const fetchAuthors = async (filters = {}, config = {}) => {
       success: payload?.success ?? true,
     };
   } catch (error) {
-    console.error("fetchAuthors error:", error);
+    console.error("[AuthorService] fetchAuthors error:", {
+      message: error?.message,
+      status: error?.response?.status,
+      url: error?.config?.url,
+      data: error?.response?.data,
+    });
+
     throw {
-      message: error?.response?.data?.message || "Failed to fetch authors",
+      message: error?.response?.data?.message || error?.message || "Failed to fetch authors",
       status: error?.response?.status,
       data: error?.response?.data,
     };
@@ -106,7 +115,9 @@ export const fetchAuthors = async (filters = {}, config = {}) => {
  */
 export const getAuthor = async (id, config = {}) => {
   try {
-    const response = await apiClient.get(`/admin/authors/${id}`, config);
+    const url = `/api/admin/authors/${id}`;
+    console.log(`[AuthorService] Fetching author from: ${url}`);
+    const response = await apiClient.get(url, config);
     const author = response?.data?.data || response?.data;
 
     return {
@@ -114,7 +125,7 @@ export const getAuthor = async (id, config = {}) => {
       success: response?.data?.success ?? true,
     };
   } catch (error) {
-    console.error("getAuthor error:", error);
+    console.error("[AuthorService] getAuthor error:", error);
     throw {
       message: error?.response?.data?.message || "Failed to fetch author",
       status: error?.response?.status,
@@ -150,7 +161,9 @@ export const createAuthor = async (authorData = {}, config = {}) => {
       formData.append("profile_image", authorData.profile_image);
     }
 
-    const response = await apiClient.post("/admin/authors", formData, {
+    const url = "/api/admin/authors";
+    console.log(`[AuthorService] Creating author at: ${url}`);
+    const response = await apiClient.post(url, formData, {
       ...config,
       headers: {
         "Content-Type": "multipart/form-data",
@@ -166,7 +179,7 @@ export const createAuthor = async (authorData = {}, config = {}) => {
       success: response?.data?.success ?? true,
     };
   } catch (error) {
-    console.error("createAuthor error:", error);
+    console.error("[AuthorService] createAuthor error:", error);
     throw {
       message: error?.response?.data?.message || "Failed to create author",
       status: error?.response?.status,
@@ -210,7 +223,9 @@ export const updateAuthor = async (id, authorData = {}, config = {}) => {
       formData.append("profile_image", authorData.profile_image);
     }
 
-    const response = await apiClient.put(`/admin/authors/${id}`, formData, {
+    const url = `/api/admin/authors/${id}`;
+    console.log(`[AuthorService] Updating author at: ${url}`);
+    const response = await apiClient.put(url, formData, {
       ...config,
       headers: {
         "Content-Type": "multipart/form-data",
@@ -226,7 +241,7 @@ export const updateAuthor = async (id, authorData = {}, config = {}) => {
       success: response?.data?.success ?? true,
     };
   } catch (error) {
-    console.error("updateAuthor error:", error);
+    console.error("[AuthorService] updateAuthor error:", error);
     throw {
       message: error?.response?.data?.message || "Failed to update author",
       status: error?.response?.status,
@@ -246,14 +261,16 @@ export const updateAuthor = async (id, authorData = {}, config = {}) => {
  */
 export const deleteAuthor = async (id, config = {}) => {
   try {
-    const response = await apiClient.delete(`/admin/authors/${id}`, config);
+    const url = `/api/admin/authors/${id}`;
+    console.log(`[AuthorService] Deleting author at: ${url}`);
+    const response = await apiClient.delete(url, config);
 
     return {
       message: response?.data?.message || "Author deleted successfully",
       success: response?.data?.success ?? true,
     };
   } catch (error) {
-    console.error("deleteAuthor error:", error);
+    console.error("[AuthorService] deleteAuthor error:", error);
     throw {
       message: error?.response?.data?.message || "Failed to delete author",
       status: error?.response?.status,
@@ -272,8 +289,10 @@ export const deleteAuthor = async (id, config = {}) => {
  */
 export const resendAuthorInvitation = async (id, config = {}) => {
   try {
+    const url = `/api/admin/authors/${id}/resend-invitation`;
+    console.log(`[AuthorService] Resending invitation at: ${url}`);
     const response = await apiClient.post(
-      `/admin/authors/${id}/resend-invitation`,
+      url,
       null,
       config
     );
@@ -283,9 +302,83 @@ export const resendAuthorInvitation = async (id, config = {}) => {
       success: response?.data?.success ?? true,
     };
   } catch (error) {
-    console.error("resendAuthorInvitation error:", error);
+    console.error("[AuthorService] resendAuthorInvitation error:", error);
     throw {
       message: error?.response?.data?.message || "Failed to resend invitation",
+      status: error?.response?.status,
+      data: error?.response?.data,
+    };
+  }
+};
+
+/**
+ * Fetch users with Author role only
+ * GET /api/admin/users?role=Author
+ * 
+ * @param {Object} filters - Filter options
+ * @param {string} filters.search - Search by name or email
+ * @param {number} filters.page - Page number for pagination
+ * @param {number} filters.per_page - Items per page
+ * @param {Object} config - Additional axios config
+ * @returns {Promise<{data: Array, meta: Object}>} Author users list
+ */
+export const fetchAuthorUsers = async (filters = {}, config = {}) => {
+  try {
+    const params = new URLSearchParams();
+
+    // Always filter by Author role
+    params.set("role", "Author");
+
+    if (filters.search) {
+      params.set("search", filters.search);
+    }
+
+    if (filters.page) {
+      params.set("page", filters.page);
+    }
+
+    if (filters.per_page) {
+      params.set("per_page", filters.per_page);
+    }
+
+    const query = params.toString();
+    const url = `/api/admin/users${query ? `?${query}` : ""}`;
+
+    console.log(`[AuthorService] Fetching author users from: ${url}`);
+    const response = await apiClient.get(url, config);
+    const payload = response?.data;
+
+    console.log("[AuthorService] fetchAuthorUsers response:", payload);
+
+    // Extract users array from response
+    const users = (Array.isArray(payload?.data) && payload.data) ||
+                  (Array.isArray(payload) && payload) ||
+                  [];
+
+    // Extract pagination metadata
+    const paginationSource = payload?.meta || payload?.pagination || {};
+    const meta = {
+      page: paginationSource?.current_page ?? paginationSource?.page ?? 1,
+      per_page: paginationSource?.per_page ?? paginationSource?.pageSize ?? 15,
+      total: paginationSource?.total ?? users.length,
+      last_page: paginationSource?.last_page ?? 1,
+    };
+
+    return {
+      data: users.map(normalizeAuthor),
+      meta,
+      success: payload?.success ?? true,
+    };
+  } catch (error) {
+    console.error("[AuthorService] fetchAuthorUsers error:", {
+      message: error?.message,
+      status: error?.response?.status,
+      url: error?.config?.url,
+      data: error?.response?.data,
+    });
+
+    throw {
+      message: error?.response?.data?.message || error?.message || "Failed to fetch author users",
       status: error?.response?.status,
       data: error?.response?.data,
     };
@@ -297,6 +390,7 @@ export const resendAuthorInvitation = async (id, config = {}) => {
  */
 export default {
   fetchAuthors,
+  fetchAuthorUsers,
   getAuthor,
   createAuthor,
   updateAuthor,

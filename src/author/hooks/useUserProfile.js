@@ -88,11 +88,17 @@ export function useUserProfile({ autoFetch = true } = {}) {
 
   const updateProfile = useCallback(async (payload) => {
     try {
+      const currentProfile = readAuthorProfileStorage();
       const response = await apiClient.put("/me/profile", payload);
       const mergedProfile = syncAuthorProfileStorage({
-        ...readAuthorProfileStorage(),
+        ...currentProfile,
         ...payload,
-        ...normalizeAuthorProfile(response?.data, readAuthorProfileStorage()),
+        ...normalizeAuthorProfile(response?.data, currentProfile),
+        photo: currentProfile.photo,
+        photo_url: currentProfile.photo_url,
+        avatar: currentProfile.avatar,
+        avatar_url: currentProfile.avatar_url,
+        avatarUrl: currentProfile.avatarUrl,
       });
       setProfile(mergedProfile);
       return mergedProfile;

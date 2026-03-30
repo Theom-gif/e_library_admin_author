@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { ArrowLeft, BookOpenText, CalendarDays, UserRound } from 'lucide-react';
 import { getWorkDetails } from '../services/openLibraryService';
 import { getManuscriptFile } from '../services/manuscriptStorage';
-import { API_BASE_URL } from '../../lib/apiClient';
+import { apiClient, API_BASE_URL } from '../../lib/apiClient';
 
 const fallbackBook = {
   title: 'Unknown Book',
@@ -22,21 +22,32 @@ const statusBadgeClass = (status) => {
 };
 
 const isAbsoluteUrl = (value = '') => /^https?:\/\//i.test(String(value));
+const isRootRelativeUrl = (value = '') => /^\//.test(String(value || '').trim());
 
 // Covers are served from the site root (e.g., https://elibrary.pncproject.site/storage/...)
 // while API calls use /api. Strip any /api suffix from the base to build correct asset URLs.
 const stripApiSuffix = (value = '') => String(value || '').replace(/\/api(?:\/.*)?$/i, '');
 const assetBaseUrl = stripApiSuffix(API_BASE_URL).replace(/\/+$/, '');
+const apiBaseUrl = API_BASE_URL.replace(/\/+$/, '');
 
 const buildStorageUrl = (path = '') => {
   if (!path) return '';
   if (isAbsoluteUrl(path) || path.startsWith('data:image/')) return path;
+  if (isRootRelativeUrl(path)) return `${assetBaseUrl}${path}`;
   
-  let clean = String(path).replace(/^\/+/, '');
+  let clean = String(path).replace(/\\/g, '/').replace(/^\/+/, '');
   
   // 🔥 FIX: remove wrong prefixes from backend
   clean = clean.replace(/^storage\/app\/public\//, '');
   clean = clean.replace(/^public\//, '');
+
+  if (/^api\//i.test(clean)) {
+    return `${assetBaseUrl}/${clean}`;
+  }
+
+  if (/^auth\//i.test(clean)) {
+    return `${apiBaseUrl}/${clean}`;
+  }
   
   if (clean.startsWith('storage/')) {
     clean = clean.slice('storage/'.length);
@@ -48,6 +59,47 @@ const buildStorageUrl = (path = '') => {
 const getSafeCoverUrl = (value) => {
   const text = String(value || '').trim();
   return buildStorageUrl(text) || fallbackBook.coverUrl;
+};
+
+const looksLikePdf = (value = '') => /\.pdf(\?|$)/i.test(String(value || '').trim());
+
+const dedupeList = (values = []) => {
+  const seen = new Set();
+  return values.filter((value) => {
+    const key = String(value || '').trim();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+
+const buildManuscriptCandidates = (book = {}) => {
+  const directCandidates = [
+    book.manuscriptUrl,
+    book.rawBookFileUrl,
+    book.rawBookFilePath,
+    book.rawPdfPath,
+    book.rawFile,
+  ]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+    .map((value) => {
+      if (isAbsoluteUrl(value) || isRootRelativeUrl(value)) return value;
+      if (/^(?:api|auth)\//i.test(value)) return value;
+      return buildStorageUrl(value);
+    });
+
+  const id = String(book.id || '').trim();
+  const apiCandidates = id
+    ? [
+        `/auth/books/${id}/file`,
+        `/auth/books/${id}/download`,
+        `/books/${id}/file`,
+        `/books/${id}/download`,
+      ]
+    : [];
+
+  return dedupeList([...directCandidates, ...apiCandidates]);
 };
 
 const formatFileSize = (bytes) => {
@@ -67,6 +119,7 @@ const BookDetailPage = () => {
   const [pdfUrl, setPdfUrl] = React.useState('');
   const [loadingPdf, setLoadingPdf] = React.useState(false);
   const [pdfError, setPdfError] = React.useState('');
+  const pdfObjectUrlRef = React.useRef('');
 
   React.useEffect(() => {
     if (book.source !== 'openlibrary' || !book.key) return;
@@ -92,27 +145,78 @@ const BookDetailPage = () => {
   }, [book.key, book.source]);
 
   React.useEffect(() => {
-    const manuscriptUrl = String(book.manuscriptUrl || '').trim();
-    if (manuscriptUrl) {
-      setLoadingPdf(true);
-      setPdfError('');
-      setPdfUrl('');
-      const resolvedUrl = buildStorageUrl(manuscriptUrl);
-      const isPdfUrl = /\.pdf(\?|$)/i.test(resolvedUrl);
-      if (!isPdfUrl) {
-        setPdfError('Uploaded manuscript is not a PDF. Preview is available for PDF only.');
-        setLoadingPdf(false);
-        return undefined;
-      }
+    if (pdfObjectUrlRef.current) {
+      URL.revokeObjectURL(pdfObjectUrlRef.current);
+      pdfObjectUrlRef.current = '';
+    }
 
-      setPdfUrl(resolvedUrl);
-      setLoadingPdf(false);
-      return undefined;
+    const manuscriptCandidates = buildManuscriptCandidates(book);
+    if (manuscriptCandidates.length > 0) {
+      const controller = new AbortController();
+
+      const loadRemotePdf = async () => {
+        setLoadingPdf(true);
+        setPdfError('');
+        setPdfUrl('');
+
+        try {
+          let lastStatus = 0;
+
+          for (const candidate of manuscriptCandidates) {
+            try {
+              const response = await apiClient.get(candidate, {
+                responseType: 'blob',
+                signal: controller.signal,
+              });
+              const fileBlob = response?.data;
+              const contentType = String(fileBlob?.type || response?.headers?.['content-type'] || '').toLowerCase();
+              const isPdfBlob = contentType.includes('pdf') || looksLikePdf(candidate) || looksLikePdf(book.manuscriptName);
+
+              if (!isPdfBlob) {
+                continue;
+              }
+
+              const objectUrl = URL.createObjectURL(fileBlob);
+              pdfObjectUrlRef.current = objectUrl;
+              setPdfUrl(objectUrl);
+              return;
+            } catch (error) {
+              if (error?.name === 'CanceledError' || error?.name === 'AbortError') {
+                return;
+              }
+
+              lastStatus = error?.response?.status || lastStatus;
+            }
+          }
+
+          if (lastStatus === 403) {
+            setPdfError('This PDF file is protected by the backend and could not be opened with your current file URL.');
+          } else if (lastStatus === 404) {
+            setPdfError('The PDF file could not be found on the server.');
+          } else {
+            setPdfError('Could not load uploaded PDF file.');
+          }
+        } finally {
+          if (!controller.signal.aborted) {
+            setLoadingPdf(false);
+          }
+        }
+      };
+
+      loadRemotePdf();
+
+      return () => {
+        controller.abort();
+        setPdfUrl('');
+        if (pdfObjectUrlRef.current) {
+          URL.revokeObjectURL(pdfObjectUrlRef.current);
+          pdfObjectUrlRef.current = '';
+        }
+      };
     }
 
     if (book.source !== 'local' || !book.id) return undefined;
 
-    let objectUrl = '';
     const loadPdf = async () => {
       setLoadingPdf(true);
       setPdfError('');
@@ -133,7 +237,8 @@ const BookDetailPage = () => {
           return;
         }
 
-        objectUrl = URL.createObjectURL(file);
+        const objectUrl = URL.createObjectURL(file);
+        pdfObjectUrlRef.current = objectUrl;
         setPdfUrl(objectUrl);
       } catch {
         setPdfError('Could not load uploaded PDF file.');
@@ -145,10 +250,21 @@ const BookDetailPage = () => {
     loadPdf();
 
     return () => {
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
+      if (pdfObjectUrlRef.current) {
+        URL.revokeObjectURL(pdfObjectUrlRef.current);
+        pdfObjectUrlRef.current = '';
+      }
       setPdfUrl('');
     };
-  }, [book.id, book.manuscriptUrl, book.source]);
+  }, [
+    book.id,
+    book.manuscriptUrl,
+    book.rawBookFilePath,
+    book.rawBookFileUrl,
+    book.rawFile,
+    book.rawPdfPath,
+    book.source,
+  ]);
 
   const effectiveDescription =
     workDetails?.description ||

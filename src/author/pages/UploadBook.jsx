@@ -763,7 +763,7 @@ const UploadBook = () => {
             onClick={() => setStep(Math.max(1, step - 1))}
             disabled={step === 1}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              step === 1 ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-[color:var(--text)] hover:bg-white/5'
+              step === 1 ? 'opacity-0 pointer-events-none' : 'author-cta-secondary'
             }`}
           >
             <ChevronLeft className="size-4" />
@@ -775,8 +775,8 @@ const UploadBook = () => {
             disabled={isSubmitting}
             className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${
               !isSubmitting && canContinue
-                ? 'bg-accent text-white shadow-glow hover:opacity-90'
-                : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                ? 'author-cta-primary'
+                : 'author-cta-disabled cursor-not-allowed'
             }`}
           >
             <span>{isSubmitting ? 'Publishing...' : step === 3 ? 'Publish Book' : 'Continue'}</span>

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { fetchAuthorFeedback, fetchAuthorNotifications } from "../../admin/services/adminService";
 import { getBooksRequest } from "../services/bookService";
+import { normalizeAuthorFeedbackEntry } from "../services/feedbackUtils";
 
 const BOOK_NOTIFICATION_STATUSES = new Set(["Approved", "Rejected"]);
 
@@ -41,16 +42,25 @@ function createBookStatusNotifications(books = []) {
 
 function createReaderFeedbackNotifications(feedbackRows = []) {
   return feedbackRows.map((feedback) => {
-    const rating = Number(feedback?.rating);
-    const ratingLabel = Number.isFinite(rating) ? `${rating}/5` : "your book";
+    const normalized = normalizeAuthorFeedbackEntry(feedback);
+    const rating = Number(normalized?.rating);
+    const hasRating = Number.isFinite(rating) && rating > 0;
+    const hasComment = Boolean(String(normalized.comment || "").trim());
+    const actionLabel = hasRating
+      ? `rated "${normalized.book || "your book"}" ${rating}/5`
+      : hasComment
+        ? `commented on "${normalized.book || "your book"}"`
+        : `interacted with "${normalized.book || "your book"}"`;
 
     return {
-      id: `reader-feedback-${feedback?.id ?? `${feedback?.bookId}-${feedback?.createdAt}`}`,
+      id: `reader-feedback-${normalized.id}`,
       type: "reader_feedback",
-      message: `${feedback?.readerName || "A reader"} rated "${feedback?.bookTitle || "your book"}" ${ratingLabel}`,
-      description: String(feedback?.comment || "A reader left new feedback on your uploaded book.").trim(),
+      message: `${normalized.user || "A reader"} ${actionLabel}`,
+      description: String(
+        normalized.comment || "A reader left new feedback on your uploaded book.",
+      ).trim(),
       read: false,
-      created_at: feedback?.createdAt || feedback?.created_at || "",
+      created_at: normalized.createdAt || "",
       source: "fallback",
     };
   });

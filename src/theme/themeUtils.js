@@ -12,7 +12,7 @@ export function getSystemTheme() {
     return LIGHT_THEME;
   }
 
-  return LIGHT_THEME;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? DARK_THEME : LIGHT_THEME;
 }
 
 export function getStoredTheme() {
@@ -47,6 +47,12 @@ export function applyThemeToDocument(theme) {
   const resolvedTheme = isThemeValue(theme) ? theme : LIGHT_THEME;
   document.documentElement.setAttribute("data-theme", resolvedTheme);
   document.documentElement.style.colorScheme = resolvedTheme;
+
+  if (resolvedTheme === DARK_THEME) {
+    document.documentElement.classList.add("dark");
+  } else {
+    document.documentElement.classList.remove("dark");
+  }
 }
 
 export function persistTheme(theme) {

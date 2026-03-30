@@ -18,7 +18,7 @@ export default function ThemeToggle({
       aria-label={`Switch to ${nextTheme} mode`}
       title={`Switch to ${nextTheme} mode`}
     >
-      {isDark ? <Moon size={iconSize} /> : <Sun size={iconSize} />}
+      {isDark ? <Sun size={iconSize} /> : <Moon size={iconSize} />}
       {showLabel ? (
         <span className={labelClassName || "font-medium"}>
           {isDark ? "Light Mode" : "Dark Mode"}

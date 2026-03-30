@@ -2,6 +2,7 @@ import React from "react";
 import { BarChart3, CalendarDays, Download } from "lucide-react";
 
 const TopReadersHeader = ({
+  isDark,
   t,
   range,
   onRangeChange,
@@ -11,12 +12,12 @@ const TopReadersHeader = ({
 }) => (
   <div className="flex flex-wrap items-end justify-end gap-4">
     <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-      <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-        <CalendarDays size={14} className="text-slate-400" />
+      <div className={isDark ? "flex h-10 items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 text-sm" : "flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm"}>
+        <CalendarDays size={14} className={isDark ? "text-slate-500" : "text-slate-400"} />
         <select
           value={range}
           onChange={(e) => onRangeChange(e.target.value)}
-          className="bg-transparent text-slate-600 outline-none"
+          className={isDark ? "bg-transparent text-slate-300 outline-none" : "bg-transparent text-slate-600 outline-none"}
         >
           <option value="all">{t("All Time")}</option>
           <option value="month">{t("This Month")}</option>
@@ -24,12 +25,12 @@ const TopReadersHeader = ({
         </select>
       </div>
 
-      <div className="flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-        <BarChart3 size={14} className="text-slate-400" />
+      <div className={isDark ? "flex h-10 items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-3 text-sm" : "flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm"}>
+        <BarChart3 size={14} className={isDark ? "text-slate-500" : "text-slate-400"} />
         <select
           value={sortBy}
           onChange={(e) => onSortByChange(e.target.value)}
-          className="bg-transparent text-slate-600 outline-none"
+          className={isDark ? "bg-transparent text-slate-300 outline-none" : "bg-transparent text-slate-600 outline-none"}
         >
           <option value="books">{t("Sort: Books")}</option>
           <option value="activity">{t("Sort: Activity")}</option>
@@ -39,7 +40,7 @@ const TopReadersHeader = ({
       <button
         type="button"
         onClick={onExport}
-        className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"
+        className={isDark ? "inline-flex h-10 items-center gap-2 rounded-xl border border-slate-600 bg-slate-800 px-4 text-sm font-medium text-slate-300 transition hover:border-indigo-700 hover:bg-indigo-950/30 hover:text-indigo-300" : "inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 transition hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-600"}
       >
         <Download size={14} />
         {t("Export")}

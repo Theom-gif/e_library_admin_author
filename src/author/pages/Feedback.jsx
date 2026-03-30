@@ -1,84 +1,93 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { 
-  MessageSquare, 
-  Star, 
-  ThumbsUp, 
-  ThumbsDown, 
+import {
+  MessageSquare,
+  Star,
+  ThumbsUp,
+  ThumbsDown,
   MoreHorizontal,
   Filter,
   Search,
-  Send
+  Send,
+  Loader2,
 } from 'lucide-react';
+import { fetchAuthorFeedback } from '../../admin/services/adminService';
+import { normalizeAuthorFeedbackEntry } from '../services/feedbackUtils';
+
+const FEEDBACK_STATE_STORAGE_KEY = 'author_feedback_ui_state';
+const MAX_FEEDBACK_FETCH_LIMIT = 20;
+
+const readFeedbackUiState = () => {
+  if (typeof window === 'undefined') return {};
+
+  try {
+    const raw = window.localStorage.getItem(FEEDBACK_STATE_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+};
+
+const writeFeedbackUiState = (value) => {
+  if (typeof window === 'undefined') return;
+  window.localStorage.setItem(FEEDBACK_STATE_STORAGE_KEY, JSON.stringify(value));
+};
 
 const Feedback = () => {
   const MotionDiv = motion.div;
-  const [feedbacks, setFeedbacks] = React.useState([
-    {
-      id: 1,
-      user: "Sarah Jenkins",
-      book: "The Midnight Library",
-      rating: 5,
-      comment: "The way you handled the concept of regret was so moving. I've been thinking about Chapter 12 for days. Can't wait for your next work!",
-      time: "2 hours ago",
-      status: "Unread",
-      avatar: "https://i.pravatar.cc/150?u=sarah",
-      helpful: 12,
-      notHelpful: 0,
-    },
-    {
-      id: 2,
-      user: "Michael Ross",
-      book: "Project Hail Mary",
-      rating: 5,
-      comment: "The technical details were spot on. It's rare to find hard sci-fi that's also this emotionally resonant. Great job!",
-      time: "5 hours ago",
-      status: "Read",
-      avatar: "https://i.pravatar.cc/150?u=michael",
-      helpful: 8,
-      notHelpful: 0,
-    },
-    {
-      id: 3,
-      user: "Emma Watson",
-      book: "The Silent Patient",
-      rating: 4,
-      comment: "Loved the atmosphere, but I felt the middle section dragged a little. Still, that twist at the end was worth it!",
-      time: "1 day ago",
-      status: "Replied",
-      avatar: "https://i.pravatar.cc/150?u=emma",
-      helpful: 5,
-      notHelpful: 1,
-      authorReply: 'Thanks for reading. I appreciate this detailed feedback.',
-    },
-    {
-      id: 4,
-      user: "David Chen",
-      book: "The Midnight Library",
-      rating: 5,
-      comment: "Your prose is beautiful. Every sentence feels carefully crafted. Looking forward to more from you.",
-      time: "2 days ago",
-      status: "Read",
-      avatar: "https://i.pravatar.cc/150?u=david",
-      helpful: 6,
-      notHelpful: 0,
-    }
-  ]);
-
+  const [feedbacks, setFeedbacks] = React.useState([]);
+  const [loading, setLoading] = React.useState(true);
+  const [error, setError] = React.useState('');
   const [searchText, setSearchText] = React.useState('');
   const [bookFilter, setBookFilter] = React.useState('All Books');
   const [statusFilter, setStatusFilter] = React.useState('All');
   const [openReplyId, setOpenReplyId] = React.useState(null);
   const [replyDrafts, setReplyDrafts] = React.useState({});
-  const [visibleCount, setVisibleCount] = React.useState(4);
+  const [visibleCount, setVisibleCount] = React.useState(6);
+  const [feedbackUiState, setFeedbackUiState] = React.useState(() => readFeedbackUiState());
+
+  const loadFeedback = React.useCallback(async () => {
+    setLoading(true);
+    setError('');
+
+    try {
+      const rows = await fetchAuthorFeedback(MAX_FEEDBACK_FETCH_LIMIT, 'all');
+      setFeedbacks(Array.isArray(rows) ? rows : []);
+    } catch (requestError) {
+      setFeedbacks([]);
+      setError(
+        requestError?.response?.data?.message ||
+          requestError?.message ||
+          'Unable to load reader feedback.',
+      );
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    loadFeedback();
+  }, [loadFeedback]);
+
+  React.useEffect(() => {
+    writeFeedbackUiState(feedbackUiState);
+  }, [feedbackUiState]);
+
+  const normalizedFeedbacks = React.useMemo(
+    () =>
+      feedbacks
+        .map((item) => normalizeAuthorFeedbackEntry(item, feedbackUiState))
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()),
+    [feedbackUiState, feedbacks],
+  );
 
   const uniqueBooks = React.useMemo(
-    () => ['All Books', ...Array.from(new Set(feedbacks.map((item) => item.book)))],
-    [feedbacks],
+    () => ['All Books', ...Array.from(new Set(normalizedFeedbacks.map((item) => item.book)))],
+    [normalizedFeedbacks],
   );
 
   const filteredFeedbacks = React.useMemo(() => {
-    return feedbacks.filter((item) => {
+    return normalizedFeedbacks.filter((item) => {
       const matchesSearch =
         item.user.toLowerCase().includes(searchText.toLowerCase()) ||
         item.book.toLowerCase().includes(searchText.toLowerCase()) ||
@@ -87,26 +96,47 @@ const Feedback = () => {
       const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
       return matchesSearch && matchesBook && matchesStatus;
     });
-  }, [bookFilter, feedbacks, searchText, statusFilter]);
+  }, [bookFilter, normalizedFeedbacks, searchText, statusFilter]);
 
   const visibleFeedbacks = filteredFeedbacks.slice(0, visibleCount);
+  const averageRating = normalizedFeedbacks.length
+    ? (
+        normalizedFeedbacks.reduce((sum, item) => sum + (Number(item.rating) || 0), 0) /
+        normalizedFeedbacks.length
+      ).toFixed(1)
+    : '0.0';
+
+  const updateFeedbackUiState = (id, updater) => {
+    setFeedbackUiState((current) => {
+      const nextEntry = updater(current[id] || {});
+      return { ...current, [id]: nextEntry };
+    });
+  };
 
   const upvote = (id) => {
-    setFeedbacks((prev) => prev.map((item) => (item.id === id ? { ...item, helpful: item.helpful + 1 } : item)));
+    updateFeedbackUiState(id, (current) => ({ ...current, helpful: Number(current.helpful || 0) + 1 }));
   };
 
   const downvote = (id) => {
-    setFeedbacks((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, notHelpful: item.notHelpful + 1 } : item)),
-    );
+    updateFeedbackUiState(id, (current) => ({ ...current, notHelpful: Number(current.notHelpful || 0) + 1 }));
+  };
+
+  const markAsRead = (id) => {
+    updateFeedbackUiState(id, (current) => ({
+      ...current,
+      status: current.authorReply ? 'Replied' : 'Read',
+    }));
   };
 
   const submitReply = (id) => {
     const draft = (replyDrafts[id] || '').trim();
     if (!draft) return;
-    setFeedbacks((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, status: 'Replied', authorReply: draft } : item)),
-    );
+
+    updateFeedbackUiState(id, (current) => ({
+      ...current,
+      status: 'Replied',
+      authorReply: draft,
+    }));
     setReplyDrafts((prev) => ({ ...prev, [id]: '' }));
     setOpenReplyId(null);
   };
@@ -121,11 +151,11 @@ const Feedback = () => {
         <div className="flex gap-4">
           <div className="bg-card-dark border border-white/5 rounded-xl px-4 py-2 flex items-center gap-2">
             <Star className="size-4 text-yellow-500 fill-yellow-500" />
-            <span className="text-sm font-bold">4.8 Avg Rating</span>
+            <span className="text-sm font-bold">{averageRating} Avg Rating</span>
           </div>
           <div className="bg-card-dark border border-white/5 rounded-xl px-4 py-2 flex items-center gap-2">
             <MessageSquare className="size-4 text-accent" />
-            <span className="text-sm font-bold">1,240 Reviews</span>
+            <span className="text-sm font-bold">{normalizedFeedbacks.length.toLocaleString()} Reviews</span>
           </div>
         </div>
       </div>
@@ -133,11 +163,11 @@ const Feedback = () => {
       <div className="flex flex-col md:flex-row gap-4 mb-8">
         <div className="flex-1 relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-500" />
-          <input 
-            type="text" 
+          <input
+            type="text"
             value={searchText}
             onChange={(e) => setSearchText(e.target.value)}
-            placeholder="Search feedback..." 
+            placeholder="Search feedback..."
             className="w-full bg-card-dark border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
           />
         </div>
@@ -165,17 +195,34 @@ const Feedback = () => {
         </div>
       </div>
 
+      {loading && (
+        <div className="flex items-center gap-2 text-sm text-slate-400 mb-6">
+          <Loader2 className="size-4 animate-spin" />
+          <span>Loading feedback...</span>
+        </div>
+      )}
+
+      {!loading && error && (
+        <p className="text-sm text-rose-400 mb-6">{error}</p>
+      )}
+
+      {!loading && !error && filteredFeedbacks.length === 0 && (
+        <p className="text-sm text-slate-400 mb-8">
+          No reader comments or ratings yet.
+        </p>
+      )}
+
       <div className="space-y-6">
         {visibleFeedbacks.map((item, i) => (
-          <MotionDiv 
+          <MotionDiv
             key={item.id}
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.1 }}
+            transition={{ delay: i * 0.06 }}
             className="bg-card-dark border border-white/5 rounded-2xl p-6 card-shadow group hover:border-accent/30 transition-all"
           >
             <div className="flex gap-6">
-              <img src={item.avatar} alt={item.user} className="size-12 rounded-full object-cover border-2 border-primary/20" />
+              <img src={item.avatar} alt={item.user} className="size-12 rounded-full object-cover border-2 border-primary/20 bg-white" />
               <div className="flex-1">
                 <div className="flex justify-between items-start mb-2">
                   <div>
@@ -184,16 +231,16 @@ const Feedback = () => {
                   </div>
                   <div className="flex flex-col items-end gap-2">
                     <div className="flex gap-0.5">
-                      {[...Array(5)].map((_, i) => (
-                        <Star key={i} className={`size-3 ${i < item.rating ? 'text-yellow-500 fill-yellow-500' : 'text-slate-600'}`} />
+                      {[...Array(5)].map((_, index) => (
+                        <Star key={index} className={`size-3 ${index < item.rating ? 'text-yellow-500 fill-yellow-500' : 'text-slate-600'}`} />
                       ))}
                     </div>
                     <span className="text-[10px] text-slate-600 font-bold uppercase tracking-widest">{item.time}</span>
                   </div>
                 </div>
-                
-                <p className="text-sm text-slate-300 leading-relaxed mb-6">"{item.comment}"</p>
-                
+
+                <p className="text-sm text-slate-300 leading-relaxed mb-6">"{item.comment || 'A reader left a rating without a written comment.'}"</p>
+
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                   <div className="flex gap-4">
                     <button
@@ -211,23 +258,27 @@ const Feedback = () => {
                       <span>Not Helpful ({item.notHelpful})</span>
                     </button>
                   </div>
-                  
+
                   <div className="flex items-center gap-3">
                     <span className={`text-[10px] font-bold uppercase tracking-widest px-2 py-1 rounded ${
-                      item.status === 'Unread' ? 'bg-accent/10 text-accent' : 
-                      item.status === 'Replied' ? 'bg-emerald-500/10 text-emerald-500' : 
+                      item.status === 'Unread' ? 'bg-accent/10 text-accent' :
+                      item.status === 'Replied' ? 'bg-emerald-500/10 text-emerald-500' :
                       'bg-slate-500/10 text-slate-500'
                     }`}>
                       {item.status}
                     </span>
                     <button
-                      onClick={() => setOpenReplyId((prev) => (prev === item.id ? null : item.id))}
+                      onClick={() => markAsRead(item.id)}
                       className="p-2 text-slate-500 hover:text-[color:var(--text)] transition-colors"
+                      title="Mark as read"
                     >
                       <MoreHorizontal className="size-4" />
                     </button>
                     <button
-                      onClick={() => setOpenReplyId((prev) => (prev === item.id ? null : item.id))}
+                      onClick={() => {
+                        markAsRead(item.id);
+                        setOpenReplyId((prev) => (prev === item.id ? null : item.id));
+                      }}
                       className="px-4 py-1.5 bg-primary/20 text-accent rounded-lg text-xs font-bold hover:bg-accent hover:text-white transition-all"
                     >
                       {item.status === 'Replied' ? 'Edit Reply' : 'Reply'}
@@ -263,11 +314,11 @@ const Feedback = () => {
           </MotionDiv>
         ))}
       </div>
-      
+
       <div className="mt-10 text-center">
         {visibleCount < filteredFeedbacks.length ? (
           <button
-            onClick={() => setVisibleCount((prev) => prev + 4)}
+            onClick={() => setVisibleCount((prev) => prev + 6)}
             className="px-8 py-3 bg-card-dark border border-white/5 rounded-xl text-sm font-bold text-slate-400 hover:text-[color:var(--text)] hover:bg-white/5 transition-all"
           >
             Load More Feedback

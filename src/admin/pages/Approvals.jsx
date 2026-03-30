@@ -79,38 +79,58 @@ const buildCoverApiUrl = (id) => {
   return `${base}/api/books/${id}/cover`;
 };
 
-const toUiBook = (book = {}) => {
-  const coverPath =
-    book.coverUrl ||
-    book.cover ||
-    book.cover_api_url ||
-    book.cover_image_url ||
-    book.cover_image_path ||
-    buildCoverApiUrl(book.id ?? book._id ?? book.bookId) ||
-    "";
-  const filePath =
-    book.fileUrl ||
-    book.book_file_url ||
-    book.book_file_path ||
-    book.file ||
-    "";
+const extractString = (value) => {
+  if (!value) return "";
+  if (typeof value === "string") return value;
+  if (typeof value === "object") return String(value.name ?? value.title ?? value.label ?? "");
+  return String(value);
+};
 
-  const cover = buildStorageUrl(coverPath) || FALLBACK_BOOK_COVER;
-  const fileUrl = buildStorageUrl(filePath);
+const toUiBook = (book = {}) => {
+  // Prefer already-resolved absolute URLs; only run buildStorageUrl on relative paths.
+  const resolveCover = (...candidates) => {
+    for (const c of candidates) {
+      if (!c) continue;
+      if (isAbsoluteUrl(c)) return c;
+      const built = buildStorageUrl(c);
+      if (built) return built;
+    }
+    return FALLBACK_BOOK_COVER;
+  };
+
+  const resolveFile = (...candidates) => {
+    for (const c of candidates) {
+      if (!c) continue;
+      if (isAbsoluteUrl(c)) return c;
+      const built = buildStorageUrl(c);
+      if (built) return built;
+    }
+    return "";
+  };
+
+  const cover = resolveCover(
+    book.coverUrl,
+    book.cover,
+    book.cover_api_url,
+    book.cover_image_url,
+    book.cover_image_path,
+    buildCoverApiUrl(book.id ?? book._id ?? book.bookId),
+  );
+
+  const fileUrl = resolveFile(
+    book.fileUrl,
+    book.book_file_url,
+    book.book_file_path,
+    book.file,
+  );
 
   return {
     id: book.id ?? book._id ?? book.bookId ?? book.slug ?? "",
     title: book.title ?? book.name ?? "Untitled",
-    author: book.author ?? book.authorName ?? book.author_name ?? "Unknown",
-    category: book.category ?? book.genre ?? book.genre_name ?? "Uncategorized",
+    author: extractString(book.author) || extractString(book.author_name) || extractString(book.authorName) || "Unknown",
+    category: extractString(book.category) || extractString(book.genre) || extractString(book.genre_name) || "Uncategorized",
     status: normalizeStatus(book.status),
-    date: formatDateLabel(
-      book.date ??
-        book.created_at ??
-        book.createdAt ??
-        book.updated_at ??
-        "",
-    ),
+    date: formatDateLabel(book.date ?? book.created_at ?? book.createdAt ?? book.updated_at ?? ""),
     cover,
     fileUrl,
   };

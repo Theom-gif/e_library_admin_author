@@ -8,7 +8,7 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
-import { 
+import {
   AreaChart, 
   Area, 
   XAxis, 
@@ -17,6 +17,7 @@ import {
   Tooltip
 } from 'recharts';
 import adminService from '../../admin/services/adminService';
+import { resolveBackendAssetUrl } from '../services/profileStorage';
 
 const formatSignedChange = (value, { digits = 1, suffix = '%' } = {}) => {
   if (typeof value === 'string' && value.trim()) {
@@ -107,11 +108,12 @@ const normalizeTopBooks = (rows = []) =>
     author: book.author || book.authorName || 'Unknown author',
     sales: getMetricValue(book.sales ?? book.revenue, 0),
     trend: formatSignedChange(book.trend ?? book.growth ?? book.salesChange),
-    coverUrl:
+    coverUrl: resolveBackendAssetUrl(
       book.coverUrl ||
       book.coverImage ||
       book.bookCover ||
       (book.cover_image_path ? adminService.buildStorageUrl(book.cover_image_path) : ''),
+    ),
   }));
 
 const MeasuredChart = ({ className, hasData, emptyMessage, children }) => {

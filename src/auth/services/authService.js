@@ -27,17 +27,72 @@ function resolveBase() {
   return configured || trimTrailingSlash(DEFAULT_API_BASE_URL);
 }
 
-function post(path, body) {
-  return axios.post(joinBaseAndPath(resolveBase(), path), body, {
+function createRequestBody(payload = {}, mode = "json") {
+  if (mode === "multipart") {
+    const formData = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      formData.append(key, value);
+    });
+    return formData;
+  }
+
+  if (mode === "urlencoded") {
+    const params = new URLSearchParams();
+    Object.entries(payload).forEach(([key, value]) => {
+      if (value === undefined || value === null || value === "") return;
+      params.append(key, String(value));
+    });
+    return params;
+  }
+
+  return payload;
+}
+
+function createHeaders(mode = "json") {
+  if (mode === "multipart") {
+    return { Accept: "application/json" };
+  }
+
+  if (mode === "urlencoded") {
+    return {
+      Accept: "application/json",
+      "Content-Type": "application/x-www-form-urlencoded",
+    };
+  }
+
+  return {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+  };
+}
+
+function post(path, body, { mode = "json" } = {}) {
+  return axios.post(joinBaseAndPath(resolveBase(), path), createRequestBody(body, mode), {
     timeout: API_TIMEOUT_MS,
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: createHeaders(mode),
   });
 }
 
-export function loginRequest(payload) {
-  return post("/api/auth/login", { email: payload.email, password: payload.password });
+export function loginRequest(payload, options = {}) {
+  return post("/api/auth/login", payload, options);
 }
 
-export function registerRequest(payload) {
-  return post("/api/auth/register", payload);
+export function registerRequest(payload, options = {}) {
+  return post("/api/auth/register", payload, options);
+}
+
+export function refreshTokenRequest(token) {
+  return axios.post(
+    joinBaseAndPath(resolveBase(), "/api/auth/refresh"),
+    {},
+    {
+      timeout: API_TIMEOUT_MS,
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+    },
+  );
 }

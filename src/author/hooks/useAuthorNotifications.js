@@ -44,12 +44,18 @@ function createReaderFeedbackNotifications(feedbackRows = []) {
   return feedbackRows.map((feedback) => {
     const normalized = normalizeAuthorFeedbackEntry(feedback);
     const rating = Number(normalized?.rating);
-    const ratingLabel = Number.isFinite(rating) ? `${rating}/5` : "your book";
+    const hasRating = Number.isFinite(rating) && rating > 0;
+    const hasComment = Boolean(String(normalized.comment || "").trim());
+    const actionLabel = hasRating
+      ? `rated "${normalized.book || "your book"}" ${rating}/5`
+      : hasComment
+        ? `commented on "${normalized.book || "your book"}"`
+        : `interacted with "${normalized.book || "your book"}"`;
 
     return {
       id: `reader-feedback-${normalized.id}`,
       type: "reader_feedback",
-      message: `${normalized.user || "A reader"} rated "${normalized.book || "your book"}" ${ratingLabel}`,
+      message: `${normalized.user || "A reader"} ${actionLabel}`,
       description: String(
         normalized.comment || "A reader left new feedback on your uploaded book.",
       ).trim(),

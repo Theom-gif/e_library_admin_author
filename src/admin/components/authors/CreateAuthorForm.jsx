@@ -1,8 +1,8 @@
 import { useState, useRef } from "react";
 import { AlertCircle, CheckCircle, Upload, X } from "lucide-react";
-import { apiClient } from "../../../lib/apiClient";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { useTheme } from "../../../theme/ThemeContext";
+import { createAuthor } from "../../services/authorService";
 
 /**
  * CreateAuthorForm Component
@@ -149,28 +149,18 @@ export default function CreateAuthorForm({ onSuccess }) {
     setSuccess("");
 
     try {
-      // Create FormData for multipart request (to handle file upload)
-      const payload = new FormData();
-      payload.append("name", formData.name.trim());
-      payload.append("email", formData.email.trim());
-      payload.append("bio", formData.bio.trim());
-
-      // Append profile image if selected
-      if (profileImage) {
-        payload.append("profile_image", profileImage);
-      }
-
-      // Send request to backend
-      const response = await apiClient.post("/admin/authors", payload, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-        },
+      // Call authorService to create author
+      const response = await createAuthor({
+        name: formData.name.trim(),
+        email: formData.email.trim(),
+        bio: formData.bio.trim(),
+        profile_image: profileImage,
       });
 
       // Success
-      if (response?.data?.success || response?.status === 201) {
+      if (response?.success) {
         setSuccess(
-          response?.data?.message ||
+          response?.message ||
             t("Author created successfully! An invitation email will be sent.")
         );
 
@@ -185,7 +175,7 @@ export default function CreateAuthorForm({ onSuccess }) {
 
         // Call callback if provided
         if (onSuccess) {
-          onSuccess(response?.data?.data || {});
+          onSuccess(response?.data || {});
         }
 
         // Clear success message after 5 seconds
@@ -193,16 +183,13 @@ export default function CreateAuthorForm({ onSuccess }) {
       }
     } catch (err) {
       // Handle error response
-      const errorMessage =
-        err?.response?.data?.message ||
-        err?.message ||
-        t("Failed to create author. Please try again.");
+      const errorMessage = err?.message || t("Failed to create author. Please try again.");
 
       setError(errorMessage);
 
       // Show field-specific errors if provided
-      if (err?.response?.data?.errors) {
-        setFieldErrors(err.response.data.errors);
+      if (err?.errors) {
+        setFieldErrors(err.errors);
       }
     } finally {
       setLoading(false);

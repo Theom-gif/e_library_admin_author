@@ -1,9 +1,13 @@
 import { useState, useEffect, useCallback } from "react";
 import { Trash2, Edit2, Mail, CheckCircle } from "lucide-react";
-import { apiClient } from "../../lib/apiClient";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useTheme } from "../../theme/ThemeContext";
-import CreateAuthorForm from "./authors/CreateAuthorForm";
+import CreateAuthorForm from "../components/authors/CreateAuthorForm";
+import {
+  fetchAuthors,
+  deleteAuthor,
+  resendAuthorInvitation,
+} from "../services/authorService";
 
 /**
  * Authors Page Component
@@ -31,16 +35,14 @@ export default function Authors() {
   /**
    * Fetch all authors from API
    */
-  const fetchAuthors = useCallback(async () => {
+  const fetchAuthorsData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
-      const response = await apiClient.get(
-        `/admin/authors${searchQuery ? `?search=${searchQuery}` : ""}`
-      );
-      setAuthors(response?.data?.data || []);
+      const result = await fetchAuthors({ search: searchQuery });
+      setAuthors(result.data || []);
     } catch (err) {
-      setError(err?.response?.data?.message || t("Failed to fetch authors"));
+      setError(err?.message || t("Failed to fetch authors"));
       console.error("Fetch authors error:", err);
     } finally {
       setLoading(false);
@@ -49,8 +51,8 @@ export default function Authors() {
 
   // Fetch authors on mount and when search changes
   useEffect(() => {
-    fetchAuthors();
-  }, [fetchAuthors]);
+    fetchAuthorsData();
+  }, [fetchAuthorsData]);
 
   /**
    * Handle new author creation
@@ -66,11 +68,11 @@ export default function Authors() {
   const handleDeleteAuthor = async (authorId) => {
     setActionLoadingId(authorId);
     try {
-      await apiClient.delete(`/admin/authors/${authorId}`);
+      await deleteAuthor(authorId);
       setAuthors((prev) => prev.filter((a) => a.id !== authorId));
       setDeleteConfirm(null);
     } catch (err) {
-      setError(err?.response?.data?.message || t("Failed to delete author"));
+      setError(err?.message || t("Failed to delete author"));
     } finally {
       setActionLoadingId(null);
     }
@@ -82,17 +84,13 @@ export default function Authors() {
   const handleResendInvite = async (authorId) => {
     setActionLoadingId(authorId);
     try {
-      const response = await apiClient.post(
-        `/admin/authors/${authorId}/resend-invitation`
-      );
-      if (response?.data?.success) {
+      const response = await resendAuthorInvitation(authorId);
+      if (response?.success) {
         setError("");
         alert(t("Invitation email sent successfully"));
       }
     } catch (err) {
-      setError(
-        err?.response?.data?.message || t("Failed to resend invitation")
-      );
+      setError(err?.message || t("Failed to resend invitation"));
     } finally {
       setActionLoadingId(null);
     }
@@ -101,15 +99,7 @@ export default function Authors() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-        <div>
-          <h1 className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-            {t("Authors Management")}
-          </h1>
-          <p className={`mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-            {t("Create and manage platform authors")}
-          </p>
-        </div>
+      <div className="flex flex-col md:flex-row md:items-center md:justify-end gap-4">
         <button
           onClick={() => setShowForm(!showForm)}
           className={`mt-4 md:mt-0 px-6 py-2 rounded-lg font-medium transition-all ${

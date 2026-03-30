@@ -36,9 +36,9 @@ const Notifications = () => {
             {t("Notification Center")}
           </p>
           <h1 className="mt-2 text-3xl font-bold tracking-tight">{t("Author Notifications")}</h1>
-          <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
+          {/* <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-300">
             {t("Review alerts generated for your author account from")} <code>/api/author/notifications</code>.
-          </p>
+          </p> */}
         </div>
 
         <div className="flex items-center gap-3">

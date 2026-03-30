@@ -90,15 +90,51 @@ export function useUserProfile({ autoFetch = true } = {}) {
     try {
       const currentProfile = readAuthorProfileStorage();
       const response = await apiClient.put("/me/profile", payload);
+      const nextPhotoSeed = {
+        photo: payload?.photo || payload?.avatar || currentProfile.photo,
+        photo_url:
+          payload?.photo_url ||
+          payload?.avatar_url ||
+          payload?.avatarUrl ||
+          payload?.photo ||
+          payload?.avatar ||
+          currentProfile.photo_url,
+        avatar: payload?.avatar || payload?.photo || currentProfile.avatar,
+        avatar_url:
+          payload?.avatar_url ||
+          payload?.photo_url ||
+          payload?.avatarUrl ||
+          payload?.avatar ||
+          payload?.photo ||
+          currentProfile.avatar_url,
+        avatarUrl:
+          payload?.avatarUrl ||
+          payload?.avatar_url ||
+          payload?.photo_url ||
+          payload?.avatar ||
+          payload?.photo ||
+          currentProfile.avatarUrl,
+      };
+      const hasPhotoUpdate = Boolean(
+        payload?.photo ||
+          payload?.photo_url ||
+          payload?.avatar ||
+          payload?.avatar_url ||
+          payload?.avatarUrl,
+      );
       const mergedProfile = syncAuthorProfileStorage({
         ...currentProfile,
         ...payload,
-        ...normalizeAuthorProfile(response?.data, currentProfile),
-        photo: currentProfile.photo,
-        photo_url: currentProfile.photo_url,
-        avatar: currentProfile.avatar,
-        avatar_url: currentProfile.avatar_url,
-        avatarUrl: currentProfile.avatarUrl,
+        ...normalizeAuthorProfile(response?.data, hasPhotoUpdate ? nextPhotoSeed : currentProfile),
+        ...(hasPhotoUpdate
+          ? nextPhotoSeed
+          : {
+              photo: currentProfile.photo,
+              photo_url: currentProfile.photo_url,
+              avatar: currentProfile.avatar,
+              avatar_url: currentProfile.avatar_url,
+              avatarUrl: currentProfile.avatarUrl,
+            }),
       });
       setProfile(mergedProfile);
       return mergedProfile;

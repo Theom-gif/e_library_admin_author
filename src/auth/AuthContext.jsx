@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { DEMO_AUTH_USERS } from "../admin/data/mockData";
-import { loginRequest, registerRequest } from "./services/authService";
+import { loginRequest, refreshTokenRequest, registerRequest } from "./services/authService";
 import { API_BASE_URL } from "../lib/apiClient";
 import { getRoleName } from "./roleUtils";
 import { AuthContext } from "./authContextStore";
@@ -34,6 +34,16 @@ function getTokenFromStorage() {
     sessionStorage.getItem(TOKEN_KEY) ||
     localStorage.getItem("access_token") ||
     sessionStorage.getItem("access_token")
+  );
+}
+
+function getRefreshTokenFromStorage() {
+  return (
+    localStorage.getItem(REFRESH_TOKEN_KEY) ||
+    sessionStorage.getItem(REFRESH_TOKEN_KEY) ||
+    localStorage.getItem("refresh_token") ||
+    sessionStorage.getItem("refresh_token") ||
+    null
   );
 }
 
@@ -82,7 +92,9 @@ function saveToken(token, remember = false) {
   const activeStorage = remember ? localStorage : sessionStorage;
   const staleStorage = remember ? sessionStorage : localStorage;
   activeStorage.setItem(TOKEN_KEY, normalizedToken);
+  activeStorage.setItem("access_token", normalizedToken);
   staleStorage.removeItem(TOKEN_KEY);
+  staleStorage.removeItem("access_token");
 }
 
 function saveRefreshToken(refreshToken, remember = false) {
@@ -93,14 +105,20 @@ function saveRefreshToken(refreshToken, remember = false) {
   const activeStorage = remember ? localStorage : sessionStorage;
   const staleStorage = remember ? sessionStorage : localStorage;
   activeStorage.setItem(REFRESH_TOKEN_KEY, normalizedToken);
+  activeStorage.setItem("refresh_token", normalizedToken);
   staleStorage.removeItem(REFRESH_TOKEN_KEY);
+  staleStorage.removeItem("refresh_token");
 }
 
 function clearToken() {
   localStorage.removeItem(TOKEN_KEY);
   sessionStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem("access_token");
+  sessionStorage.removeItem("access_token");
   localStorage.removeItem(REFRESH_TOKEN_KEY);
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+  localStorage.removeItem("refresh_token");
+  sessionStorage.removeItem("refresh_token");
 }
 
 function clearSession() {
@@ -115,7 +133,7 @@ function clearAuthStorage() {
 }
 
 function extractAuthTokens(data = {}) {
-  const sources = [data, data?.data, data?.tokens, data?.data?.tokens];
+  const sources = [data, data?.data, data?.tokens, data?.data?.tokens, data?.meta, data?.data?.meta];
   const pick = (...keys) => {
     for (const source of sources) {
       if (!source || typeof source !== "object") continue;
@@ -130,7 +148,7 @@ function extractAuthTokens(data = {}) {
 
   return {
     accessToken: pick("token", "accessToken", "access_token", "jwt", "bearerToken", "bearer_token"),
-    refreshToken: pick("refreshToken", "refresh_token"),
+    refreshToken: pick("refreshToken", "refresh_token", "refreshTokenValue"),
   };
 }
 
@@ -615,6 +633,38 @@ export function AuthProvider({ children }) {
       logout: () => {
         clearAuthStorage();
         setUser(null);
+      },
+      refreshAuthToken: async () => {
+        const currentToken = getTokenFromStorage();
+        const refreshToken = getRefreshTokenFromStorage();
+        const remember = localStorage.getItem(REMEMBER_KEY) === "1";
+        const tokenForRefresh = currentToken || refreshToken;
+
+        if (!tokenForRefresh) {
+          return { ok: false, error: "Missing login token. Please login again." };
+        }
+
+        try {
+          const response = await refreshTokenRequest(tokenForRefresh);
+          const data = response?.data || {};
+          const { accessToken, refreshToken: nextRefreshToken } = extractAuthTokens(data);
+          const nextAccessToken = accessToken || data?.token;
+
+          if (!nextAccessToken) {
+            return { ok: false, error: "Refresh succeeded but no token was returned." };
+          }
+
+          saveToken(nextAccessToken, remember);
+          if (nextRefreshToken) {
+            saveRefreshToken(nextRefreshToken, remember);
+          }
+
+          return { ok: true, token: nextAccessToken };
+        } catch (error) {
+          clearAuthStorage();
+          setUser(null);
+          return { ok: false, error: toErrorMessage(error, "Session expired. Please login again.") };
+        }
       },
     }),
     [isReady, user],

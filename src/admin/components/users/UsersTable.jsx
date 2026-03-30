@@ -5,6 +5,7 @@ import { roleStyle } from "./helpers";
 
 const UsersTable = ({
   t,
+  isDark,
   users,
   loading,
   error,
@@ -17,14 +18,14 @@ const UsersTable = ({
 }) => (
   <table className="w-full text-left">
     <thead>
-      <tr className="text-xs text-slate-400 border-t border-white/5">
+      <tr className={cn("text-xs border-t", isDark ? "text-slate-400 border-white/5" : "text-slate-600 border-slate-200")}>
         <th className="px-6 py-4">Profile</th>
         <th className="px-6 py-4">Role</th>
         <th className="px-6 py-4">Email</th>
         <th className="px-6 py-4 text-right">Action</th>
       </tr>
     </thead>
-    <tbody className="divide-y divide-white/5">
+    <tbody className={cn("divide-y", isDark ? "divide-white/5" : "divide-slate-200")}>
       {(actionError || actionSuccess) && (
         <tr>
           <td colSpan="4" className={cn("px-6 py-3 text-sm", actionError ? "text-red-400" : "text-emerald-400")}>
@@ -34,7 +35,7 @@ const UsersTable = ({
       )}
       {loading && (
         <tr>
-          <td colSpan="4" className="text-center py-8 text-slate-400 text-sm">Loading...</td>
+          <td colSpan="4" className={cn("text-center py-8 text-sm", isDark ? "text-slate-400" : "text-slate-500")}>Loading...</td>
         </tr>
       )}
       {error && (
@@ -47,19 +48,19 @@ const UsersTable = ({
         const rc = roleStyle(user.role);
 
         return (
-          <tr key={user.id} className="hover:bg-white/5 transition">
+          <tr key={user.id} className={cn("transition", isDark ? "hover:bg-white/5" : "hover:bg-slate-50")}>
             <td className="px-6 py-4">
               <div className="flex items-center gap-3">
                 {avatar ? (
-                  <img src={avatar} className="w-10 h-10 rounded-full object-cover border border-white/10" onError={(e) => (e.target.style.display = "none")} />
+                  <img src={avatar} className={cn("w-10 h-10 rounded-full object-cover border", isDark ? "border-white/10" : "border-slate-200")} onError={(e) => (e.target.style.display = "none")} />
                 ) : (
-                  <div className="w-10 h-10 rounded-full bg-indigo-500/20 flex items-center justify-center">
-                    <UserRound size={18} className="text-indigo-400" />
+                  <div className={cn("w-10 h-10 rounded-full flex items-center justify-center", isDark ? "bg-indigo-500/20" : "bg-indigo-100")}>
+                    <UserRound size={18} className={isDark ? "text-indigo-400" : "text-indigo-600"} />
                   </div>
                 )}
                 <div>
-                  <div className="text-white font-semibold text-sm">{user.first_name} {user.last_name}</div>
-                  <div className="text-xs text-slate-500">{user.email}</div>
+                  <div className={cn("font-semibold text-sm", isDark ? "text-white" : "text-slate-900")}>{user.first_name} {user.last_name}</div>
+                  <div className={cn("text-xs", isDark ? "text-slate-500" : "text-slate-500")}>{user.email}</div>
                 </div>
               </div>
             </td>
@@ -68,7 +69,7 @@ const UsersTable = ({
                 {user.role}
               </span>
             </td>
-            <td className="px-6 py-4 text-slate-400 text-sm">{user.email}</td>
+            <td className={cn("px-6 py-4 text-sm", isDark ? "text-slate-400" : "text-slate-600")}>{user.email}</td>
             <td className="px-6 py-4 text-right">
               <div className="flex items-center justify-end gap-2">
                 <button

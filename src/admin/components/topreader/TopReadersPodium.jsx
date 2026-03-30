@@ -5,29 +5,57 @@ import { medalByRank } from "./constants";
 import { formatCompactNumber, getAvatarUrl, getDisplayName, getUserHandle } from "./helpers";
 
 const RANK_CONFIG = {
-  1: {
-    ring: "ring-4 ring-amber-400",
-    badge: "bg-amber-50 text-amber-700 border border-amber-200",
-    crown: "text-amber-400",
-    gradient: "from-amber-50 to-orange-50",
-    border: "border-amber-100",
-    rankBg: "bg-amber-400 text-white",
+  light: {
+    1: {
+      ring: "ring-4 ring-amber-400",
+      badge: "bg-amber-50 text-amber-700 border border-amber-200",
+      crown: "text-amber-400",
+      gradient: "from-amber-50 to-orange-50",
+      border: "border-amber-100",
+      rankBg: "bg-amber-400 text-white",
+    },
+    2: {
+      ring: "ring-4 ring-slate-300",
+      badge: "bg-slate-100 text-slate-600 border border-slate-200",
+      crown: "text-slate-400",
+      gradient: "from-slate-50 to-slate-50",
+      border: "border-slate-100",
+      rankBg: "bg-slate-400 text-white",
+    },
+    3: {
+      ring: "ring-4 ring-orange-300",
+      badge: "bg-orange-50 text-orange-700 border border-orange-200",
+      crown: "text-orange-400",
+      gradient: "from-orange-50 to-amber-50",
+      border: "border-orange-100",
+      rankBg: "bg-orange-400 text-white",
+    },
   },
-  2: {
-    ring: "ring-4 ring-slate-300",
-    badge: "bg-slate-100 text-slate-600 border border-slate-200",
-    crown: "text-slate-400",
-    gradient: "from-slate-50 to-slate-50",
-    border: "border-slate-100",
-    rankBg: "bg-slate-400 text-white",
-  },
-  3: {
-    ring: "ring-4 ring-orange-300",
-    badge: "bg-orange-50 text-orange-700 border border-orange-200",
-    crown: "text-orange-400",
-    gradient: "from-orange-50 to-amber-50",
-    border: "border-orange-100",
-    rankBg: "bg-orange-400 text-white",
+  dark: {
+    1: {
+      ring: "ring-4 ring-amber-500",
+      badge: "bg-amber-950/30 text-amber-300 border border-amber-700/40",
+      crown: "text-amber-400",
+      gradient: "from-amber-950/20 to-orange-950/20",
+      border: "border-amber-700/40",
+      rankBg: "bg-amber-500 text-white",
+    },
+    2: {
+      ring: "ring-4 ring-slate-500",
+      badge: "bg-slate-700 text-slate-300 border border-slate-600",
+      crown: "text-slate-400",
+      gradient: "from-slate-700/30 to-slate-700/30",
+      border: "border-slate-600",
+      rankBg: "bg-slate-500 text-white",
+    },
+    3: {
+      ring: "ring-4 ring-orange-400",
+      badge: "bg-orange-950/30 text-orange-300 border border-orange-700/40",
+      crown: "text-orange-400",
+      gradient: "from-orange-950/20 to-amber-950/20",
+      border: "border-orange-700/40",
+      rankBg: "bg-orange-500 text-white",
+    },
   },
 };
 
@@ -59,8 +87,8 @@ const AvatarWithFallback = ({ user, size = "h-20 w-20", ring = "" }) => {
   );
 };
 
-const PodiumCard = ({ entry, displayRank, isChampion }) => {
-  const config = RANK_CONFIG[displayRank] || RANK_CONFIG[3];
+const PodiumCard = ({ isDark, entry, displayRank, isChampion }) => {
+  const config = RANK_CONFIG[isDark ? 'dark' : 'light'][displayRank] || RANK_CONFIG[isDark ? 'dark' : 'light'][3];
   const medal = medalByRank[displayRank] || medalByRank[3];
 
   return (
@@ -81,7 +109,7 @@ const PodiumCard = ({ entry, displayRank, isChampion }) => {
       {isChampion && (
         <div className="mb-2 flex items-center gap-1">
           <Crown size={16} className={config.crown} />
-          <span className="text-xs font-semibold text-amber-600">Champion</span>
+          <span className={isDark ? "text-xs font-semibold text-amber-400" : "text-xs font-semibold text-amber-600"}>Champion</span>
         </div>
       )}
 
@@ -94,10 +122,10 @@ const PodiumCard = ({ entry, displayRank, isChampion }) => {
 
       {/* Name */}
       <div className="mt-4 text-center">
-        <h4 className={cn("font-bold text-slate-800 truncate max-w-[160px]", isChampion ? "text-lg" : "text-base")}>
+        <h4 className={cn("font-bold truncate max-w-[160px]", isDark ? "text-slate-100" : "text-slate-800", isChampion ? "text-lg" : "text-base")}>
           {getDisplayName(entry.user)}
         </h4>
-        <p className="mt-0.5 text-xs text-slate-400">{getUserHandle(entry.user)}</p>
+        <p className={cn("mt-0.5 text-xs", isDark ? "text-slate-500" : "text-slate-400")}>{getUserHandle(entry.user)}</p>
       </div>
 
       {/* Status badge — uses emoji icon from medalByRank */}
@@ -108,19 +136,19 @@ const PodiumCard = ({ entry, displayRank, isChampion }) => {
 
       {/* Stats */}
       <div className="mt-4 grid w-full grid-cols-2 gap-2">
-        <div className="rounded-xl bg-white/80 p-3 text-center shadow-sm">
-          <div className="flex items-center justify-center gap-1 text-slate-400">
+        <div className={isDark ? "rounded-xl bg-slate-700/50 p-3 text-center shadow-sm" : "rounded-xl bg-white/80 p-3 text-center shadow-sm"}>
+          <div className={cn("flex items-center justify-center gap-1", isDark ? "text-slate-400" : "text-slate-400")}>
             <BookOpen size={11} />
             <span className="text-[10px] font-medium uppercase tracking-wide">Books</span>
           </div>
-          <p className="mt-1 text-lg font-bold text-slate-800">{formatCompactNumber(entry.booksRead)}</p>
+          <p className={isDark ? "mt-1 text-lg font-bold text-slate-200" : "mt-1 text-lg font-bold text-slate-800"}>{formatCompactNumber(entry.booksRead)}</p>
         </div>
-        <div className="rounded-xl bg-white/80 p-3 text-center shadow-sm">
-          <div className="flex items-center justify-center gap-1 text-slate-400">
+        <div className={isDark ? "rounded-xl bg-slate-700/50 p-3 text-center shadow-sm" : "rounded-xl bg-white/80 p-3 text-center shadow-sm"}>
+          <div className={cn("flex items-center justify-center gap-1", isDark ? "text-slate-400" : "text-slate-400")}>
             <BarChart3 size={11} />
             <span className="text-[10px] font-medium uppercase tracking-wide">Score</span>
           </div>
-          <p className="mt-1 text-lg font-bold text-slate-800">
+          <p className={isDark ? "mt-1 text-lg font-bold text-slate-200" : "mt-1 text-lg font-bold text-slate-800"}>
             {formatCompactNumber(entry.booksRead * 7 + entry.trend * 14)}
           </p>
         </div>
@@ -128,7 +156,7 @@ const PodiumCard = ({ entry, displayRank, isChampion }) => {
 
       {/* Trend */}
       {entry.trend > 0 && (
-        <p className="mt-3 text-xs font-medium text-emerald-600">
+        <p className={isDark ? "mt-3 text-xs font-medium text-emerald-400" : "mt-3 text-xs font-medium text-emerald-600"}>
           ↑ +{entry.trend} momentum
         </p>
       )}
@@ -136,7 +164,7 @@ const PodiumCard = ({ entry, displayRank, isChampion }) => {
   );
 };
 
-const TopReadersPodium = ({ t, podium, getActivityScore }) => {
+const TopReadersPodium = ({ isDark, t, podium, getActivityScore }) => {
   if (!podium || podium.length === 0) return null;
 
   // podium arrives as [2nd, 1st, 3rd]
@@ -144,11 +172,11 @@ const TopReadersPodium = ({ t, podium, getActivityScore }) => {
 
   return (
     <div>
-      <h3 className="mb-5 text-lg font-semibold text-slate-700">{t("Top 3 Readers")}</h3>
+      <h3 className={isDark ? "mb-5 text-lg font-semibold text-slate-300" : "mb-5 text-lg font-semibold text-slate-700"}>{t("Top 3 Readers")}</h3>
       <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-        {second && <PodiumCard entry={second} displayRank={2} isChampion={false} />}
-        {first  && <PodiumCard entry={first}  displayRank={1} isChampion={true}  />}
-        {third  && <PodiumCard entry={third}  displayRank={3} isChampion={false} />}
+        {second && <PodiumCard isDark={isDark} entry={second} displayRank={2} isChampion={false} />}
+        {first  && <PodiumCard isDark={isDark} entry={first}  displayRank={1} isChampion={true}  />}
+        {third  && <PodiumCard isDark={isDark} entry={third}  displayRank={3} isChampion={false} />}
       </div>
     </div>
   );

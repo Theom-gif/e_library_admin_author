@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { apiClient } from "../../lib/apiClient";
-import { useTheme } from "../../theme/ThemeContext";
 import NotificationsCard from "../components/setting/NotificationsCard";
 import PasswordCard from "../components/setting/PasswordCard";
 import PreferencesCard from "../components/setting/PreferencesCard";
@@ -14,7 +13,6 @@ const Settings = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [notificationPrefs, setNotificationPrefs] = useState(defaultNotifications);
   const { language, setLanguage, t } = useLanguage();
-  const { theme, setTheme } = useTheme();
   const [msg, setMsg] = useState({ type: "", text: "" });
   const [savingPrefs, setSavingPrefs] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
@@ -131,9 +129,6 @@ const Settings = () => {
             language={language}
             onLanguageChange={setLanguage}
             languageOptions={LANGUAGE_OPTIONS}
-            themeOptions={themeOptions}
-            theme={theme}
-            onThemeChange={setTheme}
           />
         </div>
       </div>

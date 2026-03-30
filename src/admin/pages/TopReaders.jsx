@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, BookOpen, TrendingUp, Users } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import { useTheme } from "../../theme/ThemeContext";
 import { apiClient } from "../../lib/apiClient";
 import { fallbackLeaders } from "../components/topreader/constants";
 import {
@@ -18,6 +19,7 @@ import TopReadersTable from "../components/topreader/TopReadersTable";
 
 const TopReaders = () => {
   const { t } = useLanguage();
+  const { isDark } = useTheme();
   const navigate = useNavigate();
   const [range, setRange] = useState("all");
   const [leaders, setLeaders] = useState(fallbackLeaders);
@@ -214,11 +216,12 @@ const TopReaders = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8">
+    <div className={isDark ? "min-h-screen bg-slate-900 px-4 py-6 sm:px-6 lg:px-8" : "min-h-screen bg-slate-50 px-4 py-6 sm:px-6 lg:px-8"}>
       <div className="mx-auto max-w-[1280px] space-y-8 font-['Inter',sans-serif]">
         {/* Stats cards */}
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
           <SummaryCard
+            isDark={isDark}
             icon={Users}
             label={t("Total Readers")}
             value={formatCompactNumber(totalReaders)}
@@ -226,6 +229,7 @@ const TopReaders = () => {
             iconTone="indigo"
           />
           <SummaryCard
+            isDark={isDark}
             icon={BookOpen}
             label={t("Books Read")}
             value={formatCompactNumber(totalBooksRead)}
@@ -233,6 +237,7 @@ const TopReaders = () => {
             iconTone="emerald"
           />
           <SummaryCard
+            isDark={isDark}
             icon={TrendingUp}
             label={t("Weekly Reading Goal")}
             value={`${goalPct}%`}
@@ -244,9 +249,8 @@ const TopReaders = () => {
 
         {/* Header + controls */}
         <TopReadersHeader
+          isDark={isDark}
           t={t}
-          searchQuery={searchQuery}
-          onSearchQueryChange={setSearchQuery}
           range={range}
           onRangeChange={setRange}
           sortBy={sortBy}
@@ -256,7 +260,7 @@ const TopReaders = () => {
 
         {/* Error */}
         {error && !isLoading && (
-          <div className="rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-600">
+          <div className={isDark ? "rounded-2xl border border-rose-900/40 bg-rose-950/20 p-4 text-sm text-rose-400" : "rounded-2xl border border-rose-100 bg-rose-50 p-4 text-sm text-rose-600"}>
             {error}
           </div>
         )}
@@ -266,8 +270,9 @@ const TopReaders = () => {
           <TopReadersLoading />
         ) : (
           <>
-            <TopReadersPodium t={t} podium={podium} getActivityScore={getActivityScore} />
+            <TopReadersPodium isDark={isDark} t={t} podium={podium} getActivityScore={getActivityScore} />
             <TopReadersTable
+              isDark={isDark}
               t={t}
               rankedLeaders={rankedLeaders}
               rangeLabel={getRangeLabel(range)}

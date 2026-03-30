@@ -5,6 +5,7 @@ import ProtectedRoute from "../auth/ProtectedRoute";
 import AdminLayout from "./layouts/AdminLayout";
 
 import Approvals from "./pages/Approvals";
+import Authors from "./pages/Authors";
 import Books from "./pages/Books";
 import Categories from "./pages/Categories";
 import Dashboard from "./pages/Dashboard";
@@ -131,6 +132,7 @@ export default function AdminRoutes() {
         <Route index element={<Navigate to="/admin/dashboard" replace />} />
         <Route path="dashboard" element={<Dashboard />} />
         <Route path="users" element={<Users />} />
+        <Route path="authors" element={<Authors />} />
         <Route path="approvals" element={<Approvals />} />
         <Route path="categories" element={<Categories />} />
         <Route path="books" element={<Books />} />

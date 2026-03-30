@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   AlertCircle,
@@ -23,6 +23,7 @@ const EMPTY_FORM = {
   lastname: "",
   bio: "",
   facebook_url: "",
+  photo_url: "",
 };
 
 const EMPTY_PASSWORD_FORM = {
@@ -41,6 +42,7 @@ function getProfileFormFromProfile(profile) {
     lastname: profile?.lastname || "",
     bio: profile?.bio || "",
     facebook_url: profile?.facebook_url || "",
+    photo_url: profile?.photo_url || profile?.photo || "",
   };
 }
 
@@ -81,7 +83,28 @@ function validateProfileForm(form, t) {
     }
   }
 
+  const photoUrlError = validatePhotoUrl(form.photo_url, t);
+  if (photoUrlError) {
+    errors.photo_url = photoUrlError;
+  }
+
   return errors;
+}
+
+function validatePhotoUrl(value, t) {
+  const photoUrl = trimValue(value);
+  if (!photoUrl) return "";
+
+  try {
+    const parsed = new URL(photoUrl);
+    if (!/^https?:$/i.test(parsed.protocol)) {
+      return t("Please enter a valid image URL.");
+    }
+  } catch {
+    return t("Please enter a valid image URL.");
+  }
+
+  return "";
 }
 
 function validatePhotoFile(file, t) {
@@ -165,8 +188,12 @@ const Profile = () => {
   const [selectedPhoto, setSelectedPhoto] = useState(null);
   const [selectedPhotoError, setSelectedPhotoError] = useState("");
   const [photoPreviewUrl, setPhotoPreviewUrl] = useState("");
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
+  const [showPhotoUrlEditor, setShowPhotoUrlEditor] = useState(false);
+  const [photoUrlDraft, setPhotoUrlDraft] = useState("");
   const [savingProfile, setSavingProfile] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const photoInputRef = useRef(null);
 
   const baselineForm = useMemo(() => getProfileFormFromProfile(profile), [profile]);
   const hasTextChanges = useMemo(
@@ -174,11 +201,12 @@ const Profile = () => {
       trimValue(form.firstname) !== trimValue(baselineForm.firstname) ||
       trimValue(form.lastname) !== trimValue(baselineForm.lastname) ||
       trimValue(form.bio) !== trimValue(baselineForm.bio) ||
-      trimValue(form.facebook_url) !== trimValue(baselineForm.facebook_url),
+      trimValue(form.facebook_url) !== trimValue(baselineForm.facebook_url) ||
+      trimValue(form.photo_url) !== trimValue(baselineForm.photo_url),
     [baselineForm, form],
   );
   const hasUnsavedChanges = hasTextChanges || Boolean(selectedPhoto);
-  const currentPhotoSrc = photoPreviewUrl || profile?.avatarUrl;
+  const currentPhotoSrc = photoPreviewUrl || trimValue(form.photo_url) || profile?.avatarUrl;
 
   useEffect(() => {
     if (hasUnsavedChanges) return;
@@ -213,6 +241,10 @@ const Profile = () => {
     setForm((current) => ({ ...current, [key]: value }));
     setFormErrors((current) => ({ ...current, [key]: "" }));
     setProfileMessage({ type: "", text: "" });
+    if (key === "photo_url" && value) {
+      setSelectedPhoto(null);
+      setSelectedPhotoError("");
+    }
   };
 
   const handleSelectPhoto = (event) => {
@@ -229,8 +261,42 @@ const Profile = () => {
     }
 
     setSelectedPhoto(file);
+    setForm((current) => ({ ...current, photo_url: "" }));
+    setPhotoUrlDraft("");
     setSelectedPhotoError("");
     setProfileMessage({ type: "", text: "" });
+    setShowPhotoOptions(false);
+    setShowPhotoUrlEditor(false);
+  };
+
+  const handleOpenFilePicker = () => {
+    setShowPhotoOptions(false);
+    setShowPhotoUrlEditor(false);
+    photoInputRef.current?.click();
+  };
+
+  const handleOpenPhotoUrlEditor = () => {
+    setShowPhotoOptions(false);
+    setShowPhotoUrlEditor(true);
+    setPhotoUrlDraft(trimValue(form.photo_url));
+    setSelectedPhoto(null);
+    setSelectedPhotoError("");
+    setProfileMessage({ type: "", text: "" });
+    setFormErrors((current) => ({ ...current, photo_url: "" }));
+  };
+
+  const handleApplyPhotoUrl = () => {
+    const nextUrl = trimValue(photoUrlDraft);
+    const validationMessage = validatePhotoUrl(nextUrl, t);
+
+    if (validationMessage) {
+      setFormErrors((current) => ({ ...current, photo_url: validationMessage }));
+      return;
+    }
+
+    handleFieldChange("photo_url", nextUrl);
+    setPhotoUrlDraft(nextUrl);
+    setShowPhotoUrlEditor(false);
   };
 
   const handleResetChanges = () => {
@@ -238,6 +304,9 @@ const Profile = () => {
     setFormErrors({});
     setSelectedPhoto(null);
     setSelectedPhotoError("");
+    setShowPhotoOptions(false);
+    setShowPhotoUrlEditor(false);
+    setPhotoUrlDraft("");
     setProfileMessage({ type: "", text: "" });
   };
 
@@ -279,6 +348,8 @@ const Profile = () => {
           lastname: trimValue(form.lastname),
           bio: trimValue(form.bio),
           facebook_url: trimValue(form.facebook_url),
+          photo: trimValue(form.photo_url),
+          avatar: trimValue(form.photo_url),
         });
       }
 
@@ -388,20 +459,94 @@ const Profile = () => {
               alt={profile?.fullName || t("Author profile photo")}
               className="h-28 w-28 rounded-[28px] border border-white/15 object-cover shadow-2xl"
             />
-            <label
-              htmlFor="profile-photo"
+            <button
+              type="button"
+              onClick={() => {
+                setShowPhotoOptions((current) => !current);
+                setShowPhotoUrlEditor(false);
+              }}
               className="absolute -bottom-2 -right-2 inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-black/70 px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
             >
               <Camera className="size-3.5" />
               {t("Change")}
-            </label>
+            </button>
             <input
               id="profile-photo"
               type="file"
-              accept="image/png,image/jpg"
+              accept="image/png,image/jpeg,image/jpg"
               className="sr-only"
+              ref={photoInputRef}
               onChange={handleSelectPhoto}
             />
+            {showPhotoOptions ? (
+              <div className="absolute left-0 top-full z-20 mt-4 w-56 rounded-2xl border border-white/10 bg-[#111827] p-2 shadow-2xl">
+                <button
+                  type="button"
+                  onClick={handleOpenFilePicker}
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-white transition hover:bg-white/8"
+                >
+                  <Camera className="size-4" />
+                  {t("Choose local photo")}
+                </button>
+                <button
+                  type="button"
+                  onClick={handleOpenPhotoUrlEditor}
+                  className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-white transition hover:bg-white/8"
+                >
+                  <ExternalLink className="size-4" />
+                  {t("Use image URL")}
+                </button>
+              </div>
+            ) : null}
+            {showPhotoUrlEditor ? (
+              <div className="absolute left-0 top-full z-20 mt-4 w-72 rounded-[24px] border border-white/10 bg-[#111827] p-4 shadow-2xl">
+                <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                  {t("Profile photo URL")}
+                </p>
+                <input
+                  type="url"
+                  autoFocus
+                  value={photoUrlDraft}
+                  onChange={(event) => {
+                    setPhotoUrlDraft(event.target.value);
+                    setFormErrors((current) => ({ ...current, photo_url: "" }));
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      handleApplyPhotoUrl();
+                    }
+                  }}
+                  placeholder="https://example.com/photo.jpg"
+                  className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 transition focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                />
+                <p className="mt-2 text-xs text-slate-400">
+                  {t("Paste a direct image link like")} <code>https://example.com/photo.jpg</code>
+                </p>
+                {formErrors.photo_url ? (
+                  <p className="mt-2 text-xs text-rose-400">{formErrors.photo_url}</p>
+                ) : null}
+                <div className="mt-4 flex items-center justify-end gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPhotoUrlEditor(false);
+                      setPhotoUrlDraft(trimValue(form.photo_url));
+                    }}
+                    className="rounded-2xl border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/6"
+                  >
+                    {t("Cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleApplyPhotoUrl}
+                    className="rounded-2xl bg-accent px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                  >
+                    {t("Apply URL")}
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
 
           <div>
@@ -527,7 +672,6 @@ const Profile = () => {
               error={formErrors.facebook_url}
               placeholder="https://facebook.com/your-page"
             />
-
             <ProfileField
               id="bio"
               label={t("Bio")}
@@ -543,9 +687,7 @@ const Profile = () => {
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold">{t("Profile photo")}</p>
-                <p className="mt-1 text-xs text-slate-400">
-                  {t("PNG or JPEG, up to 5MB. Uploads use")} <code>POST /api/me/avatar</code>.
-                </p>
+         
               </div>
               <label
                 htmlFor="profile-photo-inline"
@@ -557,7 +699,7 @@ const Profile = () => {
               <input
                 id="profile-photo-inline"
                 type="file"
-                accept="image/png,image/jpeg"
+                accept="image/png,image/jpeg,image/jpg"
                 className="sr-only"
                 onChange={handleSelectPhoto}
               />

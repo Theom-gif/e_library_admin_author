@@ -5,6 +5,7 @@ import { getMeta, timeAgo } from "./constants";
 const NotificationRow = ({ notif, onMarkRead, onDelete }) => {
   const meta = getMeta(notif.type);
   const Icon = meta.icon;
+  const hasActions = Boolean((!notif.read && onMarkRead) || onDelete);
 
   return (
     <div
@@ -34,26 +35,30 @@ const NotificationRow = ({ notif, onMarkRead, onDelete }) => {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        {!notif.read && (
-          <button
-            type="button"
-            onClick={() => onMarkRead(notif.id)}
-            title="Mark as read"
-            className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
-          >
-            <CheckCircle size={14} />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => onDelete(notif.id)}
-          title="Delete"
-          className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
+      {hasActions && (
+        <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+          {!notif.read && onMarkRead && (
+            <button
+              type="button"
+              onClick={() => onMarkRead(notif.id)}
+              title="Mark as read"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+            >
+              <CheckCircle size={14} />
+            </button>
+          )}
+          {onDelete && (
+            <button
+              type="button"
+              onClick={() => onDelete(notif.id)}
+              title="Delete"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-500"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 };

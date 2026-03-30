@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
-import { Bell, CheckCircle, Loader2, RefreshCw } from "lucide-react";
+import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { apiClient } from "../../lib/apiClient";
 import { fetchAdminNotifications } from "../services/adminService";
 import { cn } from "../../lib/utils";
 import { CATEGORIES, getMeta } from "../components/notification/constants";
@@ -30,27 +29,6 @@ const Notifications = () => {
   }, [t]);
 
   useEffect(() => { load(); }, [load]);
-
-  const markRead = async (id) => {
-    try {
-      await apiClient.post(`/admin/notifications/${id}/read`);
-      setNotifications((prev) => prev.map((n) => n.id === id ? { ...n, read: true } : n));
-    } catch { /* silent */ }
-  };
-
-  const markAllRead = async () => {
-    try {
-      await apiClient.post("/admin/notifications/read-all");
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    } catch { /* silent */ }
-  };
-
-  const deleteNotif = async (id) => {
-    try {
-      await apiClient.delete(`/admin/notifications/${id}`);
-      setNotifications((prev) => prev.filter((n) => n.id !== id));
-    } catch { /* silent */ }
-  };
 
   const filtered = notifications.filter((n) =>
     activeCategory === "all" ? true : getMeta(n.type).category === activeCategory
@@ -103,11 +81,22 @@ const Notifications = () => {
                 <h3 className="font-bold text-slate-800">
                   {t(CATEGORIES.find((c) => c.key === activeCategory)?.label || "All")}
                 </h3>
-                {unreadCount > 0 && (
-                  <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-xs font-bold text-white">
-                    {unreadCount} {t("unread")}
-                  </span>
-                )}
+                <div className="flex items-center gap-3">
+                  {unreadCount > 0 && (
+                    <span className="rounded-full bg-indigo-600 px-2.5 py-0.5 text-xs font-bold text-white">
+                      {unreadCount} {t("unread")}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={load}
+                    disabled={isLoading}
+                    className="inline-flex items-center gap-2 rounded-xl border border-slate-200 px-3 py-1.5 text-xs font-semibold text-slate-600 transition hover:border-indigo-200 hover:text-indigo-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    <RefreshCw size={13} className={cn(isLoading && "animate-spin")} />
+                    {t("Refresh")}
+                  </button>
+                </div>
               </div>
 
               <div className="p-4">
@@ -134,8 +123,6 @@ const Notifications = () => {
                       <NotificationRow
                         key={notif.id}
                         notif={notif}
-                        onMarkRead={markRead}
-                        onDelete={deleteNotif}
                       />
                     ))}
                   </div>

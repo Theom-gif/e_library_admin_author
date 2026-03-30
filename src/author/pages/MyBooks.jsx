@@ -286,7 +286,6 @@ const MyBooks = () => {
             <option>Sort by: Newest</option>
             <option>Sort by: Popularity</option>
             <option>Sort by: Rating</option>
-            <option>Sort by: Sales</option>
           </select>
         </div>
       </div>

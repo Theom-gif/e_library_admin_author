@@ -5,6 +5,7 @@ import {
   BookOpen, 
   PlusSquare, 
   BarChart3, 
+  Bell,
   MessageSquare, 
   Settings, 
   LogOut
@@ -30,6 +31,7 @@ const Sidebar = () => {
     // { icon: Filter, label: t('Categories'), path: '/author/category/technology' },
     { icon: PlusSquare, label: t('Upload New'), path: '/author/upload' },
     { icon: BarChart3, label: t('Analytics'), path: '/author/analytics' },
+    { icon: Bell, label: t('Notifications'), path: '/author/notifications' },
     { icon: MessageSquare, label: t('Feedback'), path: '/author/feedback' },
     { icon: Settings, label: t('Settings'), path: '/author/settings' },
   ];

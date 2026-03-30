@@ -280,8 +280,6 @@ const Profile = () => {
           bio: trimValue(form.bio),
           facebook_url: trimValue(form.facebook_url),
         });
-      } else if (selectedPhoto) {
-        await refreshProfile();
       }
 
       setSelectedPhoto(null);
@@ -400,7 +398,7 @@ const Profile = () => {
             <input
               id="profile-photo"
               type="file"
-              accept="image/png,image/jpeg"
+              accept="image/png,image/jpg"
               className="sr-only"
               onChange={handleSelectPhoto}
             />

@@ -13,17 +13,85 @@ import {
   Legend,
 } from 'recharts';
 import { getBooksRequest } from '../services/bookService';
+import { fetchAuthorFeedback } from '../../admin/services/adminService';
+import { normalizeAuthorFeedbackEntry } from '../services/feedbackUtils';
 import { getBookReadAnalytics } from '../../lib/userActivityService';
 
 const formatPercent = (value) => `${Number(value || 0).toFixed(1)}%`;
 const formatNumber = (value) => Number(value || 0).toLocaleString();
 
-const buildAnalyticsRows = (books = [], analyticsByIndex = []) => {
+const MAX_FEEDBACK_FETCH_LIMIT = 20;
+
+const buildFeedbackAnalyticsMap = (feedbackRows = []) => {
+  return feedbackRows.reduce((map, item) => {
+    const normalized = normalizeAuthorFeedbackEntry(item);
+    const key = String(normalized.bookId || '').trim() || String(normalized.book || '').trim().toLowerCase();
+    if (!key) {
+      return map;
+    }
+
+    const current = map.get(key) || { readerKeys: new Set(), interactions: 0 };
+    const readerKey =
+      String(normalized.userId || '').trim() ||
+      `${String(normalized.user || 'Reader').trim().toLowerCase()}|${String(normalized.comment || '').trim().toLowerCase()}`;
+
+    current.interactions += 1;
+    if (readerKey) {
+      current.readerKeys.add(readerKey);
+    }
+
+    map.set(key, current);
+    return map;
+  }, new Map());
+};
+
+const getFeedbackFallback = (feedbackMap, book) => {
+  const candidates = [
+    String(book?.id || '').trim(),
+    String(book?.bookId || '').trim(),
+    String(book?.title || '').trim().toLowerCase(),
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    const match = feedbackMap.get(candidate);
+    if (match) {
+      return match;
+    }
+  }
+
+  return null;
+};
+
+const getAnalyticsNumber = (analytics = {}, ...keys) => {
+  for (const key of keys) {
+    const value = Number(analytics?.[key]);
+    if (Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return 0;
+};
+
+const buildAnalyticsRows = (books = [], analyticsByIndex = [], feedbackRows = []) => {
+  const feedbackMap = buildFeedbackAnalyticsMap(feedbackRows);
   const rows = books.map((book, index) => {
     const analytics = analyticsByIndex[index] || {};
-    const totalReaders = Number(analytics.totalReaders) || 0;
-    const completionRate = Number(analytics.completionRate) || 0;
-    const monthlyReads = Number(analytics.monthlyReads) || 0;
+    const feedbackFallback = getFeedbackFallback(feedbackMap, book);
+    const analyticsReaders = getAnalyticsNumber(analytics, 'totalReaders', 'total_readers', 'readers');
+    const totalReaders =
+      analyticsReaders ||
+      Number(book?.totalReaders) ||
+      feedbackFallback?.readerKeys?.size ||
+      feedbackFallback?.interactions ||
+      0;
+    const completionRate =
+      getAnalyticsNumber(analytics, 'completionRate', 'completion_rate') || Number(book?.completionRate) || 0;
+    const monthlyReads =
+      getAnalyticsNumber(analytics, 'monthlyReads', 'monthly_reads', 'reads') ||
+      Number(book?.monthlyReads) ||
+      feedbackFallback?.interactions ||
+      0;
 
     return {
       id: book.id,
@@ -60,14 +128,22 @@ const Analytics = () => {
         setError('');
         
 
-        const books = await getBooksRequest({ status: 'approved' });
+        const [booksResult, feedbackResult] = await Promise.allSettled([
+          getBooksRequest({ status: 'approved' }),
+          fetchAuthorFeedback(MAX_FEEDBACK_FETCH_LIMIT, 'all'),
+        ]);
+        const books = booksResult.status === 'fulfilled' ? booksResult.value : [];
+        const feedbackRows =
+          feedbackResult.status === 'fulfilled' && Array.isArray(feedbackResult.value)
+            ? feedbackResult.value
+            : [];
         const analyticsResults = await Promise.allSettled(
           books.map((book) => getBookReadAnalytics(book.id, { signal: controller.signal })),
         );
         const analyticsByIndex = analyticsResults.map((result) =>
           result.status === 'fulfilled' ? result.value : {},
         );
-        const nextRows = buildAnalyticsRows(books, analyticsByIndex);
+        const nextRows = buildAnalyticsRows(books, analyticsByIndex, feedbackRows);
 
         if (mounted) {
           setRows(nextRows);

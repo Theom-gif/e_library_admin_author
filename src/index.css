@@ -296,6 +296,43 @@ a:focus-visible {
   box-shadow: 0 1px 3px color-mix(in srgb, #000 10%, transparent);
 }
 
+.author-cta-primary {
+  color: #ffffff !important;
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--accent) 92%, #ffffff 8%),
+      color-mix(in srgb, var(--accent) 74%, #000000 26%)) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent) !important;
+  box-shadow:
+    0 10px 24px color-mix(in srgb, var(--accent) 22%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 16%, transparent) !important;
+}
+
+.author-cta-primary:hover {
+  filter: brightness(1.05);
+  box-shadow:
+    0 14px 28px color-mix(in srgb, var(--accent) 28%, transparent),
+    0 0 0 1px color-mix(in srgb, var(--accent) 22%, transparent) !important;
+}
+
+.author-cta-secondary {
+  color: var(--text) !important;
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface) 86%) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent) !important;
+  box-shadow: 0 8px 20px color-mix(in srgb, #000 10%, transparent);
+}
+
+.author-cta-secondary:hover {
+  background: color-mix(in srgb, var(--accent) 22%, var(--surface) 78%) !important;
+}
+
+.author-cta-disabled {
+  color: var(--muted) !important;
+  background: color-mix(in srgb, var(--text) 8%, transparent) !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: none !important;
+}
+
 [data-theme='dark'] .theme-toggle-btn {
   background-color: color-mix(in srgb, var(--surface) 85%, #000 15%) !important;
   border-color: color-mix(in srgb, var(--accent) 24%, transparent) !important;

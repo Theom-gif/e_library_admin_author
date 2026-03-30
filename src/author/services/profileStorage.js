@@ -36,6 +36,10 @@ function getBackendOrigin() {
   }
 }
 
+function isLoopbackHost(host = "") {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
+
 export function resolveBackendAssetUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -45,7 +49,16 @@ export function resolveBackendAssetUrl(value) {
   if (!origin) return raw;
 
   try {
-    return new URL(raw, `${origin}/`).toString();
+    const resolvedUrl = new URL(raw, `${origin}/`);
+
+    if (typeof window !== "undefined" && window.location?.hostname) {
+      const currentHost = window.location.hostname;
+      if (!isLoopbackHost(currentHost) && isLoopbackHost(resolvedUrl.hostname)) {
+        resolvedUrl.hostname = currentHost;
+      }
+    }
+
+    return resolvedUrl.toString();
   } catch {
     return raw;
   }

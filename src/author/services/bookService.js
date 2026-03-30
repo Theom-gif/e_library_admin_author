@@ -42,15 +42,6 @@ const trimSlash = (value = '') => String(value || '').replace(/\/+$/, '');
 const stripApiSuffix = (value = '') => String(value || '').replace(/\/api(?:\/.*)?$/i, '');
 const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
 
-const buildCoverApiUrl = (id) => {
-  if (!id) return '';
-  const base = trimSlash(API_BASE_URL);
-  if (/\/api$/i.test(base)) {
-    return `${base}/books/${id}/cover`;
-  }
-  return `${base}/api/books/${id}/cover`;
-};
-
 const buildStorageUrl = (path = '') => {
   if (!path) return '';
   if (isBlobLikeUrl(path)) return path;
@@ -179,7 +170,6 @@ export const mapApiBookToUiBook = (book) => ({
       book?.cover,
       book?.image,
       book?.thumbnail,
-      buildCoverApiUrl(book?.id),
     ) || 'https://picsum.photos/seed/new-book/300/450',
   description: String(book?.description || '').trim(),
   genre: (typeof book?.category === 'string' ? book?.category : book?.category?.name) || book?.genre || '',

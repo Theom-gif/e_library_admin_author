@@ -20,6 +20,8 @@ const NATIVE_OPTION_STYLE = { color: '#0f172a', backgroundColor: '#ffffff' };
 const FALLBACK_COVER_URL = 'https://picsum.photos/seed/new-book/300/450';
 const COVER_CACHE_KEY = 'author_book_covers';
 const MAX_MANUSCRIPT_SIZE_BYTES = 100 * 1024 * 1024;
+const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_COVER_IMAGE_TYPES = ['image/jpeg', 'image/png'];
 
 const buildCoverKey = (title, author) =>
   `${String(title || '').trim().toLowerCase()}|${String(author || '').trim().toLowerCase()}`;
@@ -231,8 +233,14 @@ const UploadBook = () => {
   const handleCoverSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!String(file.type || '').startsWith('image/')) {
-      setCoverError('Please choose a valid image file.');
+    const fileType = String(file.type || '').toLowerCase();
+    if (!ACCEPTED_COVER_IMAGE_TYPES.includes(fileType)) {
+      setCoverError('Please choose a PNG or JPEG image.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > MAX_COVER_SIZE_BYTES) {
+      setCoverError('Cover image is too large. Maximum size is 5MB.');
       e.target.value = '';
       return;
     }
@@ -644,7 +652,7 @@ const UploadBook = () => {
                       <div className="text-center px-6">
                         <p className="text-sm font-bold">Upload Cover</p>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. Any image file'}
+                          {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. PNG or JPEG up to 5MB'}
                         </p>
                       </div>
                     </>
@@ -654,7 +662,7 @@ const UploadBook = () => {
                 <input
                   ref={coverInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg"
                   onChange={handleCoverSelected}
                   className="sr-only"
                 />

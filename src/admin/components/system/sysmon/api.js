@@ -5,11 +5,11 @@ const trimLeadingSlash = (value = "") => String(value || "").replace(/^\/+/, "")
 const isAbsoluteUrl = (value = "") => /^[a-z][a-z\d+\-.]*:\/\//i.test(String(value || ""));
 
 const SYSMON_HTTP_BASE = trimTrailingSlash(
-  import.meta.env.VITE_SYSMON_API_BASE_URL || (import.meta.env.DEV ? "/sysmon-api" : "/api"),
+  import.meta.env.VITE_SYSMON_API_BASE_URL || "/sysmon-api",
 );
 
 const SYSMON_WS_BASE = trimTrailingSlash(
-  import.meta.env.VITE_SYSMON_WS_URL || (import.meta.env.DEV ? "/sysmon-ws" : "/ws"),
+  import.meta.env.VITE_SYSMON_WS_URL || "/sysmon-ws",
 );
 
 export const buildSysmonHttpUrl = (path = "") => {

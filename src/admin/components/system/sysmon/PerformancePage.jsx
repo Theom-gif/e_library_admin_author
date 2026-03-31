@@ -53,15 +53,15 @@ export default function PerformancePage({ history, isDark }) {
       </ChartCard>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {/* Memory & Swap */}
-        <ChartCard title="Memory & Swap" legend={[{ color: CHART_COLORS.purple, label: "MEM" }, { color: CHART_COLORS.orange, label: "SWAP" }]}>
+        {/* Memory & Disk */}
+        <ChartCard title="Memory & Disk" legend={[{ color: CHART_COLORS.purple, label: "MEM" }, { color: CHART_COLORS.orange, label: "DISK" }]}>
           <div style={{ height: 170 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={history}>
                 {defs}
                 {xAxis}
                 {yAxisPct}
-                <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [`${v}%`, n === "memory" ? "MEM" : "SWAP"]} labelFormatter={fmtTS} />
+                <Tooltip contentStyle={tooltipStyle} formatter={(v, n) => [`${v}%`, n === "memory" ? "MEM" : "DISK"]} labelFormatter={fmtTS} />
                 <Area type="monotone" dataKey="memory" stroke={CHART_COLORS.purple} strokeWidth={1.5} fill="url(#ph-mem)"  dot={false} />
                 <Area type="monotone" dataKey="disk"   stroke={CHART_COLORS.orange} strokeWidth={1.5} fill="url(#ph-swap)" dot={false} />
               </AreaChart>

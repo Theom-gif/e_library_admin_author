@@ -10,7 +10,7 @@ export function SLabel({ children }) {
 
 export function ChartCard({ title, legend, children, style }) {
   return (
-    <div style={{ background: "var(--sm-bg-surface)", border: "1px solid var(--sm-border)", borderRadius: 8, padding: 15, ...style }}>
+    <div style={{ background: "var(--sm-bg-surface)", border: "1px solid var(--sm-border)", borderRadius: 8, padding: 15, minWidth: 0, ...style }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
         <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 10, fontWeight: 600, color: "var(--sm-text-2)", letterSpacing: ".4px" }}>{title}</span>
         {legend && (
@@ -88,6 +88,24 @@ export function StatusBadge({ status }) {
     <span style={{ display: "inline-flex", alignItems: "center", gap: 4, padding: "2px 7px", borderRadius: 3, fontSize: 9, fontWeight: 600, border: `1px solid ${c.border}`, background: c.bg, color: c.color }}>
       {status}
     </span>
+  );
+}
+
+export function TriangleIcon({ size = 14, style }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" style={style}>
+      <path d="M7 1L13 13H1L7 1Z" stroke="currentColor" strokeWidth="1.2" />
+      <line
+        x1="7"
+        y1="5"
+        x2="7"
+        y2="8.5"
+        stroke="currentColor"
+        strokeWidth="1.2"
+        strokeLinecap="round"
+      />
+      <circle cx="7" cy="10.5" r=".7" fill="currentColor" />
+    </svg>
   );
 }
 

@@ -11,6 +11,45 @@ const pick = (arr) => arr[randInt(0, arr.length - 1)];
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const round = (v, d = 1) => parseFloat(v.toFixed(d));
 
+const getLocalHostname = () => {
+  const injectedHostname =
+    typeof __SYSMON_HOSTNAME__ !== "undefined" ? String(__SYSMON_HOSTNAME__ || "").trim() : "";
+
+  if (typeof window === "undefined") {
+    return injectedHostname || "localhost";
+  }
+
+  const browserHostname = String(window.location.hostname || "").trim();
+  const isLoopbackHost =
+    !browserHostname ||
+    browserHostname === "localhost" ||
+    browserHostname === "127.0.0.1" ||
+    browserHostname === "::1";
+
+  if (injectedHostname && isLoopbackHost) {
+    return injectedHostname;
+  }
+
+  return browserHostname || injectedHostname || "localhost";
+};
+
+const getLocalPlatform = () => {
+  if (typeof navigator === "undefined") {
+    return "Local";
+  }
+
+  const platform =
+    navigator.userAgentData?.platform ||
+    navigator.platform ||
+    navigator.userAgent ||
+    "";
+
+  if (/win/i.test(platform)) return "Windows";
+  if (/mac/i.test(platform)) return "macOS";
+  if (/linux/i.test(platform)) return "Linux";
+  return platform || "Local";
+};
+
 let _cpuBase    = rand(30, 55);
 let _memBase    = rand(45, 65);
 let _diskBase   = rand(40, 60);
@@ -60,8 +99,8 @@ export const generateHealth = () => {
   const cpuCores = 8;
   const scaled   = Math.max(cpu / 100, 0.1) * cpuCores;
   return {
-    hostname: "bookhub-server-01",
-    platform: "Linux",
+    hostname: getLocalHostname(),
+    platform: getLocalPlatform(),
     cpu,
     cpuCores,
     cpuFreqMhz: round(rand(2400, 3800), 0),

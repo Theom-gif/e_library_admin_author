@@ -18,6 +18,11 @@ export default defineConfig(({mode}) => {
     'http://127.0.0.1:8000';
 
   const apiTarget = stripApiSuffix(proxyBase);
+  const sysmonProxyBase =
+    env.VITE_SYSMON_PROXY_TARGET ||
+    env.VITE_SYSMON_PROXY_BASE_URL ||
+    'http://127.0.0.1:8001';
+  const sysmonTarget = stripApiSuffix(sysmonProxyBase);
 
   return {
     root: path.resolve(__dirname, '.'),
@@ -26,6 +31,9 @@ export default defineConfig(({mode}) => {
     plugins: [react(), tailwindcss()],
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
+      __SYSMON_HOSTNAME__: JSON.stringify(
+        env.VITE_MACHINE_NAME || process.env.COMPUTERNAME || process.env.HOSTNAME || '',
+      ),
     },
     resolve: {
       alias: {
@@ -37,6 +45,19 @@ export default defineConfig(({mode}) => {
       // Do not modify - file watching is disabled to prevent flickering during agent edits.
       hmr: process.env.DISABLE_HMR !== 'true',
       proxy: {
+        '/sysmon-api': {
+          target: sysmonTarget,
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/sysmon-api/, '/api'),
+        },
+        '/sysmon-ws': {
+          target: sysmonTarget,
+          ws: true,
+          changeOrigin: true,
+          secure: false,
+          rewrite: (path) => path.replace(/^\/sysmon-ws/, '/ws'),
+        },
         '/api': {
           target: apiTarget,
           changeOrigin: true,

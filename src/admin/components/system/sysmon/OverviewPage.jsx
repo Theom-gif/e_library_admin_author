@@ -1,6 +1,5 @@
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { CHART_COLORS, ChartCard, MetricCard, SLabel, fmtTS } from "./primitives";
-import { TriangleIcon } from "../../../pages/SystemMonitor";
+import { CHART_COLORS, ChartCard, MetricCard, SLabel, TriangleIcon, fmtTS } from "./primitives";
 
 export default function OverviewPage({ health: h, history, isDark }) {
   const tooltipStyle = {
@@ -12,7 +11,6 @@ export default function OverviewPage({ health: h, history, isDark }) {
     color: isDark ? "#e8edf4" : "#0f1923",
   };
   const tickColor = isDark ? "#3d4f63" : "#8fa0b3";
-  const gridColor = isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.05)";
 
   const ni = h?.networkIn ?? 0;
   const no = h?.networkOut ?? 0;
@@ -42,7 +40,7 @@ export default function OverviewPage({ health: h, history, isDark }) {
 
       {/* Charts */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <ChartCard title="CPU & Memory" legend={[{ color: CHART_COLORS.accent, label: "CPU" }, { color: CHART_COLORS.purple, label: "MEM" }, { color: CHART_COLORS.orange, label: "SWAP" }]}>
+        <ChartCard title="CPU, Memory & Disk" legend={[{ color: CHART_COLORS.accent, label: "CPU" }, { color: CHART_COLORS.purple, label: "MEM" }, { color: CHART_COLORS.orange, label: "DISK" }]}>
           <div style={{ height: 170 }}>
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={history}>

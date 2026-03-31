@@ -26,6 +26,16 @@ const LOG_LIMIT = 80;
 const PROCESS_LIMIT = 50;
 const WS_RECONNECT_DELAY_MS = 3000;
 
+const isValidSysmonHealthPayload = (payload) =>
+  Boolean(
+    payload &&
+      typeof payload.hostname === "string" &&
+      typeof payload.cpu === "number" &&
+      typeof payload.memory === "number" &&
+      typeof payload.disk === "number" &&
+      Array.isArray(payload.loadAverage),
+  );
+
 const appendHistoryPoint = (history, health) => {
   if (!health?.updatedAt) {
     return history;
@@ -119,6 +129,9 @@ export default function SysmonApp({ onBack }) {
         "health",
         async () => {
           const data = await fetchSysmonJson("health");
+          if (!isValidSysmonHealthPayload(data)) {
+            throw new Error("Sysmon health response is not coming from the monitor service.");
+          }
           setHealth(data || null);
           setHistory((current) => appendHistoryPoint(current, data));
           setDataMode("remote");

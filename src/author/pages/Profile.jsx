@@ -13,6 +13,7 @@ import {
   User2,
 } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
+import AuthorAvatarImage from "../components/AuthorAvatarImage";
 import { useUserProfile } from "../hooks/useUserProfile";
 
 const MAX_PHOTO_SIZE_BYTES = 5 * 1024 * 1024;
@@ -42,8 +43,27 @@ function getProfileFormFromProfile(profile) {
     lastname: profile?.lastname || "",
     bio: profile?.bio || "",
     facebook_url: profile?.facebook_url || "",
-    photo_url: profile?.photo_url || profile?.photo || "",
+    photo_url:
+      profile?.photo_url ||
+      profile?.profile_image_url ||
+      profile?.avatar_url ||
+      profile?.avatarUrl ||
+      profile?.photo ||
+      profile?.profile_image ||
+      "",
   };
+}
+
+function getProfilePhotoSource(profile) {
+  return (
+    profile?.avatarUrl ||
+    profile?.photo_url ||
+    profile?.profile_image_url ||
+    profile?.avatar_url ||
+    profile?.photo ||
+    profile?.profile_image ||
+    ""
+  );
 }
 
 function getFieldErrors(error) {
@@ -121,11 +141,73 @@ function validatePhotoFile(file, t) {
   return "";
 }
 
+function buildPhotoFilenameFromUrl(photoUrl, mimeType) {
+  const fallbackExtension = mimeType === "image/png" ? "png" : "jpg";
+
+  try {
+    const parsed = new URL(photoUrl);
+    const lastSegment = parsed.pathname.split("/").filter(Boolean).pop() || "";
+    const safeName = lastSegment.replace(/[^a-zA-Z0-9._-]/g, "");
+    if (safeName) {
+      return safeName;
+    }
+  } catch {
+    // Fall back to a generated name below.
+  }
+
+  return `profile-photo.${fallbackExtension}`;
+}
+
+async function createPhotoFileFromUrl(photoUrl, t) {
+  let response;
+
+  try {
+    response = await fetch(photoUrl, { cache: "no-store" });
+  } catch {
+    throw new Error(
+      t("We couldn't download that image URL. Please use a direct public JPG or PNG image, or upload the file instead."),
+    );
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      t("We couldn't download that image URL. Please use a direct public JPG or PNG image, or upload the file instead."),
+    );
+  }
+
+  const contentType = String(response.headers.get("content-type") || "")
+    .split(";")[0]
+    .trim()
+    .toLowerCase();
+  const blob = await response.blob();
+  const blobType = String(blob.type || contentType)
+    .split(";")[0]
+    .trim()
+    .toLowerCase()
+    .replace("image/jpg", "image/jpeg");
+
+  if (!blobType.startsWith("image/")) {
+    throw new Error(t("That URL does not point to an image file."));
+  }
+
+  if (!ACCEPTED_IMAGE_TYPES.includes(blobType)) {
+    throw new Error(t("Please use a PNG or JPEG image URL."));
+  }
+
+  if (blob.size > MAX_PHOTO_SIZE_BYTES) {
+    throw new Error(t("Image size must be 5MB or less."));
+  }
+
+  return new File([blob], buildPhotoFilenameFromUrl(photoUrl, blobType), {
+    type: blobType,
+  });
+}
+
 function ProfileField({ id, label, value, onChange, error, placeholder, textarea = false }) {
   const baseClassName =
-    "w-full rounded-2xl border bg-primary/5 px-4 py-3 text-sm text-[color:var(--text)] transition focus:outline-none focus:ring-2 focus:ring-accent/40";
+    "w-full rounded-2xl border border-white/10 bg-[var(--surface-2)] px-4 py-3 text-sm text-[color:var(--text)] placeholder:text-slate-500 transition focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/30";
   const className = `${baseClassName} ${
-    error ? "border-rose-400/60" : "border-white/8 focus:border-accent/40"
+    error ? "border-rose-400/60" : ""
   }`;
 
   return (
@@ -168,7 +250,7 @@ function PasswordField({ id, label, value, onChange, placeholder }) {
         value={value}
         onChange={onChange}
         placeholder={placeholder}
-        className="w-full rounded-2xl border border-white/8 bg-primary/5 px-4 py-3 text-sm text-[color:var(--text)] transition focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
+        className="w-full rounded-2xl border border-white/10 bg-[var(--surface-2)] px-4 py-3 text-sm text-[color:var(--text)] placeholder:text-slate-500 transition focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/30"
       />
     </div>
   );
@@ -196,17 +278,20 @@ const Profile = () => {
   const photoInputRef = useRef(null);
 
   const baselineForm = useMemo(() => getProfileFormFromProfile(profile), [profile]);
-  const hasTextChanges = useMemo(
+  const photoUrlChanged = useMemo(
+    () => trimValue(form.photo_url) !== trimValue(baselineForm.photo_url),
+    [baselineForm.photo_url, form.photo_url],
+  );
+  const hasProfileDetailsChanges = useMemo(
     () =>
       trimValue(form.firstname) !== trimValue(baselineForm.firstname) ||
       trimValue(form.lastname) !== trimValue(baselineForm.lastname) ||
       trimValue(form.bio) !== trimValue(baselineForm.bio) ||
-      trimValue(form.facebook_url) !== trimValue(baselineForm.facebook_url) ||
-      trimValue(form.photo_url) !== trimValue(baselineForm.photo_url),
+      trimValue(form.facebook_url) !== trimValue(baselineForm.facebook_url),
     [baselineForm, form],
   );
-  const hasUnsavedChanges = hasTextChanges || Boolean(selectedPhoto);
-  const currentPhotoSrc = photoPreviewUrl || trimValue(form.photo_url) || profile?.avatarUrl;
+  const hasUnsavedChanges = hasProfileDetailsChanges || photoUrlChanged || Boolean(selectedPhoto);
+  const currentPhotoSrc = photoPreviewUrl || trimValue(form.photo_url) || getProfilePhotoSource(profile);
 
   useEffect(() => {
     if (hasUnsavedChanges) return;
@@ -338,31 +423,60 @@ const Profile = () => {
     setProfileMessage({ type: "", text: "" });
 
     try {
+      const photoUrl = trimValue(form.photo_url);
+      let nextProfile = profile;
+      let photoMirrorWarning = "";
+      const shouldPersistPhotoUrl = !selectedPhoto && photoUrlChanged;
+
       if (selectedPhoto) {
-        await uploadAvatar(selectedPhoto);
+        nextProfile = await uploadAvatar(selectedPhoto);
+      } else if (photoUrlChanged && photoUrl) {
+        try {
+          const mirroredPhoto = await createPhotoFileFromUrl(photoUrl, t);
+          nextProfile = await uploadAvatar(mirroredPhoto);
+        } catch (mirrorError) {
+          photoMirrorWarning =
+            mirrorError?.message ||
+            t("We couldn't mirror that image file, but we'll still save the URL.");
+        }
       }
 
-      if (hasTextChanges) {
-        await updateProfile({
+      if (hasProfileDetailsChanges || shouldPersistPhotoUrl) {
+        nextProfile = await updateProfile({
           firstname: trimValue(form.firstname),
           lastname: trimValue(form.lastname),
           bio: trimValue(form.bio),
           facebook_url: trimValue(form.facebook_url),
-          photo: trimValue(form.photo_url),
-          avatar: trimValue(form.photo_url),
+          ...(shouldPersistPhotoUrl
+            ? {
+                photo: photoUrl,
+                photo_url: photoUrl,
+                avatar: photoUrl,
+                avatar_url: photoUrl,
+                avatarUrl: photoUrl,
+                profile_image: photoUrl,
+                profile_image_url: photoUrl,
+              }
+            : {}),
         });
       }
 
+      const nextForm = getProfileFormFromProfile(nextProfile);
       setSelectedPhoto(null);
       setSelectedPhotoError("");
       setFormErrors({});
+      setForm(nextForm);
+      setPhotoUrlDraft(trimValue(nextForm.photo_url));
       setProfileMessage({
         type: "success",
-        text: selectedPhoto && hasTextChanges
-          ? t("Profile and photo updated successfully.")
-          : selectedPhoto
-            ? t("Photo updated successfully.")
-            : t("Profile updated successfully."),
+        text: photoMirrorWarning
+          ? `${t("Photo URL saved successfully.")} ${photoMirrorWarning}`
+          :
+          ((selectedPhoto || (photoUrlChanged && photoUrl)) && hasProfileDetailsChanges
+            ? t("Profile and photo updated successfully.")
+            : selectedPhoto || (photoUrlChanged && photoUrl)
+              ? t("Photo updated successfully.")
+              : t("Profile updated successfully.")),
       });
     } catch (requestError) {
       const serverFieldErrors = getFieldErrors(requestError);
@@ -376,7 +490,11 @@ const Profile = () => {
       setFormErrors((current) => ({ ...current, ...nextErrors }));
       setSelectedPhotoError(
         serverFieldErrors.photo ||
+          serverFieldErrors.photo_url ||
           serverFieldErrors.avatar ||
+          serverFieldErrors.avatar_url ||
+          serverFieldErrors.profile_image ||
+          serverFieldErrors.profile_image_url ||
           serverFieldErrors.avatar_file ||
           serverFieldErrors.photo_file ||
           selectedPhotoError,
@@ -449,15 +567,33 @@ const Profile = () => {
         ? "text-emerald-400"
         : "text-slate-400";
 
+  const panelClassName = "rounded-[28px] border border-white/10 bg-card-dark p-6 card-shadow";
+  const subtleButtonClassName =
+    "inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-[color:var(--text)] transition hover:bg-white/10";
+  const heroCardStyle = {
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--surface) 84%), color-mix(in srgb, var(--surface) 78%, var(--bg) 22%))",
+    boxShadow: "0 30px 90px color-mix(in srgb, #000 18%, transparent)",
+  };
+
   return (
     <div className="mx-auto max-w-6xl p-6 md:p-8">
-      <div className="mb-8 flex flex-col gap-6 rounded-[32px] border border-white/6 bg-[linear-gradient(135deg,rgba(74,134,143,0.22),rgba(13,18,29,0.95))] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.28)] lg:flex-row lg:items-center lg:justify-between">
+      <div
+        className="mb-8 flex flex-col gap-6 rounded-[32px] border border-white/10 p-6 lg:flex-row lg:items-center lg:justify-between"
+        style={heroCardStyle}
+      >
         <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
           <div className="relative">
-            <img
-              src={currentPhotoSrc}
+            <AuthorAvatarImage
+              profile={{
+                ...profile,
+                avatarUrl: currentPhotoSrc,
+                avatar_url: currentPhotoSrc,
+                photo_url: currentPhotoSrc,
+                profile_image_url: currentPhotoSrc,
+              }}
               alt={profile?.fullName || t("Author profile photo")}
-              className="h-28 w-28 rounded-[28px] border border-white/15 object-cover shadow-2xl"
+              className="h-28 w-28 rounded-[28px] border border-white/10 object-cover shadow-2xl"
             />
             <button
               type="button"
@@ -465,7 +601,7 @@ const Profile = () => {
                 setShowPhotoOptions((current) => !current);
                 setShowPhotoUrlEditor(false);
               }}
-              className="absolute -bottom-2 -right-2 inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-black/70 px-3 py-2 text-xs font-semibold text-white transition hover:bg-black"
+              className="absolute -bottom-2 -right-2 inline-flex cursor-pointer items-center gap-2 rounded-full border border-white/10 bg-[var(--surface)] px-3 py-2 text-xs font-semibold text-[color:var(--text)] shadow-lg transition hover:bg-white/10"
             >
               <Camera className="size-3.5" />
               {t("Change")}
@@ -479,11 +615,11 @@ const Profile = () => {
               onChange={handleSelectPhoto}
             />
             {showPhotoOptions ? (
-              <div className="absolute left-0 top-full z-20 mt-4 w-56 rounded-2xl border border-white/10 bg-[#111827] p-2 shadow-2xl">
+              <div className="absolute left-0 top-full z-20 mt-4 w-56 rounded-2xl border border-white/10 bg-[var(--surface)] p-2 shadow-2xl">
                 <button
                   type="button"
                   onClick={handleOpenFilePicker}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-white transition hover:bg-white/8"
+                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-[color:var(--text)] transition hover:bg-white/10"
                 >
                   <Camera className="size-4" />
                   {t("Choose local photo")}
@@ -491,7 +627,7 @@ const Profile = () => {
                 <button
                   type="button"
                   onClick={handleOpenPhotoUrlEditor}
-                  className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-white transition hover:bg-white/8"
+                  className="mt-1 flex w-full items-center gap-3 rounded-xl px-3 py-2 text-left text-sm font-medium text-[color:var(--text)] transition hover:bg-white/10"
                 >
                   <ExternalLink className="size-4" />
                   {t("Use image URL")}
@@ -499,7 +635,7 @@ const Profile = () => {
               </div>
             ) : null}
             {showPhotoUrlEditor ? (
-              <div className="absolute left-0 top-full z-20 mt-4 w-72 rounded-[24px] border border-white/10 bg-[#111827] p-4 shadow-2xl">
+              <div className="absolute left-0 top-full z-20 mt-4 w-72 rounded-[24px] border border-white/10 bg-[var(--surface)] p-4 shadow-2xl">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
                   {t("Profile photo URL")}
                 </p>
@@ -518,7 +654,7 @@ const Profile = () => {
                     }
                   }}
                   placeholder="https://example.com/photo.jpg"
-                  className="mt-3 w-full rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white placeholder:text-slate-500 transition focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/40"
+                  className="mt-3 w-full rounded-2xl border border-white/10 bg-[var(--surface-2)] px-4 py-3 text-sm text-[color:var(--text)] placeholder:text-slate-500 transition focus:border-accent/40 focus:outline-none focus:ring-2 focus:ring-accent/30"
                 />
                 <p className="mt-2 text-xs text-slate-400">
                   {t("Paste a direct image link like")} <code>https://example.com/photo.jpg</code>
@@ -533,14 +669,14 @@ const Profile = () => {
                       setShowPhotoUrlEditor(false);
                       setPhotoUrlDraft(trimValue(form.photo_url));
                     }}
-                    className="rounded-2xl border border-white/10 px-3 py-2 text-xs font-semibold text-slate-300 transition hover:bg-white/6"
+                    className="rounded-2xl border border-white/10 bg-white/5 px-3 py-2 text-xs font-semibold text-[color:var(--text)] transition hover:bg-white/10"
                   >
                     {t("Cancel")}
                   </button>
                   <button
                     type="button"
                     onClick={handleApplyPhotoUrl}
-                    className="rounded-2xl bg-accent px-3 py-2 text-xs font-semibold text-white transition hover:opacity-90"
+                    className="author-cta-primary rounded-2xl px-3 py-2 text-xs font-semibold transition"
                   >
                     {t("Apply URL")}
                   </button>
@@ -555,11 +691,11 @@ const Profile = () => {
             </p>
             <h1 className="text-3xl font-bold tracking-tight">{profile?.fullName || t("Author")}</h1>
             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-300">
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1">
                 <Mail className="size-4" />
                 {profile?.email || t("No email available")}
               </span>
-              <span className="inline-flex items-center gap-2 rounded-full bg-white/8 px-3 py-1">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-3 py-1">
                 <ShieldCheck className="size-4 text-emerald-400" />
                 {profile?.tier || t("Pro Author")}
               </span>
@@ -574,7 +710,7 @@ const Profile = () => {
           <button
             type="button"
             onClick={() => navigate("/author/my-books")}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/12"
+            className={subtleButtonClassName}
           >
             <BookOpen className="size-4" />
             {t("My Books")}
@@ -584,7 +720,7 @@ const Profile = () => {
             onClick={() => {
               refreshProfile().catch(() => {});
             }}
-            className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-slate-200"
+            className="author-cta-secondary inline-flex items-center justify-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition"
           >
             <RefreshCw className="size-4" />
             {t("Refresh")}
@@ -605,14 +741,14 @@ const Profile = () => {
       <div className="grid gap-6 lg:grid-cols-[1.45fr_0.95fr]">
         <form
           onSubmit={handleSaveProfile}
-          className="rounded-[28px] border border-white/6 bg-card-dark p-6 shadow-[0_20px_70px_rgba(0,0,0,0.16)]"
+          className={panelClassName}
         >
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-xl font-bold">{t("Public details")}</h2>
-              <p className="mt-1 text-sm text-slate-400">
+              {/* <p className="mt-1 text-sm text-slate-400">
                 {t("These fields sync with")} <code>/api/me/profile</code>.
-              </p>
+              </p> */}
             </div>
             {hasUnsavedChanges ? (
               <span className="rounded-full border border-amber-400/25 bg-amber-400/10 px-3 py-1 text-xs font-semibold text-amber-300">
@@ -652,14 +788,14 @@ const Profile = () => {
               >
                 {t("Email")}
               </label>
-              <div className="flex items-center gap-3 rounded-2xl border border-white/8 bg-primary/5 px-4 py-3 text-sm text-slate-300">
+              <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-[var(--surface-2)] px-4 py-3 text-sm text-slate-300">
                 <Mail className="size-4 text-slate-500" />
                 <input
                   id="profile-email"
                   type="email"
                   readOnly
                   value={profile?.email || ""}
-                  className="w-full bg-transparent outline-none"
+                  className="w-full bg-transparent text-[color:var(--text)] outline-none"
                 />
               </div>
             </div>
@@ -683,7 +819,7 @@ const Profile = () => {
             />
           </div>
 
-          <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-primary/5 p-4">
+          <div className="mt-6 rounded-2xl border border-dashed border-white/10 bg-white/5 p-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm font-semibold">{t("Profile photo")}</p>
@@ -691,7 +827,7 @@ const Profile = () => {
               </div>
               <label
                 htmlFor="profile-photo-inline"
-                className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/6 px-4 py-3 text-sm font-semibold text-white transition hover:bg-white/10"
+                className={subtleButtonClassName}
               >
                 <Camera className="size-4" />
                 {selectedPhoto ? t("Replace photo") : t("Choose photo")}
@@ -714,21 +850,21 @@ const Profile = () => {
             ) : null}
           </div>
 
-          <div className="mt-6 flex flex-col gap-3 border-t border-white/6 pt-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="mt-6 flex flex-col gap-3 border-t border-white/10 pt-5 sm:flex-row sm:items-center sm:justify-between">
             <p className={`text-sm ${messageClassName(profileMessage.type)}`}>{profileMessage.text || " "}</p>
             <div className="flex flex-wrap justify-end gap-3">
               <button
                 type="button"
                 onClick={handleResetChanges}
                 disabled={savingProfile || (!hasUnsavedChanges && !profileMessage.text)}
-                className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-semibold text-slate-300 transition hover:bg-white/6 disabled:cursor-not-allowed disabled:opacity-50"
+                className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-[color:var(--text)] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {t("Reset")}
               </button>
               <button
                 type="submit"
                 disabled={savingProfile || loading}
-                className="inline-flex items-center gap-2 rounded-2xl bg-accent px-5 py-3 text-sm font-semibold text-white shadow-glow transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                className="author-cta-primary inline-flex items-center gap-2 rounded-2xl px-5 py-3 text-sm font-semibold shadow-glow transition disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {savingProfile ? <RefreshCw className="size-4 animate-spin" /> : <Save className="size-4" />}
                 {savingProfile ? t("Saving...") : t("Save Profile")}
@@ -740,17 +876,17 @@ const Profile = () => {
         <div className="space-y-6">
           <form
             onSubmit={handlePasswordChange}
-            className="rounded-[28px] border border-white/6 bg-card-dark p-6 shadow-[0_20px_70px_rgba(0,0,0,0.16)]"
+            className={panelClassName}
           >
             <div className="mb-5 flex items-start gap-3">
-              <div className="rounded-2xl bg-accent/15 p-3 text-accent">
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-accent">
                 <KeyRound className="size-5" />
               </div>
               <div>
                 <h2 className="text-xl font-bold">{t("Change password")}</h2>
-                <p className="mt-1 text-sm text-slate-400">
+                {/* <p className="mt-1 text-sm text-slate-400">
                   {t("This form submits to")} <code>POST /api/auth/change-password</code>.
-                </p>
+                </p> */}
               </div>
             </div>
 
@@ -796,12 +932,12 @@ const Profile = () => {
               />
             </div>
 
-            <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/6 pt-4">
+            <div className="mt-5 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
               <p className={`text-sm ${messageClassName(passwordMessage.type)}`}>{passwordMessage.text || " "}</p>
               <button
                 type="submit"
                 disabled={changingPassword}
-                className="inline-flex items-center gap-2 rounded-2xl bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+                className="author-cta-primary inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {changingPassword ? <RefreshCw className="size-4 animate-spin" /> : <ShieldCheck className="size-4" />}
                 {changingPassword ? t("Updating...") : t("Update Password")}
@@ -809,35 +945,35 @@ const Profile = () => {
             </div>
           </form>
 
-          <div className="rounded-[28px] border border-white/6 bg-card-dark p-6 shadow-[0_20px_70px_rgba(0,0,0,0.16)]">
+          <div className={panelClassName}>
             <div className="mb-5 flex items-start gap-3">
-              <div className="rounded-2xl bg-white/8 p-3 text-slate-200">
+              <div className="rounded-2xl border border-white/10 bg-white/10 p-3 text-[color:var(--text)]">
                 <User2 className="size-5" />
               </div>
               <div>
                 <h2 className="text-xl font-bold">{t("Profile summary")}</h2>
-                <p className="mt-1 text-sm text-slate-400">
+                {/* <p className="mt-1 text-sm text-slate-400">
                   {t("A quick snapshot of the profile data currently cached in the client.")}
-                </p>
+                </p> */}
               </div>
             </div>
 
             <div className="space-y-4 text-sm">
-              <div className="rounded-2xl border border-white/8 bg-primary/5 p-4">
+              <div className="rounded-2xl border border-white/10 bg-[var(--surface-2)] p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{t("Display name")}</p>
                 <p className="mt-2 text-base font-semibold">{profile?.fullName || t("Author")}</p>
               </div>
-              <div className="rounded-2xl border border-white/8 bg-primary/5 p-4">
+              <div className="rounded-2xl border border-white/10 bg-[var(--surface-2)] p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">{t("Photo source")}</p>
-                <p className="mt-2 break-all text-slate-300">
-                  {profile?.photo_url || profile?.photo || t("No photo uploaded yet")}
-                </p>
+                {/* <p className="mt-2 break-all text-slate-300">
+                  {getProfilePhotoSource(profile) || t("No photo uploaded yet")}
+                </p> */}
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <button
                   type="button"
                   onClick={() => navigate("/author/settings")}
-                  className="rounded-2xl border border-white/10 bg-primary/5 px-4 py-3 text-left text-sm font-semibold transition hover:bg-white/6"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-left text-sm font-semibold text-[color:var(--text)] transition hover:bg-white/10"
                 >
                   {t("Open settings")}
                 </button>
@@ -849,7 +985,7 @@ const Profile = () => {
                     }
                   }}
                   disabled={!profile?.facebook_url}
-                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-primary/5 px-4 py-3 text-sm font-semibold transition hover:bg-white/6 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex items-center justify-center gap-2 rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-semibold text-[color:var(--text)] transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <ExternalLink className="size-4" />
                   {t("Open Facebook")}

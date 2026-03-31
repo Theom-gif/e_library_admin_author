@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../auth/useAuth';
 import { useLanguage } from '../../i18n/LanguageContext';
+import AuthorAvatarImage from './AuthorAvatarImage';
 import {
   AUTHOR_PROFILE_KEY,
   AUTHOR_PROFILE_UPDATED_EVENT,
@@ -81,8 +82,8 @@ const Sidebar = () => {
             return `${baseClasses} ${isActive ? activeClasses : inactiveClasses}`;
           }}
         >
-          <img 
-            src={profile.avatarUrl}
+          <AuthorAvatarImage
+            profile={profile}
             alt={profile.name}
             className="size-10 rounded-full ring-2 ring-primary/20 object-cover"
           />

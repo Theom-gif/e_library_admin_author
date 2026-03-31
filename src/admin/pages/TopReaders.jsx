@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { ArrowUpRight, BookOpen, TrendingUp, Users } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useTheme } from "../../theme/ThemeContext";
@@ -20,23 +19,12 @@ import TopReadersTable from "../components/topreader/TopReadersTable";
 const TopReaders = () => {
   const { t } = useLanguage();
   const { isDark } = useTheme();
-  const navigate = useNavigate();
   const [range, setRange] = useState("all");
   const [leaders, setLeaders] = useState(fallbackLeaders);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState("books");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-
-  const handleUnauthorized = () => {
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("bookhub_token");
-      sessionStorage.removeItem("bookhub_token");
-      localStorage.removeItem("bookhub_session");
-      sessionStorage.removeItem("bookhub_session");
-    }
-    navigate("/login", { replace: true });
-  };
 
   const getRangeLabel = (rangeValue) => {
     switch (rangeValue) {
@@ -108,8 +96,8 @@ const TopReaders = () => {
         const message = err?.response?.data?.message || err?.message;
 
         if (status === 401) {
-          setError(t("Session expired. Redirecting to login..."));
-          handleUnauthorized();
+          setError(message || t("You are not authorized to view this leaderboard right now."));
+          setLeaders(fallbackLeaders);
         } else if (status === 404) {
           setLeaders(fallbackLeaders);
         } else {

@@ -65,7 +65,12 @@ export default function SysmonApp({ onBack }) {
   const [dataMode, setDataMode] = useState("remote");
   const wsRef = useRef(null);
   const reconnectRef = useRef(null);
+  const logsRef = useRef([]);
   const prevAlertIds = useRef(new Set());
+
+  useEffect(() => {
+    logsRef.current = logs;
+  }, [logs]);
 
   const addToast = useCallback((level, title, message) => {
     const id = `${Date.now()}-${Math.random()}`;
@@ -75,14 +80,16 @@ export default function SysmonApp({ onBack }) {
     }, 5000);
   }, []);
 
-  const applyFallbackSnapshot = useCallback((sort = "cpu") => {
+  const applyFallbackSnapshot = useCallback(({ sort = "cpu", refreshLogs = true } = {}) => {
     const nextHealth = generateHealth();
-    const nextLogs = generateLogs(LOG_LIMIT);
+    const nextLogs = refreshLogs ? generateLogs(LOG_LIMIT) : logsRef.current;
 
     pushHistory(nextHealth);
     setHealth(nextHealth);
     setHistory(getHistory(HISTORY_POINTS));
-    setLogs(nextLogs);
+    if (refreshLogs) {
+      setLogs(nextLogs);
+    }
     setProcesses(generateProcesses(PROCESS_LIMIT, sort));
     setDisks(generateDisks());
     setNetwork(generateNetworkInterfaces());
@@ -239,7 +246,7 @@ export default function SysmonApp({ onBack }) {
     const failedCount = results.filter((result) => result == null).length;
 
     if (!hasRemoteHealth && failedCount >= 3) {
-      applyFallbackSnapshot(procSort);
+      applyFallbackSnapshot({ sort: procSort, refreshLogs: true });
     }
   }, [
     applyFallbackSnapshot,
@@ -274,24 +281,29 @@ export default function SysmonApp({ onBack }) {
     const historyId = window.setInterval(() => {
       fetchHistory({ silent: true });
     }, 10000);
-    const logsId = window.setInterval(() => {
-      fetchLogs({ silent: true });
-    }, 15000);
+    const logsId =
+      page === "logs"
+        ? null
+        : window.setInterval(() => {
+            fetchLogs({ silent: true });
+          }, 15000);
     const statsId = window.setInterval(() => {
       fetchStats({ silent: true });
     }, 15000);
 
     return () => {
       window.clearInterval(historyId);
-      window.clearInterval(logsId);
+      if (logsId) {
+        window.clearInterval(logsId);
+      }
       window.clearInterval(statsId);
     };
-  }, [dataMode, fetchHistory, fetchLogs, fetchStats]);
+  }, [dataMode, fetchHistory, fetchLogs, fetchStats, page]);
 
   useEffect(() => {
     if (dataMode === "fallback") {
       const fallbackHealthId = window.setInterval(() => {
-        applyFallbackSnapshot(procSort);
+        applyFallbackSnapshot({ sort: procSort, refreshLogs: page !== "logs" });
       }, 5000);
 
       return () => {
@@ -310,7 +322,7 @@ export default function SysmonApp({ onBack }) {
     return () => {
       window.clearInterval(fallbackHealthId);
     };
-  }, [applyFallbackSnapshot, dataMode, fetchHealth, procSort, wsState]);
+  }, [applyFallbackSnapshot, dataMode, fetchHealth, page, procSort, wsState]);
 
   useEffect(() => {
     if (dataMode === "fallback") {
@@ -319,13 +331,6 @@ export default function SysmonApp({ onBack }) {
       }
       if (page === "network") {
         setNetwork(generateNetworkInterfaces());
-      }
-      if (page === "logs") {
-        const nextLogs = generateLogs(LOG_LIMIT);
-        setLogs(nextLogs);
-        if (health) {
-          setStats(generateStats(nextLogs, health));
-        }
       }
       if (page === "stats" && health) {
         setStats(generateStats(logs, health));
@@ -346,6 +351,19 @@ export default function SysmonApp({ onBack }) {
       fetchStats({ silent: true });
     }
   }, [dataMode, fetchDisks, fetchLogs, fetchNetwork, fetchStats, health, logs, page]);
+
+  const refreshLogsView = useCallback(() => {
+    if (dataMode === "fallback") {
+      const nextLogs = generateLogs(LOG_LIMIT);
+      setLogs(nextLogs);
+      if (health) {
+        setStats(generateStats(nextLogs, health));
+      }
+      return;
+    }
+
+    fetchLogs();
+  }, [dataMode, fetchLogs, health]);
 
   useEffect(() => {
     let cancelled = false;
@@ -563,7 +581,7 @@ export default function SysmonApp({ onBack }) {
           )}
           {page === "disks" && <DisksPage disks={disks} />}
           {page === "network" && <NetworkPage interfaces={network} />}
-          {page === "logs" && <LogsPage logs={logs} />}
+          {page === "logs" && <LogsPage logs={logs} onRefresh={refreshLogsView} />}
           {page === "stats" && <StatsPage stats={stats} isDark={isDark} />}
         </div>
       </div>

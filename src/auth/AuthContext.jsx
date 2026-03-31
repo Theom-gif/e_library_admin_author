@@ -635,17 +635,15 @@ export function AuthProvider({ children }) {
         setUser(null);
       },
       refreshAuthToken: async () => {
-        const currentToken = getTokenFromStorage();
         const refreshToken = getRefreshTokenFromStorage();
         const remember = localStorage.getItem(REMEMBER_KEY) === "1";
-        const tokenForRefresh = refreshToken || currentToken;
 
-        if (!tokenForRefresh) {
-          return { ok: false, error: "Missing login token. Please login again." };
+        if (!refreshToken) {
+          return { ok: false, error: "Missing refresh token. Please login again." };
         }
 
         try {
-          const response = await refreshTokenRequest(tokenForRefresh);
+          const response = await refreshTokenRequest(refreshToken);
           const data = response?.data || {};
           const { accessToken, refreshToken: nextRefreshToken } = extractAuthTokens(data);
           const nextAccessToken = accessToken || data?.token;

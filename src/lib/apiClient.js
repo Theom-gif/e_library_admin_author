@@ -43,6 +43,11 @@ function getStoredRefreshToken() {
   );
 }
 
+function dispatchUnauthorizedEvent() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
+}
+
 function persistAccessToken(token) {
   if (typeof window === "undefined" || !token) return;
 
@@ -169,21 +174,21 @@ async function requestTokenRefresh() {
     return refreshPromise;
   }
 
-  const currentToken = getStoredAccessToken();
   const refreshToken = getStoredRefreshToken();
-  const tokenForRefresh = refreshToken || currentToken;
 
-  if (!tokenForRefresh) {
-    throw new Error("Missing refresh token.");
+  if (!refreshToken) {
+    const error = new Error("Missing refresh token.");
+    error.code = "NO_REFRESH_TOKEN";
+    throw error;
   }
 
   refreshPromise = axios
     .post(
       normalizeApiUrl("/auth/refresh"),
       {
-        refresh_token: refreshToken || undefined,
-        refreshToken: refreshToken || undefined,
-        token: refreshToken || currentToken || undefined,
+        refresh_token: refreshToken,
+        refreshToken: refreshToken,
+        token: refreshToken,
       },
       {
         baseURL: API_BASE_URL,
@@ -191,7 +196,7 @@ async function requestTokenRefresh() {
         headers: {
           Accept: "application/json",
           "Content-Type": "application/json",
-          Authorization: `Bearer ${tokenForRefresh}`,
+          Authorization: `Bearer ${refreshToken}`,
         },
       },
     )
@@ -265,7 +270,8 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       const url = String(error.config?.url || "");
       const isAuthRoute = /\/auth\/(login|register|refresh|logout)/i.test(url);
-      const canRetry = !error.config?._retry && !isAuthRoute;
+      const hasRefreshToken = Boolean(getStoredRefreshToken());
+      const canRetry = !error.config?._retry && !isAuthRoute && hasRefreshToken;
 
       if (canRetry && typeof window !== "undefined") {
         try {
@@ -274,19 +280,31 @@ apiClient.interceptors.response.use(
           error.config.headers = error.config.headers || {};
           error.config.headers.Authorization = `Bearer ${refreshedToken}`;
           return apiClient.request(error.config);
-        } catch {
-          clearStoredAuth();
-          window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
-          if (window.location.pathname !== "/login") {
-            window.location.href = "/login";
+        } catch (refreshError) {
+          if (refreshError?.code !== "NO_REFRESH_TOKEN") {
+            clearStoredAuth();
+            dispatchUnauthorizedEvent();
           }
+          return Promise.reject(error);
         }
-      } else if (!isAuthRoute && typeof window !== "undefined") {
-        clearStoredAuth();
-        window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT));
-        if (window.location.pathname !== "/login") {
-          window.location.href = "/login";
+      } else if (isAuthRoute) {
+        return Promise.reject(error);
+      } else {
+        const authMessage = String(
+          error.response?.data?.message || error.response?.data?.error || error.message || "",
+        ).toLowerCase();
+        const shouldInvalidateSession =
+          authMessage.includes("expired") ||
+          authMessage.includes("invalid token") ||
+          authMessage.includes("token has expired") ||
+          authMessage.includes("unauthenticated");
+
+        if (shouldInvalidateSession && !hasRefreshToken) {
+          clearStoredAuth();
+          dispatchUnauthorizedEvent();
         }
+
+        return Promise.reject(error);
       }
     }
 

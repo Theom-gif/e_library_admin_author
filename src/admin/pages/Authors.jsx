@@ -1,96 +1,88 @@
-import { useState, useEffect, useCallback } from "react";
-import { Trash2, Edit2, Mail, CheckCircle } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
+import { AlertCircle, CheckCircle2, Mail, PenTool, ShieldCheck, UserRound, X } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { useTheme } from "../../theme/ThemeContext";
 import CreateAuthorForm from "../components/authors/CreateAuthorForm";
-import {
-  fetchAuthors,
-  deleteAuthor,
-  resendAuthorInvitation,
-} from "../services/authorService";
+import AuthorsTable from "../components/authors/AuthorsTable";
+import { deleteAuthor, fetchAuthors, resendAuthorInvitation } from "../services/authorService";
 
-/**
- * Authors Page Component
- * 
- * Admin page to:
- * - Create new authors via the CreateAuthorForm
- * - View list of all authors
- * - Delete authors
- * - Resend invitation email to authors
- * - View author details (email, bio, profile image)
- */
 export default function Authors() {
   const { t } = useLanguage();
   const { isDark } = useTheme();
-
-  // State
   const [authors, setAuthors] = useState([]);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [pageError, setPageError] = useState("");
+  const [flash, setFlash] = useState(null);
   const [showForm, setShowForm] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState("");
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [selectedAuthor, setSelectedAuthor] = useState(null);
 
-  /**
-   * Fetch all authors from API
-   */
   const fetchAuthorsData = useCallback(async () => {
     setLoading(true);
-    setError("");
+    setPageError("");
+
     try {
-      const result = await fetchAuthors({ search: searchQuery });
+      const result = await fetchAuthors();
       setAuthors(result.data || []);
     } catch (err) {
-      setError(err?.message || t("Failed to fetch authors"));
-      console.error("Fetch authors error:", err);
+      setPageError(err?.message || t("Failed to fetch authors"));
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, t]);
+  }, [t]);
 
-  // Fetch authors on mount and when search changes
   useEffect(() => {
     fetchAuthorsData();
   }, [fetchAuthorsData]);
 
-  /**
-   * Handle new author creation
-   */
-  const handleAuthorCreated = (newAuthor) => {
-    setAuthors((prev) => [newAuthor, ...prev]);
+  const handleAuthorCreated = ({ message }) => {
+    setFlash({
+      type: "success",
+      message: message || t("Author created successfully"),
+    });
     setShowForm(false);
+    fetchAuthorsData();
   };
 
-  /**
-   * Delete author
-   */
   const handleDeleteAuthor = async (authorId) => {
     setActionLoadingId(authorId);
+
     try {
-      await deleteAuthor(authorId);
-      setAuthors((prev) => prev.filter((a) => a.id !== authorId));
+      const response = await deleteAuthor(authorId);
+      setAuthors((prev) => prev.filter((author) => author.id !== authorId));
       setDeleteConfirm(null);
+      if (selectedAuthor?.id === authorId) {
+        setSelectedAuthor(null);
+      }
+      setFlash({
+        type: "success",
+        message: response?.message || t("Author deleted successfully"),
+      });
     } catch (err) {
-      setError(err?.message || t("Failed to delete author"));
+      setFlash({
+        type: "error",
+        message: err?.message || t("Failed to delete author"),
+      });
     } finally {
       setActionLoadingId(null);
     }
   };
 
-  /**
-   * Resend invitation email to author
-   */
   const handleResendInvite = async (authorId) => {
     setActionLoadingId(authorId);
+
     try {
       const response = await resendAuthorInvitation(authorId);
-      if (response?.success) {
-        setError("");
-        alert(t("Invitation email sent successfully"));
-      }
+      setFlash({
+        type: "success",
+        message: response?.message || t("Invitation email sent successfully"),
+      });
     } catch (err) {
-      setError(err?.message || t("Failed to resend invitation"));
+      setFlash({
+        type: "error",
+        message: err?.message || t("Failed to resend invitation"),
+      });
     } finally {
       setActionLoadingId(null);
     }
@@ -98,245 +90,144 @@ export default function Authors() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-end gap-4">
+      <div className="flex justify-end">
         <button
-          onClick={() => setShowForm(!showForm)}
-          className={`mt-4 md:mt-0 px-6 py-2 rounded-lg font-medium transition-all ${
+          type="button"
+          onClick={() => setShowForm((prev) => !prev)}
+          className={`inline-flex items-center gap-2 rounded-xl px-5 py-3 font-semibold transition ${
             isDark
-              ? "bg-purple-600 hover:bg-purple-700 text-white"
-              : "bg-purple-500 hover:bg-purple-600 text-white"
+              ? "bg-[#214046] text-white hover:bg-[#2a525a]"
+              : "bg-[#4a868f] text-white hover:bg-[#3f7880]"
           }`}
         >
-          {showForm ? t("Cancel") : t("Create Author")}
+          <PenTool size={18} />
+          {showForm ? t("Hide Form") : t("Create Author")}
         </button>
       </div>
 
-      {/* Create Form Section */}
-      {showForm && (
-        <div className={`p-6 rounded-lg border ${
-          isDark
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
+      {flash && (
+        <div className={`flex items-start gap-3 rounded-2xl border px-4 py-3 ${
+          flash.type === "success"
+            ? isDark
+              ? "border-emerald-500/25 bg-emerald-500/10 text-emerald-200"
+              : "border-emerald-200 bg-emerald-50 text-emerald-800"
+            : isDark
+              ? "border-red-500/25 bg-red-500/10 text-red-200"
+              : "border-red-200 bg-red-50 text-red-800"
         }`}>
-          <CreateAuthorForm onSuccess={handleAuthorCreated} />
+          {flash.type === "success" ? <CheckCircle2 size={18} className="mt-0.5 shrink-0" /> : <AlertCircle size={18} className="mt-0.5 shrink-0" />}
+          <div className="flex-1">
+            <p className="font-medium">{flash.message}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setFlash(null)}
+            className="text-sm opacity-80 transition hover:opacity-100"
+          >
+            {t("Dismiss")}
+          </button>
         </div>
       )}
 
-      {/* Authors List Section */}
-      <div className={`rounded-lg border ${
-        isDark
-          ? "bg-gray-800 border-gray-700"
-          : "bg-white border-gray-200"
+      {showForm && (
+        <CreateAuthorForm
+          onSuccess={handleAuthorCreated}
+          onCancel={() => setShowForm(false)}
+        />
+      )}
+
+      {pageError && (
+        <div className={`rounded-2xl border px-4 py-3 ${
+          isDark ? "border-red-500/20 bg-red-500/10 text-red-200" : "border-red-200 bg-red-50 text-red-800"
+        }`}>
+          {pageError}
+        </div>
+      )}
+
+      <section className={`overflow-hidden rounded-[24px] border ${
+        isDark ? "border-slate-800 bg-slate-900/70" : "border-slate-200 bg-white"
       }`}>
-        {/* Search Bar */}
-        <div className={`p-4 border-b ${isDark ? "border-gray-700" : "border-gray-200"}`}>
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder={t("Search authors by name or email...")}
-            className={`w-full px-4 py-2 rounded-lg border transition-colors ${
-              isDark
-                ? "bg-gray-700 border-gray-600 text-white placeholder-gray-500"
-                : "bg-gray-50 border-gray-300 text-gray-900 placeholder-gray-500"
-            } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-          />
+        <div className={`border-b px-6 py-4 ${
+          isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-slate-50"
+        }`}>
+          <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+            {t("Author Directory")}
+          </h3>
+          <p className={`mt-1 text-sm ${isDark ? "text-slate-400" : "text-slate-600"}`}>
+            {t("All created authors appear here immediately after a successful submission.")}
+          </p>
         </div>
 
-        {/* Error Alert */}
-        {error && (
-          <div className={`p-4 border-b ${
-            isDark
-              ? "bg-red-900/20 border-red-700/50 text-red-300"
-              : "bg-red-50 border-red-200 text-red-800"
+        {selectedAuthor && (
+          <div className={`border-b px-6 py-5 ${
+            isDark ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-slate-50/80"
           }`}>
-            {error}
-          </div>
-        )}
-
-        {/* Loading State */}
-        {loading && (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin">⚙️</div>
-            <p className={`mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-              {t("Loading authors...")}
-            </p>
-          </div>
-        )}
-
-        {/* Empty State */}
-        {!loading && authors.length === 0 && (
-          <div className="p-8 text-center">
-            <p className={`text-lg font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-              {t("No authors found")}
-            </p>
-            <p className={`mt-1 ${isDark ? "text-gray-500" : "text-gray-600"}`}>
-              {t("Create a new author to get started")}
-            </p>
-          </div>
-        )}
-
-        {/* Authors Table */}
-        {!loading && authors.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className={`border-b ${
-                  isDark ? "border-gray-700 bg-gray-700/50" : "border-gray-200 bg-gray-50"
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div className="flex items-start gap-4">
+                <div className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold ${
+                  isDark ? "bg-[#214046] text-white" : "bg-[#4a868f] text-white"
                 }`}>
-                  <th className={`px-6 py-3 text-left text-sm font-semibold ${
-                    isDark ? "text-gray-300" : "text-gray-700"
+                  {String(selectedAuthor.name || "AU")
+                    .trim()
+                    .split(/\s+/)
+                    .slice(0, 2)
+                    .map((part) => part[0]?.toUpperCase() || "")
+                    .join("")}
+                </div>
+                <div>
+                  <h4 className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
+                    {selectedAuthor.name}
+                  </h4>
+                  <div className={`mt-2 flex flex-wrap items-center gap-3 text-sm ${
+                    isDark ? "text-slate-300" : "text-slate-600"
                   }`}>
-                    {t("Name")}
-                  </th>
-                  <th className={`px-6 py-3 text-left text-sm font-semibold ${
-                    isDark ? "text-gray-300" : "text-gray-700"
+                    <span className="inline-flex items-center gap-2">
+                      <Mail size={15} />
+                      {selectedAuthor.email}
+                    </span>
+                    <span className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-amber-500">
+                      <ShieldCheck size={14} />
+                      Author
+                    </span>
+                  </div>
+                  <p className={`mt-3 max-w-3xl text-sm leading-6 ${
+                    isDark ? "text-slate-400" : "text-slate-600"
                   }`}>
-                    {t("Email")}
-                  </th>
-                  <th className={`px-6 py-3 text-left text-sm font-semibold ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
-                    {t("Status")}
-                  </th>
-                  <th className={`px-6 py-3 text-right text-sm font-semibold ${
-                    isDark ? "text-gray-300" : "text-gray-700"
-                  }`}>
-                    {t("Actions")}
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {authors.map((author) => (
-                  <tr
-                    key={author.id}
-                    className={`border-b transition-colors hover:bg-gray-700/30 ${
-                      isDark
-                        ? "border-gray-700"
-                        : "border-gray-200 hover:bg-gray-50"
-                    }`}
-                  >
-                    {/* Author Profile */}
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        {author.profile_image_url && (
-                          <img
-                            src={author.profile_image_url}
-                            alt={author.name}
-                            className="w-10 h-10 rounded-full object-cover"
-                          />
-                        )}
-                        <div>
-                          <p className={`font-medium ${isDark ? "text-white" : "text-gray-900"}`}>
-                            {author.name}
-                          </p>
-                          {author.bio && (
-                            <p className={`text-sm ${isDark ? "text-gray-500" : "text-gray-600"}`}>
-                              {author.bio.substring(0, 50)}
-                              {author.bio.length > 50 ? "..." : ""}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </td>
+                    {selectedAuthor.bio || t("No biography has been added for this author yet.")}
+                  </p>
+                </div>
+              </div>
 
-                    {/* Email */}
-                    <td className={`px-6 py-4 text-sm ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                      {author.email}
-                    </td>
-
-                    {/* Status */}
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-sm font-medium ${
-                        author.is_active
-                          ? isDark
-                            ? "bg-green-900/30 text-green-300"
-                            : "bg-green-100 text-green-700"
-                          : isDark
-                            ? "bg-yellow-900/30 text-yellow-300"
-                            : "bg-yellow-100 text-yellow-700"
-                      }`}>
-                        {author.is_active ? (
-                          <>
-                            <CheckCircle size={14} />
-                            {t("Active")}
-                          </>
-                        ) : (
-                          <>
-                            <Mail size={14} />
-                            {t("Pending")}
-                          </>
-                        )}
-                      </span>
-                    </td>
-
-                    {/* Actions */}
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2">
-                        {/* Resend Invitation */}
-                        {!author.is_active && (
-                          <button
-                            onClick={() => handleResendInvite(author.id)}
-                            disabled={actionLoadingId === author.id}
-                            className={`p-2 rounded transition-colors ${
-                              isDark
-                                ? "hover:bg-gray-700 text-blue-400"
-                                : "hover:bg-gray-100 text-blue-600"
-                            } ${actionLoadingId === author.id ? "opacity-50" : ""}`}
-                            title={t("Resend invitation")}
-                          >
-                            <Mail size={18} />
-                          </button>
-                        )}
-
-                        {/* Delete Button */}
-                        {deleteConfirm === author.id ? (
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleDeleteAuthor(author.id)}
-                              disabled={actionLoadingId === author.id}
-                              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                                isDark
-                                  ? "bg-red-600 hover:bg-red-700 text-white"
-                                  : "bg-red-500 hover:bg-red-600 text-white"
-                              } ${actionLoadingId === author.id ? "opacity-50" : ""}`}
-                            >
-                              {actionLoadingId === author.id ? t("Deleting...") : t("Confirm")}
-                            </button>
-                            <button
-                              onClick={() => setDeleteConfirm(null)}
-                              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                                isDark
-                                  ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
-                                  : "bg-gray-200 hover:bg-gray-300 text-gray-800"
-                              }`}
-                            >
-                              {t("Cancel")}
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setDeleteConfirm(author.id)}
-                            className={`p-2 rounded transition-colors ${
-                              isDark
-                                ? "hover:bg-gray-700 text-red-400"
-                                : "hover:bg-gray-100 text-red-600"
-                            }`}
-                            title={t("Delete author")}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+              <button
+                type="button"
+                onClick={() => setSelectedAuthor(null)}
+                className={`inline-flex items-center gap-2 self-start rounded-xl border px-4 py-2 text-sm font-semibold transition ${
+                  isDark
+                    ? "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                    : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                }`}
+              >
+                <X size={16} />
+                {t("Close")}
+              </button>
+            </div>
           </div>
         )}
-      </div>
+
+        <AuthorsTable
+          authors={authors}
+          loading={loading}
+          emptyTitle={t("No authors found")}
+          emptyDescription={t("Create a new author to get started")}
+          actionLoadingId={actionLoadingId}
+          deleteConfirm={deleteConfirm}
+          onDeleteRequest={setDeleteConfirm}
+          onDeleteConfirm={handleDeleteAuthor}
+          onDeleteCancel={() => setDeleteConfirm(null)}
+          onResendInvite={handleResendInvite}
+          onViewAuthor={setSelectedAuthor}
+        />
+      </section>
     </div>
   );
 }

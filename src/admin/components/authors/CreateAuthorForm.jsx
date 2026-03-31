@@ -1,144 +1,142 @@
-import { useState, useRef } from "react";
-import { AlertCircle, CheckCircle, Upload, X } from "lucide-react";
+import { useState } from "react";
+import {
+  AlertCircle,
+  BookOpen,
+  Eye,
+  EyeOff,
+  FileText,
+  LoaderCircle,
+  Lock,
+  Mail,
+  User as UserIcon,
+} from "lucide-react";
 import { useLanguage } from "../../../i18n/LanguageContext";
 import { useTheme } from "../../../theme/ThemeContext";
 import { createAuthor } from "../../services/authorService";
 
-/**
- * CreateAuthorForm Component
- * 
- * A comprehensive form for admin to create new authors with:
- * - Form validation (required fields, unique email)
- * - Profile image upload with preview
- * - Success/error alerting
- * - Form reset after submission
- * - Responsive design
- */
-export default function CreateAuthorForm({ onSuccess }) {
+const MAX_BIO_LENGTH = 500;
+
+function getFieldError(errors, key) {
+  const value = errors?.[key];
+  if (Array.isArray(value)) return value[0] || "";
+  return typeof value === "string" ? value : "";
+}
+
+function getInputClass(isDark, hasError, withIcon = false) {
+  return [
+    "w-full rounded-xl border py-3 outline-none transition-all",
+    withIcon ? "pl-12 pr-12" : "px-4",
+    isDark
+      ? "border-[rgba(255,255,255,0.08)] bg-[#1d3438] text-[#f8fafc] placeholder:text-[#94a3b8]/30"
+      : "border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400",
+    hasError
+      ? isDark
+        ? "border-red-400/70"
+        : "border-red-400 bg-red-50"
+      : "focus:border-[#4a868f]",
+  ].join(" ");
+}
+
+export default function CreateAuthorForm({ onSuccess, onCancel }) {
   const { t } = useLanguage();
   const { isDark } = useTheme();
-
-  // Form state
-  const [formData, setFormData] = useState({
-    name: "",
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [form, setForm] = useState({
+    firstName: "",
+    lastName: "",
     email: "",
+    password: "",
+    password_confirmation: "",
     bio: "",
   });
-
-  // File state
-  const [profileImage, setProfileImage] = useState(null);
-  const [imagePreview, setImagePreview] = useState(null);
-  const fileInputRef = useRef(null);
-
-  // UI state
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [fieldErrors, setFieldErrors] = useState({});
 
-  /**
-   * Validate form inputs
-   * - Check required fields
-   * - Validate email format
-   * - Clear previous errors
-   */
+  const cardClass = isDark
+    ? "border-[rgba(255,255,255,0.08)] bg-[#16282b] text-[#f8fafc] shadow-2xl"
+    : "border-slate-200 bg-white text-slate-900 shadow-[0_20px_60px_rgba(15,23,42,0.08)]";
+  const accentIconClass = isDark ? "bg-[#214046]" : "bg-[#e5f3f5]";
+  const labelClass = isDark ? "text-[#94a3b8]" : "text-slate-600";
+  const helperTextClass = isDark ? "text-[#94a3b8]" : "text-slate-500";
+  const iconColorClass = isDark ? "text-[#94a3b8]" : "text-slate-400";
+  const cancelButtonClass = isDark
+    ? "border-[rgba(255,255,255,0.08)] bg-[#1d3438] text-[#94a3b8] hover:text-[#f8fafc]"
+    : "border-slate-200 bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900";
+  const footerBorderClass = isDark ? "border-[rgba(255,255,255,0.05)]" : "border-slate-200";
+  const errorBoxClass = isDark
+    ? "border-red-500/20 bg-red-500/10 text-red-300"
+    : "border-red-200 bg-red-50 text-red-800";
+  const successBoxClass = isDark
+    ? "border-emerald-500/20 bg-emerald-500/10 text-emerald-300"
+    : "border-emerald-200 bg-emerald-50 text-emerald-800";
+
+  const onChange = (key, value) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    setError("");
+    setSuccess("");
+
+    if (fieldErrors[key]) {
+      setFieldErrors((prev) => ({ ...prev, [key]: "" }));
+    }
+  };
+
+  const resetForm = () => {
+    setForm({ firstName: "", lastName: "", email: "", password: "", password_confirmation: "", bio: "" });
+    setFieldErrors({});
+    setShowPassword(false);
+    setShowConfirmPassword(false);
+  };
+
   const validateForm = () => {
-    const errors = {};
+    const nextErrors = {};
+    const trimmedFirstName = form.firstName.trim();
+    const trimmedLastName = form.lastName.trim();
+    const trimmedEmail = form.email.trim().toLowerCase();
 
-    // Validate name
-    if (!formData.name.trim()) {
-      errors.name = t("Author name is required");
-    } else if (formData.name.trim().length < 2) {
-      errors.name = t("Author name must be at least 2 characters");
+    if (!trimmedFirstName) {
+      nextErrors.firstName = t("First name is required");
+    } else if (trimmedFirstName.length < 2) {
+      nextErrors.firstName = t("First name must be at least 2 characters");
     }
 
-    // Validate email
-    if (!formData.email.trim()) {
-      errors.email = t("Email is required");
-    } else {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(formData.email)) {
-        errors.email = t("Please enter a valid email address");
-      }
+    if (!trimmedLastName) {
+      nextErrors.lastName = t("Last name is required");
+    } else if (trimmedLastName.length < 2) {
+      nextErrors.lastName = t("Last name must be at least 2 characters");
     }
 
-    // Validate bio
-    if (formData.bio.trim().length > 500) {
-      errors.bio = t("Bio must not exceed 500 characters");
+    if (!trimmedEmail) {
+      nextErrors.email = t("Email is required");
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedEmail)) {
+      nextErrors.email = t("Please enter a valid email address");
     }
 
-    setFieldErrors(errors);
-    return Object.keys(errors).length === 0;
+    if (!form.password) {
+      nextErrors.password = t("Password is required");
+    } else if (form.password.length < 8) {
+      nextErrors.password = t("Password must be at least 8 characters");
+    }
+
+    if (!form.password_confirmation) {
+      nextErrors.password_confirmation = t("Password confirmation is required");
+    } else if (form.password !== form.password_confirmation) {
+      nextErrors.password_confirmation = t("Password confirmation does not match");
+    }
+
+    if (form.bio.trim().length > MAX_BIO_LENGTH) {
+      nextErrors.bio = t("Bio must not exceed 500 characters");
+    }
+
+    setFieldErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  /**
-   * Handle text input changes
-   */
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
+  const onSubmit = async (event) => {
+    event.preventDefault();
 
-    // Clear error for this field when user starts typing
-    if (fieldErrors[name]) {
-      setFieldErrors((prev) => ({
-        ...prev,
-        [name]: "",
-      }));
-    }
-  };
-
-  /**
-   * Handle file input change - validate and create preview
-   */
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-
-    if (file) {
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        setError(t("Please select an image file"));
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        setError(t("Image must be smaller than 5MB"));
-        return;
-      }
-
-      setProfileImage(file);
-      setError("");
-
-      // Create preview
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreview(reader.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  /**
-   * Remove selected image
-   */
-  const handleRemoveImage = () => {
-    setProfileImage(null);
-    setImagePreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
-  };
-
-  /**
-   * Submit form - create new author via API
-   */
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-
-    // Validate form
     if (!validateForm()) {
       setError(t("Please fix the errors above"));
       return;
@@ -149,324 +147,262 @@ export default function CreateAuthorForm({ onSuccess }) {
     setSuccess("");
 
     try {
-      // Call authorService to create author
       const response = await createAuthor({
-        name: formData.name.trim(),
-        email: formData.email.trim(),
-        bio: formData.bio.trim(),
-        profile_image: profileImage,
+        firstname: form.firstName.trim(),
+        lastname: form.lastName.trim(),
+        email: form.email.trim().toLowerCase(),
+        password: form.password,
+        password_confirmation: form.password_confirmation,
+        bio: form.bio.trim(),
       });
 
-      // Success
-      if (response?.success) {
-        setSuccess(
-          response?.message ||
-            t("Author created successfully! An invitation email will be sent.")
-        );
+      if (!response?.success) {
+        setError(response?.message || t("Failed to create author"));
+        return;
+      }
 
-        // Reset form
-        setFormData({
-          name: "",
-          email: "",
-          bio: "",
+      const successMessage = response.message || t("Author created successfully");
+      setSuccess(successMessage);
+
+      if (typeof onSuccess === "function") {
+        onSuccess({
+          author: response.data || {},
+          message: successMessage,
         });
-        handleRemoveImage();
-        setFieldErrors({});
-
-        // Call callback if provided
-        if (onSuccess) {
-          onSuccess(response?.data || {});
-        }
-
-        // Clear success message after 5 seconds
-        setTimeout(() => setSuccess(""), 5000);
       }
+
+      resetForm();
     } catch (err) {
-      // Handle error response
-      const errorMessage = err?.message || t("Failed to create author. Please try again.");
-
-      setError(errorMessage);
-
-      // Show field-specific errors if provided
-      if (err?.errors) {
-        setFieldErrors(err.errors);
-      }
+      setFieldErrors({
+        firstName: getFieldError(err?.errors, "firstname") || getFieldError(err?.errors, "first_name") || getFieldError(err?.errors, "name"),
+        lastName: getFieldError(err?.errors, "lastname") || getFieldError(err?.errors, "last_name"),
+        email: getFieldError(err?.errors, "email"),
+        password: getFieldError(err?.errors, "password"),
+        password_confirmation: getFieldError(err?.errors, "password_confirmation"),
+        bio: getFieldError(err?.errors, "bio"),
+      });
+      setError(err?.message || t("Failed to create author"));
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className={`text-3xl font-bold ${isDark ? "text-white" : "text-gray-900"}`}>
-          {t("Create New Author")}
-        </h1>
-        <p className={`mt-2 ${isDark ? "text-gray-400" : "text-gray-600"}`}>
-          {t(
-            "Add a new author to the platform. They will receive an invitation email to set up their account."
-          )}
+    <div className={`w-full rounded-[24px] border p-8 lg:p-10 ${cardClass}`}>
+      <div className="mb-8 text-center">
+        <div className={`mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-2xl ${accentIconClass}`}>
+          <BookOpen size={24} className="text-[#4a868f]" />
+        </div>
+        <h2 className="text-3xl font-bold">{t("Create Author")}</h2>
+        <p className={`mt-2 ${helperTextClass}`}>
+          {t("Create a new author account with the backend author registration endpoint.")}
         </p>
       </div>
 
-      {/* Success Alert */}
-      {success && (
-        <div className={`mb-6 p-4 rounded-lg border flex items-start gap-3 ${
-          isDark
-            ? "bg-green-900/20 border-green-700/50 text-green-300"
-            : "bg-green-50 border-green-200 text-green-800"
-        }`}>
-          <CheckCircle size={20} className="flex-shrink-0 mt-0.5" />
+      <form className="space-y-5" onSubmit={onSubmit}>
+        <div className="grid gap-5 md:grid-cols-2">
           <div>
-            <h3 className="font-semibold">{t("Success")}</h3>
-            <p className="text-sm mt-1">{success}</p>
+            <label className={`mb-2 block text-xs font-bold uppercase tracking-wider ${labelClass}`}>
+              {t("First Name")}
+            </label>
+            <div className="relative">
+              <UserIcon className={`absolute left-4 top-1/2 -translate-y-1/2 ${iconColorClass}`} size={18} />
+              <input
+                type="text"
+                value={form.firstName}
+                onChange={(event) => onChange("firstName", event.target.value)}
+                placeholder="Jane"
+                disabled={loading}
+                className={[
+                  getInputClass(isDark, Boolean(fieldErrors.firstName), true),
+                  "pr-4",
+                ].join(" ")}
+              />
+            </div>
+            {fieldErrors.firstName && <p className="mt-2 text-sm text-red-400">{fieldErrors.firstName}</p>}
+          </div>
+
+          <div>
+            <label className={`mb-2 block text-xs font-bold uppercase tracking-wider ${labelClass}`}>
+              {t("Last Name")}
+            </label>
+            <div className="relative">
+              <UserIcon className={`absolute left-4 top-1/2 -translate-y-1/2 ${iconColorClass}`} size={18} />
+              <input
+                type="text"
+                value={form.lastName}
+                onChange={(event) => onChange("lastName", event.target.value)}
+                placeholder="Doe"
+                disabled={loading}
+                className={[
+                  getInputClass(isDark, Boolean(fieldErrors.lastName), true),
+                  "pr-4",
+                ].join(" ")}
+              />
+            </div>
+            {fieldErrors.lastName && <p className="mt-2 text-sm text-red-400">{fieldErrors.lastName}</p>}
           </div>
         </div>
-      )}
 
-      {/* Error Alert */}
-      {error && (
-        <div className={`mb-6 p-4 rounded-lg border flex items-start gap-3 ${
-          isDark
-            ? "bg-red-900/20 border-red-700/50 text-red-300"
-            : "bg-red-50 border-red-200 text-red-800"
-        }`}>
-          <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
+        <div className="grid gap-5 md:grid-cols-2">
           <div>
-            <h3 className="font-semibold">{t("Error")}</h3>
-            <p className="text-sm mt-1">{error}</p>
+            <label className={`mb-2 block text-xs font-bold uppercase tracking-wider ${labelClass}`}>
+              {t("Email Address")}
+            </label>
+            <div className="relative">
+              <Mail className={`absolute left-4 top-1/2 -translate-y-1/2 ${iconColorClass}`} size={18} />
+              <input
+                type="email"
+                value={form.email}
+                onChange={(event) => onChange("email", event.target.value)}
+                placeholder="jane.doe@university.edu"
+                disabled={loading}
+                className={getInputClass(isDark, Boolean(fieldErrors.email), true)}
+              />
+            </div>
+            {fieldErrors.email && <p className="mt-2 text-sm text-red-400">{fieldErrors.email}</p>}
+          </div>
+
+          <div>
+            <label className={`mb-2 block text-xs font-bold uppercase tracking-wider ${labelClass}`}>
+              {t("Password")}
+            </label>
+            <div className="relative">
+              <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 ${iconColorClass}`} size={18} />
+              <input
+                type={showPassword ? "text" : "password"}
+                value={form.password}
+                onChange={(event) => onChange("password", event.target.value)}
+                placeholder="Minimum 8 characters"
+                disabled={loading}
+                className={getInputClass(isDark, Boolean(fieldErrors.password), true)}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword((prev) => !prev)}
+                className={`absolute right-4 top-1/2 -translate-y-1/2 transition ${
+                  isDark ? "text-[#94a3b8] hover:text-[#f8fafc]" : "text-slate-400 hover:text-slate-700"
+                }`}
+                aria-label={showPassword ? "Hide password" : "Show password"}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
+            {fieldErrors.password && <p className="mt-2 text-sm text-red-400">{fieldErrors.password}</p>}
           </div>
         </div>
-      )}
 
-      {/* Form */}
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Author Name Field */}
         <div>
-          <label className={`block text-sm font-medium mb-2 ${
-            isDark ? "text-gray-300" : "text-gray-700"
-          }`}>
-            {t("Author Name")} <span className="text-red-500">*</span>
+          <label className={`mb-2 block text-xs font-bold uppercase tracking-wider ${labelClass}`}>
+            {t("Confirm Password")}
           </label>
-          <input
-            type="text"
-            name="name"
-            value={formData.name}
-            onChange={handleInputChange}
-            placeholder="John Doe"
-            className={`w-full px-4 py-2 rounded-lg border transition-colors ${
-              fieldErrors.name
-                ? isDark
-                  ? "border-red-600/60 bg-red-900/10"
-                  : "border-red-300 bg-red-50"
-                : isDark
-                  ? "border-gray-600 bg-gray-700 text-white"
-                  : "border-gray-300 bg-white text-gray-900"
-            } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            disabled={loading}
-          />
-          {fieldErrors.name && (
-            <p className="text-red-500 text-sm mt-1">{fieldErrors.name}</p>
+          <div className="relative">
+            <Lock className={`absolute left-4 top-1/2 -translate-y-1/2 ${iconColorClass}`} size={18} />
+            <input
+              type={showConfirmPassword ? "text" : "password"}
+              value={form.password_confirmation}
+              onChange={(event) => onChange("password_confirmation", event.target.value)}
+              placeholder="Repeat password"
+              disabled={loading}
+              className={getInputClass(isDark, Boolean(fieldErrors.password_confirmation), true)}
+            />
+            <button
+              type="button"
+              onClick={() => setShowConfirmPassword((prev) => !prev)}
+              className={`absolute right-4 top-1/2 -translate-y-1/2 transition ${
+                isDark ? "text-[#94a3b8] hover:text-[#f8fafc]" : "text-slate-400 hover:text-slate-700"
+              }`}
+              aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+            >
+              {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+          {fieldErrors.password_confirmation && (
+            <p className="mt-2 text-sm text-red-400">{fieldErrors.password_confirmation}</p>
           )}
         </div>
 
-        {/* Email Field */}
         <div>
-          <label className={`block text-sm font-medium mb-2 ${
-            isDark ? "text-gray-300" : "text-gray-700"
-          }`}>
-            {t("Email")} <span className="text-red-500">*</span>
-          </label>
-          <input
-            type="email"
-            name="email"
-            value={formData.email}
-            onChange={handleInputChange}
-            placeholder="author@example.com"
-            className={`w-full px-4 py-2 rounded-lg border transition-colors ${
-              fieldErrors.email
-                ? isDark
-                  ? "border-red-600/60 bg-red-900/10"
-                  : "border-red-300 bg-red-50"
-                : isDark
-                  ? "border-gray-600 bg-gray-700 text-white"
-                  : "border-gray-300 bg-white text-gray-900"
-            } focus:outline-none focus:ring-2 focus:ring-purple-500`}
-            disabled={loading}
-          />
-          {fieldErrors.email && (
-            <p className="text-red-500 text-sm mt-1">{fieldErrors.email}</p>
-          )}
-          <p className={`text-xs mt-1 ${isDark ? "text-gray-500" : "text-gray-600"}`}>
-            {t("Ensure this email is unique")}
-          </p>
-        </div>
-
-        {/* Bio Field */}
-        <div>
-          <label className={`block text-sm font-medium mb-2 ${
-            isDark ? "text-gray-300" : "text-gray-700"
-          }`}>
+          <label className={`mb-2 block text-xs font-bold uppercase tracking-wider ${labelClass}`}>
             {t("Bio")}
           </label>
-          <textarea
-            name="bio"
-            value={formData.bio}
-            onChange={handleInputChange}
-            placeholder="Write a brief biography about the author..."
-            rows="4"
-            className={`w-full px-4 py-2 rounded-lg border transition-colors ${
-              fieldErrors.bio
-                ? isDark
-                  ? "border-red-600/60 bg-red-900/10"
-                  : "border-red-300 bg-red-50"
-                : isDark
-                  ? "border-gray-600 bg-gray-700 text-white"
-                  : "border-gray-300 bg-white text-gray-900"
-            } focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none`}
-            disabled={loading}
-          />
-          <div className="flex justify-between mt-1">
-            <p className={`text-xs ${isDark ? "text-gray-500" : "text-gray-600"}`}>
-              {t("Maximum 500 characters")}
-            </p>
-            <p className={`text-xs ${
-              formData.bio.length > 500
-                ? "text-red-500"
-                : isDark
-                  ? "text-gray-500"
-                  : "text-gray-600"
-            }`}>
-              {formData.bio.length}/500
-            </p>
+          <div className="relative">
+            <FileText className={`absolute left-4 top-4 ${iconColorClass}`} size={18} />
+            <textarea
+              rows="4"
+              value={form.bio}
+              onChange={(event) => onChange("bio", event.target.value)}
+              placeholder="Write a short biography about this author..."
+              disabled={loading}
+              className={[
+                "w-full rounded-xl border py-3 pl-12 pr-4 outline-none transition-all resize-none",
+                isDark
+                  ? "border-[rgba(255,255,255,0.08)] bg-[#1d3438] text-[#f8fafc] placeholder:text-[#94a3b8]/30"
+                  : "border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400",
+                fieldErrors.bio
+                  ? isDark
+                    ? "border-red-400/70"
+                    : "border-red-400 bg-red-50"
+                  : "focus:border-[#4a868f]",
+              ].join(" ")}
+            />
           </div>
-          {fieldErrors.bio && (
-            <p className="text-red-500 text-sm mt-1">{fieldErrors.bio}</p>
-          )}
+          <div className={`mt-2 flex items-center justify-between text-xs ${helperTextClass}`}>
+            <span>{t("Optional profile summary")}</span>
+            <span className={form.bio.length > MAX_BIO_LENGTH ? "text-red-400" : ""}>
+              {form.bio.length}/{MAX_BIO_LENGTH}
+            </span>
+          </div>
+          {fieldErrors.bio && <p className="mt-2 text-sm text-red-400">{fieldErrors.bio}</p>}
         </div>
 
-        {/* Profile Image Upload */}
-        <div>
-          <label className={`block text-sm font-medium mb-2 ${
-            isDark ? "text-gray-300" : "text-gray-700"
-          }`}>
-            {t("Profile Image")}
-          </label>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {/* Upload Area */}
-            <div>
-              <label
-                className={`block border-2 border-dashed rounded-lg p-6 text-center cursor-pointer transition-colors ${
-                  isDark
-                    ? "border-gray-600 hover:border-purple-500 hover:bg-purple-900/10"
-                    : "border-gray-300 hover:border-purple-500 hover:bg-purple-50"
-                } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  disabled={loading}
-                />
-                <Upload
-                  size={32}
-                  className={`mx-auto mb-2 ${
-                    isDark ? "text-gray-400" : "text-gray-400"
-                  }`}
-                />
-                <p className={`font-medium ${isDark ? "text-gray-300" : "text-gray-700"}`}>
-                  {t("Click to upload")}
-                </p>
-                <p className={`text-sm ${isDark ? "text-gray-500" : "text-gray-600"}`}>
-                  {t("PNG, JPG up to 5MB")}
-                </p>
-              </label>
-            </div>
-
-            {/* Image Preview */}
-            {imagePreview && (
-              <div className={`relative rounded-lg overflow-hidden border ${
-                isDark ? "border-gray-600 bg-gray-800" : "border-gray-300 bg-gray-100"
-              }`}>
-                <img
-                  src={imagePreview}
-                  alt="Preview"
-                  className="w-full h-48 object-cover"
-                />
-                <button
-                  type="button"
-                  onClick={handleRemoveImage}
-                  className={`absolute top-2 right-2 p-1 rounded-full transition-colors ${
-                    isDark
-                      ? "bg-red-900/80 hover:bg-red-800"
-                      : "bg-red-500 hover:bg-red-600"
-                  }`}
-                  aria-label="Remove image"
-                >
-                  <X size={20} className="text-white" />
-                </button>
-              </div>
-            )}
+        {error && (
+          <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${errorBoxClass}`}>
+            <AlertCircle size={18} className="mt-0.5 shrink-0" />
+            <span>{error}</span>
           </div>
-        </div>
+        )}
 
-        {/* Submit Button */}
-        <div className="flex gap-4 pt-4">
+        {success && (
+          <div className={`flex items-start gap-2 rounded-xl border px-4 py-3 text-sm ${successBoxClass}`}>
+            <span>{success}</span>
+          </div>
+        )}
+
+        <div className="flex flex-col gap-3 sm:flex-row">
           <button
             type="submit"
             disabled={loading}
-            className={`flex-1 px-6 py-3 rounded-lg font-medium transition-all ${
-              isDark
-                ? "bg-purple-600 hover:bg-purple-700 text-white"
-                : "bg-purple-500 hover:bg-purple-600 text-white"
-            } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#214046] py-3.5 font-bold text-[#f8fafc] shadow-lg transition-all hover:bg-[#2a525a] hover:shadow-[#4a868f]/10 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            {loading ? (
-              <>
-                <span className="inline-block animate-spin mr-2">⚙️</span>
-                {t("Creating...")}
-              </>
-            ) : (
-              t("Create Author")
-            )}
+            {loading ? <LoaderCircle size={18} className="animate-spin" /> : null}
+            <span>{loading ? t("Creating...") : t("Create Author")}</span>
           </button>
           <button
-            type="reset"
+            type="button"
             onClick={() => {
-              setFormData({ name: "", email: "", bio: "" });
-              handleRemoveImage();
-              setFieldErrors({});
               setError("");
+              setSuccess("");
+              resetForm();
+              if (typeof onCancel === "function") {
+                onCancel();
+              }
             }}
             disabled={loading}
-            className={`px-6 py-3 rounded-lg font-medium transition-all ${
-              isDark
-                ? "bg-gray-700 hover:bg-gray-600 text-gray-300"
-                : "bg-gray-200 hover:bg-gray-300 text-gray-800"
-            } ${loading ? "opacity-50 cursor-not-allowed" : ""}`}
+            className={`rounded-xl border px-5 py-3.5 font-semibold transition disabled:cursor-not-allowed disabled:opacity-70 ${cancelButtonClass}`}
           >
-            {t("Clear")}
+            {t("Cancel")}
           </button>
         </div>
       </form>
 
-      {/* Info Box */}
-      <div className={`mt-8 p-4 rounded-lg border ${
-        isDark
-          ? "bg-blue-900/20 border-blue-700/50 text-blue-300"
-          : "bg-blue-50 border-blue-200 text-blue-900"
-      }`}>
-        <h3 className="font-semibold mb-2">{t("What happens after creation?")}</h3>
-        <ul className="text-sm space-y-1 list-disc list-inside">
-          <li>{t("An invitation email will be sent to the author")}</li>
-          <li>{t("They can set their own password via the invitation link")}</li>
-          <li>{t("Their profile image and bio will be saved")}</li>
-          <li>{t("They can start uploading books immediately after setup")}</li>
-        </ul>
+      <div className={`mt-8 border-t pt-6 ${footerBorderClass}`}>
+        <div className={`max-w-lg text-xs leading-relaxed ${helperTextClass}`}>
+          <h3 className="font-bold uppercase tracking-[0.2em] text-[#4a868f]">{t("API Payload")}</h3>
+          <p className="mt-2">
+            {t("Submit firstname, lastname, email, password, password_confirmation, role_id: 2, and bio to the author registration endpoint if your backend supports it.")}
+          </p>
+        </div>
       </div>
     </div>
   );

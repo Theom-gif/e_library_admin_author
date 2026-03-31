@@ -9,6 +9,7 @@ import { fetchAdminNotifications, fetchAdminBooks } from "../services/adminServi
 const TITLES = {
   "/admin/dashboard":     "Admin Dashboard",
   "/admin/users":         "Manages Users",
+  "/admin/authors":       "Author Management",
   "/admin/approvals":     "Book Approvals",
   "/admin/categories":    "Categories",
   "/admin/books":         "All Books",

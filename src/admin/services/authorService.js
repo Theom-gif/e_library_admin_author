@@ -1,5 +1,9 @@
 import { apiClient } from "../../lib/apiClient";
 
+const AUTHOR_API_PREFIX = String(import.meta.env.VITE_AUTHOR_API_PREFIX || "/authors").replace(/\/+$/, "");
+const buildAuthorUrl = (suffix = "") => `${AUTHOR_API_PREFIX}${suffix}`;
+const AUTHOR_REGISTRATION_URL = String(import.meta.env.VITE_AUTHOR_REGISTRATION_URL || "/auth/author_registration");
+
 /**
  * Author Management API Service
  * 
@@ -62,18 +66,19 @@ export const fetchAuthors = async (filters = {}, config = {}) => {
     }
 
     const query = params.toString();
-    const url = `/admin/authors${query ? `?${query}` : ""}`;
+    const url = `${buildAuthorUrl()}${query ? `?${query}` : ""}`;
 
     const response = await apiClient.get(url, config);
     const payload = response?.data;
 
     // Extract authors array from response
-    const authors = (Array.isArray(payload?.data) && payload.data) ||
+    const authors = (Array.isArray(payload?.data?.data) && payload.data.data) ||
+                    (Array.isArray(payload?.data) && payload.data) ||
                     (Array.isArray(payload) && payload) ||
                     [];
 
     // Extract pagination metadata
-    const paginationSource = payload?.meta || payload?.pagination || {};
+    const paginationSource = payload?.data?.meta || payload?.meta || payload?.pagination || {};
     const meta = {
       page: paginationSource?.current_page ?? paginationSource?.page ?? 1,
       per_page: paginationSource?.per_page ?? paginationSource?.pageSize ?? 15,
@@ -106,7 +111,7 @@ export const fetchAuthors = async (filters = {}, config = {}) => {
  */
 export const getAuthor = async (id, config = {}) => {
   try {
-    const response = await apiClient.get(`/admin/authors/${id}`, config);
+    const response = await apiClient.get(buildAuthorUrl(`/${id}`), config);
     const author = response?.data?.data || response?.data;
 
     return {
@@ -137,32 +142,22 @@ export const getAuthor = async (id, config = {}) => {
  */
 export const createAuthor = async (authorData = {}, config = {}) => {
   try {
-    // Use FormData for multipart request (file upload)
-    const formData = new FormData();
-    formData.append("name", authorData.name);
-    formData.append("email", authorData.email);
-    
-    if (authorData.bio) {
-      formData.append("bio", authorData.bio);
-    }
+    const payload = {
+      firstname: authorData.firstname,
+      lastname: authorData.lastname,
+      email: authorData.email,
+      password: authorData.password,
+      password_confirmation: authorData.password_confirmation,
+      role_id: 2,
+      ...(authorData.bio ? { bio: authorData.bio } : {}),
+    };
 
-    if (authorData.profile_image instanceof File) {
-      formData.append("profile_image", authorData.profile_image);
-    }
-
-    const response = await apiClient.post("/admin/authors", formData, {
-      ...config,
-      headers: {
-        "Content-Type": "multipart/form-data",
-        ...config.headers,
-      },
-    });
-
-    const author = response?.data?.data || response?.data;
+    const response = await apiClient.post(AUTHOR_REGISTRATION_URL, payload, config);
+    const author = response?.data?.data || response?.data?.user || response?.data;
 
     return {
       data: normalizeAuthor(author),
-      message: response?.data?.message || "Author created successfully",
+      message: response?.data?.message || "Author registered successfully",
       success: response?.data?.success ?? true,
     };
   } catch (error) {
@@ -202,6 +197,10 @@ export const updateAuthor = async (id, authorData = {}, config = {}) => {
       formData.append("email", authorData.email);
     }
 
+    if (authorData.password) {
+      formData.append("password", authorData.password);
+    }
+
     if (authorData.bio) {
       formData.append("bio", authorData.bio);
     }
@@ -210,7 +209,7 @@ export const updateAuthor = async (id, authorData = {}, config = {}) => {
       formData.append("profile_image", authorData.profile_image);
     }
 
-    const response = await apiClient.put(`/admin/authors/${id}`, formData, {
+    const response = await apiClient.put(buildAuthorUrl(`/${id}`), formData, {
       ...config,
       headers: {
         "Content-Type": "multipart/form-data",
@@ -246,7 +245,7 @@ export const updateAuthor = async (id, authorData = {}, config = {}) => {
  */
 export const deleteAuthor = async (id, config = {}) => {
   try {
-    const response = await apiClient.delete(`/admin/authors/${id}`, config);
+    const response = await apiClient.delete(buildAuthorUrl(`/${id}`), config);
 
     return {
       message: response?.data?.message || "Author deleted successfully",
@@ -273,7 +272,7 @@ export const deleteAuthor = async (id, config = {}) => {
 export const resendAuthorInvitation = async (id, config = {}) => {
   try {
     const response = await apiClient.post(
-      `/admin/authors/${id}/resend-invitation`,
+      buildAuthorUrl(`/${id}/resend-invitation`),
       null,
       config
     );

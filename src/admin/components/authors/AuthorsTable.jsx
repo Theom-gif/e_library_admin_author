@@ -1,4 +1,5 @@
 import { Eye, Trash2, UserRound } from "lucide-react";
+import AuthorStatusBadge from "./AuthorStatusBadge";
 
 function getInitials(name = "") {
   return String(name)
@@ -21,13 +22,13 @@ function getAvatarTone(index) {
   return tones[index % tones.length];
 }
 
-function Avatar({ author, index }) {
+function Avatar({ author, index, isDark }) {
   if (author.profile_image_url) {
     return (
       <img
         src={author.profile_image_url}
         alt={author.name}
-        className="h-12 w-12 rounded-full object-cover ring-2 ring-white/60"
+        className={`h-12 w-12 rounded-full object-cover ring-2 ${isDark ? "ring-slate-700/80" : "ring-white/60"}`}
       />
     );
   }
@@ -39,12 +40,17 @@ function Avatar({ author, index }) {
   );
 }
 
-function ActionButton({ children, onClick, tone = "primary", disabled = false, title, icon }) {
-  const className =
-    tone === "danger"
-      ? "border-red-200 bg-red-50 text-red-400 hover:bg-red-100"
-      : tone === "secondary"
-        ? "border-indigo-200 bg-indigo-50 text-indigo-400 hover:bg-indigo-100"
+function ActionButton({ children, onClick, tone = "primary", disabled = false, title, icon, isDark = false }) {
+  const className = tone === "danger"
+    ? isDark
+      ? "border-red-400/25 bg-red-500/10 text-red-300 hover:bg-red-500/15"
+      : "border-red-200 bg-red-50 text-red-400 hover:bg-red-100"
+    : tone === "secondary"
+      ? isDark
+        ? "border-indigo-400/25 bg-indigo-500/10 text-indigo-200 hover:bg-indigo-500/15"
+        : "border-indigo-200 bg-indigo-50 text-indigo-400 hover:bg-indigo-100"
+      : isDark
+        ? "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
         : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50";
 
   return (
@@ -64,6 +70,7 @@ function ActionButton({ children, onClick, tone = "primary", disabled = false, t
 export default function AuthorsTable({
   authors,
   loading,
+  isDark,
   emptyTitle,
   emptyDescription,
   actionLoadingId,
@@ -78,8 +85,10 @@ export default function AuthorsTable({
     return (
       <div className="flex min-h-[260px] items-center justify-center">
         <div className="text-center">
-          <div className="mx-auto h-10 w-10 animate-spin rounded-full border-2 border-slate-200 border-t-[#4a868f]" />
-          <p className="mt-4 text-sm text-slate-500">Loading authors...</p>
+          <div className={`mx-auto h-10 w-10 animate-spin rounded-full border-2 border-t-[#4a868f] ${
+            isDark ? "border-slate-700" : "border-slate-200"
+          }`} />
+          <p className={`mt-4 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>Loading authors...</p>
         </div>
       </div>
     );
@@ -88,8 +97,8 @@ export default function AuthorsTable({
   if (!authors.length) {
     return (
       <div className="px-6 py-14 text-center">
-        <p className="text-lg font-semibold text-slate-900">{emptyTitle}</p>
-        <p className="mt-2 text-sm text-slate-500">{emptyDescription}</p>
+        <p className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>{emptyTitle}</p>
+        <p className={`mt-2 text-sm ${isDark ? "text-slate-400" : "text-slate-500"}`}>{emptyDescription}</p>
       </div>
     );
   }
@@ -97,8 +106,8 @@ export default function AuthorsTable({
   return (
     <div className="overflow-x-auto">
       <table className="w-full min-w-[980px]">
-        <thead className="bg-slate-50">
-          <tr className="text-slate-800">
+        <thead className={isDark ? "bg-slate-900/80" : "bg-slate-50"}>
+          <tr className={isDark ? "text-slate-300" : "text-slate-800"}>
             <th className="px-8 py-5 text-left text-sm font-bold">Profile</th>
             <th className="px-8 py-5 text-left text-sm font-bold">Role</th>
             <th className="px-8 py-5 text-left text-sm font-bold">Email</th>
@@ -107,22 +116,27 @@ export default function AuthorsTable({
         </thead>
         <tbody>
           {authors.map((author, index) => (
-            <tr key={author.id} className="border-t border-slate-200 transition hover:bg-slate-50/80">
+            <tr
+              key={author.id}
+              className={`border-t transition ${
+                isDark
+                  ? "border-slate-800 bg-slate-950/30 hover:bg-slate-900/70"
+                  : "border-slate-200 hover:bg-slate-50/80"
+              }`}
+            >
               <td className="px-8 py-6">
                 <div className="flex items-center gap-4">
-                  <Avatar author={author} index={index} />
+                  <Avatar author={author} index={index} isDark={isDark} />
                   <div className="min-w-0">
-                    <p className="truncate text-[15px] font-semibold text-slate-900">{author.name}</p>
-                    <p className="truncate text-sm text-slate-600">{author.email}</p>
+                    <p className={`truncate text-[15px] font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>{author.name}</p>
+                    <p className={`truncate text-sm ${isDark ? "text-slate-400" : "text-slate-600"}`}>{author.email}</p>
                   </div>
                 </div>
               </td>
               <td className="px-8 py-6">
-                <span className="inline-flex rounded-full border border-amber-300 bg-amber-50 px-4 py-1.5 text-sm font-medium text-amber-500">
-                  Author
-                </span>
+                <AuthorStatusBadge isActive={Boolean(author.is_active)} isDark={isDark} labelActive="Author" labelPending="Author" />
               </td>
-              <td className="px-8 py-6 text-[15px] text-slate-800">{author.email}</td>
+              <td className={`px-8 py-6 text-[15px] ${isDark ? "text-slate-200" : "text-slate-800"}`}>{author.email}</td>
               <td className="px-8 py-6">
                 <div className="flex items-center justify-end gap-3">
                   <ActionButton
@@ -130,6 +144,7 @@ export default function AuthorsTable({
                     tone="secondary"
                     title="View author"
                     icon={<Eye size={16} />}
+                    isDark={isDark}
                   >
                     View
                   </ActionButton>
@@ -141,6 +156,7 @@ export default function AuthorsTable({
                         tone="danger"
                         title="Confirm delete"
                         icon={<Trash2 size={16} />}
+                        isDark={isDark}
                       >
                         {actionLoadingId === author.id ? "Deleting..." : "Confirm"}
                       </ActionButton>
@@ -148,6 +164,7 @@ export default function AuthorsTable({
                         onClick={onDeleteCancel}
                         title="Cancel delete"
                         icon={<UserRound size={16} />}
+                        isDark={isDark}
                       >
                         Cancel
                       </ActionButton>
@@ -158,6 +175,7 @@ export default function AuthorsTable({
                       tone="danger"
                       title="Delete author"
                       icon={<Trash2 size={16} />}
+                      isDark={isDark}
                     >
                       Delete
                     </ActionButton>

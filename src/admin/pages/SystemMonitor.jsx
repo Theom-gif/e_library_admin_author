@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useTheme } from "../../theme/ThemeContext";
 import {
   generateDisks, generateHealth, generateLogs,
@@ -17,6 +18,7 @@ const PAGES = ["overview", "performance", "processes", "disks", "network", "logs
 
 export default function SystemMonitor() {
   const { isDark } = useTheme();
+  const navigate = useNavigate();
   const [page, setPage]           = useState("overview");
   const [health, setHealth]       = useState(null);
   const [history, setHistory]     = useState([]);
@@ -113,6 +115,16 @@ export default function SystemMonitor() {
 
       {/* Top bar */}
       <div className="flex h-[50px] shrink-0 items-center gap-3 border-b px-4" style={{ background: "var(--sm-bg-surface)", borderColor: "var(--sm-border)" }}>
+        <button
+          onClick={() => navigate(-1)}
+          className="flex items-center justify-center w-8 h-8 rounded hover:bg-white/10 transition-colors"
+          style={{ background: "var(--sm-bg-hover)", border: "1px solid var(--sm-border)" }}
+          title="Go back"
+        >
+          <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+            <path d="M19 12H5M12 19l-7-7 7-7" />
+          </svg>
+        </button>
         <LogoMark />
         <span style={{ fontFamily: "'IBM Plex Mono',monospace", fontSize: 13, fontWeight: 600, letterSpacing: -0.3 }}>sysmon</span>
         <HostBadge health={health} />

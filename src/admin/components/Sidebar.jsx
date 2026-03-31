@@ -8,6 +8,7 @@ import {
   Trophy,
   Users,
   Activity,
+  PenTool,
 } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "../../lib/utils";
@@ -18,6 +19,7 @@ export default function Sidebar() {
   const links = [
     { to: "/admin/dashboard", label: t("Dashboard"), icon: LayoutDashboard },
     { to: "/admin/users", label: t("Users"), icon: Users },
+    { to: "/admin/authors", label: t("Authors"), icon: PenTool },
     { to: "/admin/approvals", label: t("Approvals"), icon: CheckSquare },
     { to: "/admin/categories", label: t("Categories"), icon: Grid },
     { to: "/admin/books", label: t("Books"), icon: BookOpen },

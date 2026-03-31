@@ -18,6 +18,7 @@ const Layout = () => {
     loading: isLoadingNotifications,
     error: notificationsError,
     refreshNotifications,
+    markAllAsRead,
   } = useAuthorNotifications();
   const previewNotifications = notifications.slice(0, 6);
 
@@ -44,8 +45,19 @@ const Layout = () => {
   }, []);
 
   const handleViewAllNotifications = () => {
+    markAllAsRead();
     setIsBellOpen(false);
     navigate('/author/notifications');
+  };
+
+  const handleToggleBell = () => {
+    setIsBellOpen((open) => {
+      const nextOpen = !open;
+      if (nextOpen && unreadCount > 0) {
+        markAllAsRead();
+      }
+      return nextOpen;
+    });
   };
 
   return (
@@ -59,7 +71,7 @@ const Layout = () => {
             <div className="relative" ref={menuRef}>
               <button
                 type="button"
-                onClick={() => setIsBellOpen((open) => !open)}
+                onClick={handleToggleBell}
                 className="relative p-2 text-slate-400 hover:bg-primary/20 rounded-full transition-colors"
                 aria-label={t('Notifications')}
               >
@@ -78,11 +90,6 @@ const Layout = () => {
                       <p className="text-sm font-semibold text-[color:var(--text)]">{t('Notifications')}</p>
                       <p className="text-xs text-slate-500">{t('Latest author activity')}</p>
                     </div>
-                    {unreadCount > 0 && (
-                      <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-xs font-semibold text-red-300">
-                        {unreadCount} {t('unread')}
-                      </span>
-                    )}
                   </div>
 
                   <div className="max-h-[320px] overflow-y-auto p-2">

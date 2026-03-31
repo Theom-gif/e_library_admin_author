@@ -454,12 +454,12 @@ const Dashboard = () => {
           <p className="text-slate-400 mt-1">Here's what's happening with your books today.</p>
         </div>
         <div className="flex gap-3">
-          <button
+          {/* <button
             onClick={() => window.alert('Report download started.')}
             className="px-4 py-2 rounded-lg text-sm font-bold border border-white/10 bg-primary text-on-primary shadow-glow hover:brightness-110 transition-all"
           >
-            {/* Download Report */}
-          </button>
+            Download Report
+          </button> */}
         </div>
       </div>
 

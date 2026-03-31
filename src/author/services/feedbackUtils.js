@@ -173,8 +173,20 @@ export function normalizeAuthorFeedbackEntry(item = {}, uiState = {}) {
 
   const state = uiState[id] || {};
   const reply = String(state.authorReply || "").trim();
-  const helpfulCount = firstFiniteNumber([state.helpful, item?.helpful, item?.helpful_count, item?.likes], 0);
-  const notHelpfulCount = firstFiniteNumber([state.notHelpful, item?.notHelpful, item?.not_helpful], 0);
+  const baseHelpfulCount = firstFiniteNumber([item?.helpful, item?.helpful_count, item?.likes], 0);
+  const baseNotHelpfulCount = firstFiniteNumber([item?.notHelpful, item?.not_helpful], 0);
+  const legacyHelpfulOverride = Number(state.helpful);
+  const legacyNotHelpfulOverride = Number(state.notHelpful);
+  const helpfulDelta = firstFiniteNumber(
+    [state.helpfulDelta],
+    Number.isFinite(legacyHelpfulOverride) ? legacyHelpfulOverride - baseHelpfulCount : 0,
+  );
+  const notHelpfulDelta = firstFiniteNumber(
+    [state.notHelpfulDelta],
+    Number.isFinite(legacyNotHelpfulOverride) ? legacyNotHelpfulOverride - baseNotHelpfulCount : 0,
+  );
+  const helpfulCount = Math.max(0, baseHelpfulCount + helpfulDelta);
+  const notHelpfulCount = Math.max(0, baseNotHelpfulCount + notHelpfulDelta);
   const backendStatus = firstNonEmpty([item?.status, item?.feedback_status]);
   const normalizedStatus = reply
     ? "Replied"
@@ -197,6 +209,7 @@ export function normalizeAuthorFeedbackEntry(item = {}, uiState = {}) {
     avatar: avatarUrl || buildAvatarUrl(userName),
     helpful: helpfulCount,
     notHelpful: notHelpfulCount,
+    reaction: firstNonEmpty([state.reaction]),
     authorReply: reply,
   };
 }

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, Loader2, RefreshCw } from "lucide-react";
 import { useLanguage } from "../../i18n/LanguageContext";
 import { cn } from "../../lib/utils";
@@ -16,7 +16,14 @@ const Notifications = () => {
     loading: isLoading,
     error,
     refreshNotifications,
+    markAllAsRead,
   } = useAuthorNotifications();
+
+  useEffect(() => {
+    if (!isLoading && notifications.length > 0) {
+      markAllAsRead();
+    }
+  }, [isLoading, markAllAsRead, notifications]);
 
   const filteredNotifications = useMemo(
     () =>

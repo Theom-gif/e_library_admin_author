@@ -22,6 +22,11 @@ const COVER_CACHE_KEY = 'author_book_covers';
 const MAX_MANUSCRIPT_SIZE_BYTES = 100 * 1024 * 1024;
 const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024;
 const ACCEPTED_COVER_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+const UPLOAD_STEPS = [
+  { id: 1, label: 'Details', note: 'Title, author, genre, cover' },
+  { id: 2, label: 'Content', note: 'Upload manuscript file' },
+  { id: 3, label: 'Review & Submit', note: 'Check before publish' },
+];
 
 const buildCoverKey = (title, author) =>
   `${String(title || '').trim().toLowerCase()}|${String(author || '').trim().toLowerCase()}`;
@@ -432,27 +437,49 @@ const UploadBook = () => {
         <p className="text-slate-400 mt-1">Follow the steps to publish your book.</p>
       </div>
 
-      <div className="flex items-center justify-between mb-12 relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/5 -translate-y-1/2 z-0"></div>
-        {[
-          { id: 1, label: 'Details', note: 'Title, author, genre' },
-          { id: 2, label: 'Content', note: 'PDF + cover image' },
-          { id: 3, label: 'Review & Submit', note: 'Check & publish' },
-        ].map((item) => (
-          <div key={item.id} className="relative z-10 flex flex-col items-center gap-2">
-            <div
-              className={`size-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
-                step >= item.id ? 'bg-accent text-white shadow-glow' : 'bg-card-dark border border-white/10 text-slate-500'
-              }`}
-            >
-              {step > item.id ? <CheckCircle2 className="size-5" /> : item.id}
-            </div>
-            <span className={`text-[10px] uppercase font-bold tracking-wider ${step >= item.id ? 'text-accent' : 'text-slate-500'}`}>
-              {item.label}
-            </span>
-            <span className="text-[10px] text-slate-500">{item.note}</span>
-          </div>
-        ))}
+      <div className="relative mb-12">
+        <div className="absolute left-[12%] right-[12%] top-7 hidden h-0.5 bg-[var(--border)] md:block" />
+        <div className="grid gap-4 md:grid-cols-3">
+          {UPLOAD_STEPS.map((item) => {
+            const isCompleted = step > item.id;
+            const isCurrent = step === item.id;
+
+            return (
+              <div
+                key={item.id}
+                className={`relative rounded-3xl border p-4 text-center transition-all duration-300 ${
+                  isCompleted
+                    ? 'border-accent/30 bg-[color:var(--surface-overlay-15)] shadow-glow'
+                    : isCurrent
+                      ? 'border-accent/40 bg-[color:var(--surface-overlay-10)] shadow-[0_20px_55px_rgba(0,0,0,0.12)]'
+                      : 'border-white/10 bg-[var(--surface-2)]'
+                }`}
+              >
+                <div
+                  className={`mx-auto flex size-14 items-center justify-center rounded-full border text-base font-bold transition-all ${
+                    isCompleted
+                      ? 'border-accent bg-accent text-white'
+                      : isCurrent
+                        ? 'border-accent bg-accent text-white ring-4 ring-accent/15'
+                        : 'border-white/15 bg-[var(--surface)] text-slate-500'
+                  }`}
+                >
+                  {isCompleted ? <CheckCircle2 className="size-6" /> : item.id}
+                </div>
+                <p
+                  className={`mt-4 text-xs font-bold uppercase tracking-[0.18em] ${
+                    isCompleted || isCurrent ? 'text-accent' : 'text-slate-500'
+                  }`}
+                >
+                  {item.label}
+                </p>
+                <p className="mt-2 text-sm font-medium text-[color:var(--text)]">
+                  {item.note}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="bg-card-dark border border-white/5 rounded-2xl p-8 card-shadow">

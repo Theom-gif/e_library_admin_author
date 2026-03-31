@@ -397,12 +397,39 @@ export const getUserRank = async (userId, range = "all", config = {}) => {
  * }
  */
 export const getBookReadAnalytics = async (bookId, config = {}) => {
-  const response = await apiClient.get(
+  const endpoints = [
     `/books/${bookId}/read-analytics`,
-    config
-  );
+    `/books/${bookId}/analytics`,
+  ];
 
-  return response?.data || {};
+  let lastError = null;
+
+  for (const endpoint of endpoints) {
+    try {
+      const response = await apiClient.get(endpoint, config);
+      const payload = response?.data;
+      const unwrapped =
+        payload && typeof payload === "object" && !Array.isArray(payload) && payload.data
+          ? payload.data
+          : payload;
+
+      return unwrapped && typeof unwrapped === "object" && !Array.isArray(unwrapped)
+        ? unwrapped
+        : {};
+    } catch (error) {
+      lastError = error;
+      const status = error?.response?.status;
+      if (status !== 404 && status !== 405) {
+        break;
+      }
+    }
+  }
+
+  if (lastError) {
+    throw lastError;
+  }
+
+  return {};
 };
 
 /**

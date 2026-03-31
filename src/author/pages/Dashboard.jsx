@@ -8,7 +8,7 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
-import { 
+import {
   AreaChart, 
   Area, 
   XAxis, 
@@ -16,7 +16,10 @@ import {
   CartesianGrid, 
   Tooltip
 } from 'recharts';
-import adminService from '../../admin/services/adminService';
+import { getBooksRequest } from '../services/bookService';
+import { fetchAuthorFeedback } from '../../admin/services/adminService';
+import { normalizeAuthorFeedbackEntry } from '../services/feedbackUtils';
+import { getBookReadAnalytics } from '../../lib/userActivityService';
 
 const formatSignedChange = (value, { digits = 1, suffix = '%' } = {}) => {
   if (typeof value === 'string' && value.trim()) {
@@ -43,6 +46,8 @@ const getMetricValue = (value, fallback = 0) => {
 };
 
 const PROFILE_STORAGE_KEY = 'author_studio_profile';
+const DASHBOARD_RANGE_DAYS = 30;
+const MAX_FEEDBACK_FETCH_LIMIT = 20;
 
 const getStoredAuthorName = () => {
   if (typeof window === 'undefined') return '';
@@ -57,43 +62,236 @@ const getStoredAuthorName = () => {
   }
 };
 
-const normalizeAuthorStats = (payload = {}) => ({
-  authorName: payload.authorName || payload.author?.name || payload.name || '',
-  totalSales: getMetricValue(payload.totalSales ?? payload.sales, 0),
-  totalReaders: getMetricValue(payload.totalReaders ?? payload.activeReaders, 0),
-  totalReads: getMetricValue(payload.totalReads ?? payload.reads, 0),
-  averageRating: getMetricValue(payload.averageRating ?? payload.rating, 0),
-  salesTrend: formatSignedChange(payload.salesTrend ?? payload.totalSales?.change ?? payload.salesChange),
-  readersTrend: formatSignedChange(payload.readersTrend ?? payload.activeReaders?.change ?? payload.totalReaders?.change),
-  readsTrend: formatSignedChange(payload.readsTrend ?? payload.totalReads?.change ?? payload.readsChange),
-  ratingTrend: formatSignedChange(payload.ratingTrend ?? payload.averageRating?.change ?? payload.ratingChange, {
-    digits: 1,
-    suffix: '',
-  }),
-});
+const toDateKey = (value) => {
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return '';
+  return new Date(timestamp).toISOString().slice(0, 10);
+};
 
-const normalizePerformanceData = (rows = []) =>
-  rows
-    .map((row) => ({
-      label: row.label || row.name || row.date || row.month || '',
-      sales: getMetricValue(row.sales ?? row.revenue, 0),
-      reads: getMetricValue(row.reads, 0),
-    }))
-    .filter((row) => row.label);
+const createTimelineDays = (days = DASHBOARD_RANGE_DAYS) => {
+  return Array.from({ length: days }, (_, index) => {
+    const current = new Date();
+    current.setHours(0, 0, 0, 0);
+    current.setDate(current.getDate() - (days - index - 1));
 
-const normalizeTopBooks = (rows = []) =>
-  rows.map((book, index) => ({
-    id: book.id ?? `${book.title || 'book'}-${index}`,
-    title: book.title || 'Untitled',
-    author: book.author || book.authorName || 'Unknown author',
-    sales: getMetricValue(book.sales ?? book.revenue, 0),
-    trend: formatSignedChange(book.trend ?? book.growth ?? book.salesChange),
-    coverUrl:
-      book.coverUrl ||
-      book.coverImage ||
-      book.bookCover ||
-      (book.cover_image_path ? adminService.buildStorageUrl(book.cover_image_path) : ''),
-  }));
+    return {
+      key: current.toISOString().slice(0, 10),
+      label: current.toLocaleDateString(undefined, { month: 'short', day: 'numeric' }),
+    };
+  });
+};
+
+const getBookMatchKeys = (book = {}) =>
+  [
+    String(book?.bookId || book?.id || '').trim(),
+    String(book?.title || '').trim().toLowerCase(),
+  ].filter(Boolean);
+
+const getFeedbackMatchKeys = (item = {}) =>
+  [
+    String(item?.bookId || '').trim(),
+    String(item?.book || '').trim().toLowerCase(),
+  ].filter(Boolean);
+
+const getReaderKey = (item = {}) =>
+  String(item?.userId || '').trim() ||
+  String(item?.user || '').trim().toLowerCase() ||
+  `${String(item?.user || 'reader').trim().toLowerCase()}|${String(item?.comment || '').trim().toLowerCase()}`;
+
+const getAnalyticsNumber = (analytics = {}, ...keys) => {
+  for (const key of keys) {
+    const value = Number(analytics?.[key]);
+    if (Number.isFinite(value)) {
+      return value;
+    }
+  }
+
+  return 0;
+};
+
+const calculateChange = (current, previous, options = {}) => {
+  const { digits = 1, suffix = '%' } = options;
+  const currentValue = Number(current) || 0;
+  const previousValue = Number(previous) || 0;
+
+  if (previousValue === 0) {
+    return formatSignedChange(currentValue > 0 ? 100 : 0, { digits, suffix });
+  }
+
+  const percentChange = ((currentValue - previousValue) / Math.abs(previousValue)) * 100;
+  return formatSignedChange(percentChange, { digits, suffix });
+};
+
+const buildFeedbackSummary = (feedbackRows = []) => {
+  const normalizedRows = feedbackRows.map((item) => normalizeAuthorFeedbackEntry(item));
+  const perBook = new Map();
+  const readerSet = new Set();
+  const timelineReaders = new Map();
+  let ratingsTotal = 0;
+  let ratingsCount = 0;
+
+  normalizedRows.forEach((item) => {
+    const matchKeys = getFeedbackMatchKeys(item);
+    if (matchKeys.length === 0) return;
+
+    const readerKey = getReaderKey(item);
+    if (readerKey) {
+      readerSet.add(readerKey);
+    }
+
+    const dateKey = toDateKey(item.createdAt);
+    if (dateKey) {
+      timelineReaders.set(dateKey, (timelineReaders.get(dateKey) || 0) + 1);
+    }
+
+    const rating = Number(item.rating);
+    if (Number.isFinite(rating) && rating > 0) {
+      ratingsTotal += rating;
+      ratingsCount += 1;
+    }
+
+    matchKeys.forEach((key) => {
+      const current = perBook.get(key) || {
+        readerKeys: new Set(),
+        interactions: 0,
+        ratingsTotal: 0,
+        ratingsCount: 0,
+      };
+
+      current.interactions += 1;
+      if (readerKey) {
+        current.readerKeys.add(readerKey);
+      }
+      if (Number.isFinite(rating) && rating > 0) {
+        current.ratingsTotal += rating;
+        current.ratingsCount += 1;
+      }
+
+      perBook.set(key, current);
+    });
+  });
+
+  return {
+    perBook,
+    readerCount: readerSet.size,
+    timelineReaders,
+    ratingsTotal,
+    ratingsCount,
+  };
+};
+
+const getFeedbackForBook = (book, feedbackSummary) => {
+  const keys = getBookMatchKeys(book);
+  for (const key of keys) {
+    const match = feedbackSummary.perBook.get(key);
+    if (match) return match;
+  }
+  return null;
+};
+
+const buildBookMetrics = (books = [], analyticsByIndex = [], feedbackSummary) =>
+  books.map((book, index) => {
+    const analytics = analyticsByIndex[index] || {};
+    const feedback = getFeedbackForBook(book, feedbackSummary);
+    const totalReaders =
+      getAnalyticsNumber(analytics, 'totalReaders', 'total_readers', 'readers') ||
+      Number(book?.totalReaders) ||
+      feedback?.readerKeys?.size ||
+      feedback?.interactions ||
+      0;
+    const totalReads =
+      getAnalyticsNumber(analytics, 'monthlyReads', 'monthly_reads', 'reads', 'totalReads', 'total_reads') ||
+      Number(book?.monthlyReads) ||
+      feedback?.interactions ||
+      totalReaders;
+    const rating =
+      Number(book?.rating) > 0
+        ? Number(book.rating)
+        : feedback?.ratingsCount
+          ? feedback.ratingsTotal / feedback.ratingsCount
+          : 0;
+
+    return {
+      ...book,
+      totalReaders,
+      totalReads,
+      rating,
+    };
+  });
+
+const buildOverviewSeries = (books = [], feedbackSummary, days = DASHBOARD_RANGE_DAYS) => {
+  const timeline = createTimelineDays(days);
+  const datedBooks = books.filter((book) => toDateKey(book.createdAt));
+  const undatedBooksCount = books.length - datedBooks.length;
+  const booksByDay = datedBooks.reduce((map, book) => {
+    const key = toDateKey(book.createdAt);
+    map.set(key, (map.get(key) || 0) + 1);
+    return map;
+  }, new Map());
+
+  let cumulativeBooks = undatedBooksCount;
+  let cumulativeReaders = 0;
+
+  return timeline.map((point) => {
+    cumulativeBooks += booksByDay.get(point.key) || 0;
+    cumulativeReaders += feedbackSummary.timelineReaders.get(point.key) || 0;
+
+    return {
+      label: point.label,
+      books: cumulativeBooks,
+      readers: cumulativeReaders,
+    };
+  });
+};
+
+const buildDashboardStats = (bookMetrics = [], feedbackSummary, overviewSeries = []) => {
+  const totalBooks = bookMetrics.length;
+  const totalReaders =
+    feedbackSummary.readerCount ||
+    bookMetrics.reduce((sum, book) => sum + (Number(book.totalReaders) || 0), 0);
+  const totalReads =
+    bookMetrics.reduce((sum, book) => sum + (Number(book.totalReads) || 0), 0) ||
+    Array.from(feedbackSummary.timelineReaders.values()).reduce((sum, value) => sum + value, 0);
+  const averageRating =
+    feedbackSummary.ratingsCount > 0
+      ? feedbackSummary.ratingsTotal / feedbackSummary.ratingsCount
+      : (
+          bookMetrics.reduce((sum, book) => sum + (Number(book.rating) || 0), 0) /
+          Math.max(1, bookMetrics.filter((book) => Number(book.rating) > 0).length)
+        ) || 0;
+
+  const midpoint = Math.max(1, Math.floor(overviewSeries.length / 2));
+  const previousHalf = overviewSeries.slice(0, midpoint);
+  const recentHalf = overviewSeries.slice(midpoint);
+  const previousBookAdds = Math.max(0, (previousHalf.at(-1)?.books || 0) - (previousHalf[0]?.books || 0));
+  const recentBookAdds = Math.max(0, (recentHalf.at(-1)?.books || 0) - (recentHalf[0]?.books || 0));
+  const previousReaders = Math.max(0, (previousHalf.at(-1)?.readers || 0) - (previousHalf[0]?.readers || 0));
+  const recentReaders = Math.max(0, (recentHalf.at(-1)?.readers || 0) - (recentHalf[0]?.readers || 0));
+
+  return {
+    totalBooks,
+    totalReaders,
+    totalReads,
+    averageRating,
+    booksTrend: calculateChange(recentBookAdds, previousBookAdds),
+    readersTrend: calculateChange(recentReaders, previousReaders),
+    readsTrend: calculateChange(totalReads, Math.max(0, totalReads - recentReaders)),
+    ratingTrend: calculateChange(averageRating, 0, { digits: 1, suffix: '' }),
+  };
+};
+
+const buildTopBooks = (bookMetrics = []) =>
+  [...bookMetrics]
+    .sort((left, right) => {
+      const byReaders = (Number(right.totalReaders) || 0) - (Number(left.totalReaders) || 0);
+      if (byReaders !== 0) return byReaders;
+
+      const byRating = (Number(right.rating) || 0) - (Number(left.rating) || 0);
+      if (byRating !== 0) return byRating;
+
+      return new Date(right.createdAt || 0).getTime() - new Date(left.createdAt || 0).getTime();
+    })
+    .slice(0, 4);
 
 const MeasuredChart = ({ className, hasData, emptyMessage, children }) => {
   const containerRef = useRef(null);
@@ -167,7 +365,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const [storedAuthorName] = useState(() => getStoredAuthorName());
   const [stats, setStats] = useState(null);
-  const displayName = stats?.authorName || storedAuthorName || 'Author';
+  const displayName = storedAuthorName || 'Author';
   const [performanceData, setPerformanceData] = useState([]);
   const [topBooks, setTopBooks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -179,30 +377,49 @@ const Dashboard = () => {
     const fetchDashboardData = async () => {
       try {
         setLoading(true);
-        const [statsRes, perfRes, booksRes] = await Promise.allSettled([
-          adminService.fetchAuthorStats({ signal: controller.signal }),
-          adminService.fetchAuthorPerformance('30d', 'daily', { signal: controller.signal }),
-          adminService.fetchAuthorTopBooks({ limit: 4, orderBy: 'sales' }, { signal: controller.signal }),
+        const [booksResult, feedbackResult] = await Promise.allSettled([
+          getBooksRequest({ status: 'All' }),
+          fetchAuthorFeedback(MAX_FEEDBACK_FETCH_LIMIT, 'all', { signal: controller.signal }),
         ]);
+        const books = booksResult.status === 'fulfilled' ? booksResult.value : [];
+        const feedbackRows =
+          feedbackResult.status === 'fulfilled' && Array.isArray(feedbackResult.value)
+            ? feedbackResult.value
+            : [];
+        const analyticsResults = await Promise.allSettled(
+          books.map((book) => getBookReadAnalytics(book.id, { signal: controller.signal })),
+        );
 
         if (controller.signal.aborted || !mounted) {
           return;
         }
 
-        if (statsRes.status === 'fulfilled') {
-          setStats(normalizeAuthorStats(statsRes.value));
-        }
+        const analyticsByIndex = analyticsResults.map((result) =>
+          result.status === 'fulfilled' ? result.value : {},
+        );
+        const feedbackSummary = buildFeedbackSummary(feedbackRows);
+        const bookMetrics = buildBookMetrics(books, analyticsByIndex, feedbackSummary);
+        const overviewSeries = buildOverviewSeries(bookMetrics, feedbackSummary);
+        const nextStats = buildDashboardStats(bookMetrics, feedbackSummary, overviewSeries);
 
-        if (perfRes.status === 'fulfilled') {
-          setPerformanceData(normalizePerformanceData(perfRes.value));
-        }
-
-        if (booksRes.status === 'fulfilled') {
-          setTopBooks(normalizeTopBooks(booksRes.value));
-        }
+        setStats(nextStats);
+        setPerformanceData(overviewSeries);
+        setTopBooks(buildTopBooks(bookMetrics));
       } catch (err) {
         if (controller.signal.aborted || !mounted) return;
         console.error('Error fetching dashboard data:', err);
+        setStats({
+          totalBooks: 0,
+          totalReaders: 0,
+          totalReads: 0,
+          averageRating: 0,
+          booksTrend: '+0%',
+          readersTrend: '+0%',
+          readsTrend: '+0%',
+          ratingTrend: '+0.0',
+        });
+        setPerformanceData([]);
+        setTopBooks([]);
       } finally {
         if (mounted) {
           setLoading(false);
@@ -237,22 +454,22 @@ const Dashboard = () => {
           <p className="text-slate-400 mt-1">Here's what's happening with your books today.</p>
         </div>
         <div className="flex gap-3">
-          <button
+          {/* <button
             onClick={() => window.alert('Report download started.')}
             className="px-4 py-2 rounded-lg text-sm font-bold border border-white/10 bg-primary text-on-primary shadow-glow hover:brightness-110 transition-all"
           >
             Download Report
-          </button>
+          </button> */}
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
         <StatCard 
           title="Total Books" 
-          value={stats ? `$${stats.totalSales?.toFixed(2) || '0.00'}` : '$0.00'} 
-          change={stats?.salesTrend || '+0%'} 
+          value={stats ? (stats.totalBooks?.toLocaleString() || '0') : '0'} 
+          change={stats?.booksTrend || '+0%'} 
           icon={TrendingUp} 
-          isPositive={stats?.salesTrend?.startsWith('+') !== false}
+          isPositive={stats?.booksTrend?.startsWith('+') !== false}
         />
         <StatCard 
           title="Active Readers" 
@@ -284,11 +501,11 @@ const Dashboard = () => {
             <div className="flex gap-4">
               <div className="flex items-center gap-2">
                 <div className="size-2 rounded-full bg-accent"></div>
-                <span className="text-xs font-semibold text-[color:var(--text)]">Books Sold</span>
+                <span className="text-xs font-semibold text-[color:var(--text)]">Books</span>
               </div>
               <div className="flex items-center gap-2">
                 <div className="size-2 rounded-full bg-primary"></div>
-                <span className="text-xs font-semibold text-[color:var(--text)]">Books Read</span>
+                <span className="text-xs font-semibold text-[color:var(--text)]">Readers</span>
               </div>
             </div>
           </div>
@@ -332,7 +549,7 @@ const Dashboard = () => {
                 />
                 <Area
                   type="monotone"
-                  dataKey="sales"
+                  dataKey="books"
                   stroke="#4a868f"
                   strokeWidth={3}
                   fillOpacity={1}
@@ -340,7 +557,7 @@ const Dashboard = () => {
                 />
                 <Area
                   type="monotone"
-                  dataKey="reads"
+                  dataKey="readers"
                   stroke="#22494f"
                   strokeWidth={2}
                   fillOpacity={1}
@@ -357,7 +574,7 @@ const Dashboard = () => {
             {topBooks.length > 0 ? topBooks.map((book, i) => (
               <div key={book.id} className="flex items-center gap-4">
                 <img 
-                  src={book.coverUrl || `https://picsum.photos/seed/book${i}/100/150`} 
+                  src={book.img || `https://picsum.photos/seed/book${i}/100/150`} 
                   alt={book.title} 
                   className="w-12 h-16 rounded-md object-cover border border-white/5" 
                   onError={(e) => { e.target.src = `https://picsum.photos/seed/book${i}/100/150`; }}
@@ -367,9 +584,9 @@ const Dashboard = () => {
                   <p className="text-xs text-slate-500 truncate">{book.author}</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold">${book.sales?.toFixed(0) || '0'}</p>
-                  <p className={`text-[10px] ${book.trend?.startsWith('+') ? 'text-emerald-500' : 'text-rose-500'}`}>
-                    {book.trend || '+0%'}
+                  <p className="text-sm font-bold">{Number(book.totalReaders || 0).toLocaleString()} readers</p>
+                  <p className="text-[10px] text-slate-500">
+                    {Number(book.rating) > 0 ? `${Number(book.rating).toFixed(1)} rating` : 'No rating yet'}
                   </p>
                 </div>
               </div>

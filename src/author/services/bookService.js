@@ -42,15 +42,6 @@ const trimSlash = (value = '') => String(value || '').replace(/\/+$/, '');
 const stripApiSuffix = (value = '') => String(value || '').replace(/\/api(?:\/.*)?$/i, '');
 const ASSET_BASE_URL = trimSlash(stripApiSuffix(API_BASE_URL));
 
-const buildCoverApiUrl = (id) => {
-  if (!id) return '';
-  const base = trimSlash(API_BASE_URL);
-  if (/\/api$/i.test(base)) {
-    return `${base}/books/${id}/cover`;
-  }
-  return `${base}/api/books/${id}/cover`;
-};
-
 const buildStorageUrl = (path = '') => {
   if (!path) return '';
   if (isBlobLikeUrl(path)) return path;
@@ -133,13 +124,33 @@ const normalizeStatusFilter = (value) => {
   return text;
 };
 
+const getBookRating = (book = {}) => {
+  const candidates = [
+    book?.rating,
+    book?.average_rating,
+    book?.averageRating,
+    book?.book_rating,
+    book?.score,
+    book?.review_rating,
+  ];
+
+  for (const candidate of candidates) {
+    const value = Number(candidate);
+    if (Number.isFinite(value) && value >= 0) {
+      return value;
+    }
+  }
+
+  return 0;
+};
+
 export const mapApiBookToUiBook = (book) => ({
   bookId: toNumberId(book?.id),
   id: toNumberId(book?.id),
   title: String(book?.title || 'Untitled').trim(),
   author: book?.author_name || (typeof book?.author === 'string' ? book?.author : book?.author?.name) || 'Unknown Author',
   status: normalizeStatus(book?.status),
-  rating: 0,
+  rating: getBookRating(book),
   reads: '0',
   sales: '$0',
   img:
@@ -159,7 +170,6 @@ export const mapApiBookToUiBook = (book) => ({
       book?.cover,
       book?.image,
       book?.thumbnail,
-      buildCoverApiUrl(book?.id),
     ) || 'https://picsum.photos/seed/new-book/300/450',
   description: String(book?.description || '').trim(),
   genre: (typeof book?.category === 'string' ? book?.category : book?.category?.name) || book?.genre || '',
@@ -169,6 +179,13 @@ export const mapApiBookToUiBook = (book) => ({
     book?.book_file_url,
     book?.file,
   ),
+  rawPdfPath: book?.pdf_path || '',
+  rawBookFilePath: book?.book_file_path || '',
+  rawBookFileUrl: book?.book_file_url || '',
+  rawFile: book?.file || '',
+  totalReaders: Number(book?.totalReaders ?? book?.total_readers ?? book?.readers ?? 0) || 0,
+  completionRate: Number(book?.completionRate ?? book?.completion_rate ?? 0) || 0,
+  monthlyReads: Number(book?.monthlyReads ?? book?.monthly_reads ?? 0) || 0,
   createdAt: book?.created_at || book?.createdAt || '',
   updatedAt: book?.updated_at || book?.updatedAt || '',
   manuscriptName: getFileName(book?.pdf_path || book?.book_file_url || book?.book_file_path || ''),

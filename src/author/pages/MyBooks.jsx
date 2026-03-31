@@ -12,9 +12,12 @@ import {
 } from 'lucide-react';
 import { searchBooks } from '../services/openLibraryService';
 import { deleteBookRequest, getBooksRequest } from '../services/bookService';
+import { fetchAuthorFeedback } from '../../admin/services/adminService';
 import { clearAllManuscriptFiles } from '../services/manuscriptStorage';
 import { clearAllCoverFiles } from '../services/coverStorage';
 import { clearLocalBooks } from '../services/localBookStorage';
+import { normalizeAuthorFeedbackEntry } from '../services/feedbackUtils';
+import { resolveBackendAssetUrl } from '../services/profileStorage';
 
 const DEFAULT_COVER = 'https://picsum.photos/seed/new-book/300/450';
 const FALLBACK_COVER_URL = DEFAULT_COVER;
@@ -32,10 +35,7 @@ const statusStyles = {
 
 const getSafeCoverUrl = (value) => {
   const text = String(value || '').trim();
-  if (text.startsWith('data:image/') || text.startsWith('blob:') || /^https?:\/\//i.test(text)) {
-    return text;
-  }
-  return FALLBACK_COVER_URL;
+  return resolveBackendAssetUrl(text) || FALLBACK_COVER_URL;
 };
 
 const isPlaceholderCover = (value) => {
@@ -67,6 +67,52 @@ const readCoverCache = () => {
   }
 };
 
+const buildBookRatingMap = (feedbackRows = []) => {
+  const map = new Map();
+
+  feedbackRows
+    .map((item) => normalizeAuthorFeedbackEntry(item))
+    .forEach((item) => {
+      const rating = Number(item.rating);
+      if (!Number.isFinite(rating) || rating <= 0) return;
+
+      const keys = [
+        String(item.bookId || '').trim(),
+        String(item.book || '').trim().toLowerCase(),
+      ].filter(Boolean);
+
+      keys.forEach((key) => {
+        const current = map.get(key) || { total: 0, count: 0 };
+        current.total += rating;
+        current.count += 1;
+        map.set(key, current);
+      });
+    });
+
+  return map;
+};
+
+const mergeBookRatings = (books = [], feedbackRows = []) => {
+  const ratingMap = buildBookRatingMap(feedbackRows);
+
+  return books.map((book) => {
+    const keys = [
+      String(book.bookId || book.id || '').trim(),
+      String(book.title || '').trim().toLowerCase(),
+    ].filter(Boolean);
+
+    const match = keys.map((key) => ratingMap.get(key)).find(Boolean);
+    if (!match?.count) {
+      return book;
+    }
+
+    return {
+      ...book,
+      rating: match.total / match.count,
+    };
+  });
+};
+
 const MyBooks = () => {
   const MotionDiv = motion.div;
   const navigate = useNavigate();
@@ -94,8 +140,11 @@ const MyBooks = () => {
     setBooksLoading(true);
     setBooksError('');
     try {
-      const dbBooks = await getBooksRequest({ status: 'All' });
-      setBooks(dbBooks);
+      const [dbBooks, feedbackRows] = await Promise.all([
+        getBooksRequest({ status: 'All' }),
+        fetchAuthorFeedback(20, 'all').catch(() => []),
+      ]);
+      setBooks(mergeBookRatings(dbBooks, Array.isArray(feedbackRows) ? feedbackRows : []));
     } catch (error) {
       const status = error?.response?.status;
       const serverMessage = error?.response?.data?.message || error?.response?.data?.error || '';
@@ -216,6 +265,10 @@ const MyBooks = () => {
     manuscriptType: book.manuscriptType || '',
     manuscriptSizeBytes: book.manuscriptSizeBytes || 0,
     manuscriptUrl: book.manuscriptUrl || '',
+    rawPdfPath: book.rawPdfPath || '',
+    rawBookFilePath: book.rawBookFilePath || '',
+    rawBookFileUrl: book.rawBookFileUrl || '',
+    rawFile: book.rawFile || '',
     source: book.source || 'database',
   });
 
@@ -256,7 +309,7 @@ const MyBooks = () => {
         </div>
         <button
           onClick={() => navigate('/author/upload')}
-          className="flex items-center gap-2 px-6 py-3 bg-accent text-white rounded-xl font-bold shadow-glow hover:opacity-90 transition-all"
+          className="author-cta-primary flex items-center gap-2 rounded-xl px-6 py-3 font-bold transition-all"
         >
           <Plus className="size-5" />
           <span>Add New Book</span>
@@ -358,7 +411,11 @@ const MyBooks = () => {
                   </div>
                   <div className="flex items-center gap-1 shrink-0 pt-1">
                     <Star className="size-4 text-yellow-500 fill-yellow-500" />
-                    <span className="text-sm font-bold">{book.rating || 'N/A'}</span>
+                    <span className="text-sm font-bold">
+                      {Number.isFinite(Number(book.rating)) && Number(book.rating) > 0
+                        ? Number(book.rating).toFixed(1)
+                        : 'N/A'}
+                    </span>
                   </div>
                 </div>
 
@@ -387,14 +444,14 @@ const MyBooks = () => {
                 <div className="flex gap-2 pt-1">
                   <button
                     onClick={() => navigate('/author/book-detail', { state: { book: toDetailBook(book) } })}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-primary text-on-primary rounded-lg text-xs font-bold hover:brightness-110 transition-colors"
+                    className="author-cta-secondary flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-bold transition-colors"
                   >
                     <Eye className="size-3.5" />
                     <span>View Details</span>
                   </button>
                   <button
                     onClick={() => navigate('/author/edit-book', { state: { book: toEditableBook(book) } })}
-                    className="flex-1 flex items-center justify-center gap-2 py-2 bg-accent text-white rounded-lg text-xs font-bold hover:bg-accent/80 transition-colors"
+                    className="author-cta-primary flex-1 flex items-center justify-center gap-2 rounded-lg py-2 text-xs font-bold transition-colors"
                   >
                     <Edit3 className="size-3.5" />
                     <span>Edit</span>

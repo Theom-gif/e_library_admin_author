@@ -20,6 +20,13 @@ const NATIVE_OPTION_STYLE = { color: '#0f172a', backgroundColor: '#ffffff' };
 const FALLBACK_COVER_URL = 'https://picsum.photos/seed/new-book/300/450';
 const COVER_CACHE_KEY = 'author_book_covers';
 const MAX_MANUSCRIPT_SIZE_BYTES = 100 * 1024 * 1024;
+const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024;
+const ACCEPTED_COVER_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+const UPLOAD_STEPS = [
+  { id: 1, label: 'Details', note: 'Title, author, genre, cover' },
+  { id: 2, label: 'Content', note: 'Upload manuscript file' },
+  { id: 3, label: 'Review & Submit', note: 'Check before publish' },
+];
 
 const buildCoverKey = (title, author) =>
   `${String(title || '').trim().toLowerCase()}|${String(author || '').trim().toLowerCase()}`;
@@ -231,8 +238,14 @@ const UploadBook = () => {
   const handleCoverSelected = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!String(file.type || '').startsWith('image/')) {
-      setCoverError('Please choose a valid image file.');
+    const fileType = String(file.type || '').toLowerCase();
+    if (!ACCEPTED_COVER_IMAGE_TYPES.includes(fileType)) {
+      setCoverError('Please choose a PNG or JPEG image.');
+      e.target.value = '';
+      return;
+    }
+    if (file.size > MAX_COVER_SIZE_BYTES) {
+      setCoverError('Cover image is too large. Maximum size is 5MB.');
       e.target.value = '';
       return;
     }
@@ -424,27 +437,49 @@ const UploadBook = () => {
         <p className="text-slate-400 mt-1">Follow the steps to publish your book.</p>
       </div>
 
-      <div className="flex items-center justify-between mb-12 relative">
-        <div className="absolute top-1/2 left-0 w-full h-0.5 bg-white/5 -translate-y-1/2 z-0"></div>
-        {[
-          { id: 1, label: 'Details', note: 'Title, author, genre' },
-          { id: 2, label: 'Content', note: 'PDF + cover image' },
-          { id: 3, label: 'Review & Submit', note: 'Check & publish' },
-        ].map((item) => (
-          <div key={item.id} className="relative z-10 flex flex-col items-center gap-2">
-            <div
-              className={`size-10 rounded-full flex items-center justify-center font-bold text-sm transition-all duration-300 ${
-                step >= item.id ? 'bg-accent text-white shadow-glow' : 'bg-card-dark border border-white/10 text-slate-500'
-              }`}
-            >
-              {step > item.id ? <CheckCircle2 className="size-5" /> : item.id}
-            </div>
-            <span className={`text-[10px] uppercase font-bold tracking-wider ${step >= item.id ? 'text-accent' : 'text-slate-500'}`}>
-              {item.label}
-            </span>
-            <span className="text-[10px] text-slate-500">{item.note}</span>
-          </div>
-        ))}
+      <div className="relative mb-12">
+        <div className="absolute left-[12%] right-[12%] top-7 hidden h-0.5 bg-[var(--border)] md:block" />
+        <div className="grid gap-4 md:grid-cols-3">
+          {UPLOAD_STEPS.map((item) => {
+            const isCompleted = step > item.id;
+            const isCurrent = step === item.id;
+
+            return (
+              <div
+                key={item.id}
+                className={`relative rounded-3xl border p-4 text-center transition-all duration-300 ${
+                  isCompleted
+                    ? 'border-accent/30 bg-[color:var(--surface-overlay-15)] shadow-glow'
+                    : isCurrent
+                      ? 'border-accent/40 bg-[color:var(--surface-overlay-10)] shadow-[0_20px_55px_rgba(0,0,0,0.12)]'
+                      : 'border-white/10 bg-[var(--surface-2)]'
+                }`}
+              >
+                <div
+                  className={`mx-auto flex size-14 items-center justify-center rounded-full border text-base font-bold transition-all ${
+                    isCompleted
+                      ? 'border-accent bg-accent text-white'
+                      : isCurrent
+                        ? 'border-accent bg-accent text-white ring-4 ring-accent/15'
+                        : 'border-white/15 bg-[var(--surface)] text-slate-500'
+                  }`}
+                >
+                  {isCompleted ? <CheckCircle2 className="size-6" /> : item.id}
+                </div>
+                <p
+                  className={`mt-4 text-xs font-bold uppercase tracking-[0.18em] ${
+                    isCompleted || isCurrent ? 'text-accent' : 'text-slate-500'
+                  }`}
+                >
+                  {item.label}
+                </p>
+                <p className="mt-2 text-sm font-medium text-[color:var(--text)]">
+                  {item.note}
+                </p>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       <div className="bg-card-dark border border-white/5 rounded-2xl p-8 card-shadow">
@@ -644,7 +679,7 @@ const UploadBook = () => {
                       <div className="text-center px-6">
                         <p className="text-sm font-bold">Upload Cover</p>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. Any image file'}
+                          {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. PNG or JPEG up to 5MB'}
                         </p>
                       </div>
                     </>
@@ -654,7 +689,7 @@ const UploadBook = () => {
                 <input
                   ref={coverInputRef}
                   type="file"
-                  accept="image/*"
+                  accept="image/png,image/jpeg,image/jpg"
                   onChange={handleCoverSelected}
                   className="sr-only"
                 />
@@ -763,7 +798,7 @@ const UploadBook = () => {
             onClick={() => setStep(Math.max(1, step - 1))}
             disabled={step === 1}
             className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
-              step === 1 ? 'opacity-0 pointer-events-none' : 'text-slate-400 hover:text-[color:var(--text)] hover:bg-white/5'
+              step === 1 ? 'opacity-0 pointer-events-none' : 'author-cta-secondary'
             }`}
           >
             <ChevronLeft className="size-4" />
@@ -775,8 +810,8 @@ const UploadBook = () => {
             disabled={isSubmitting}
             className={`flex items-center gap-2 px-8 py-2.5 rounded-xl text-sm font-bold transition-all ${
               !isSubmitting && canContinue
-                ? 'bg-accent text-white shadow-glow hover:opacity-90'
-                : 'bg-slate-700 text-slate-400 cursor-not-allowed'
+                ? 'author-cta-primary'
+                : 'author-cta-disabled cursor-not-allowed'
             }`}
           >
             <span>{isSubmitting ? 'Publishing...' : step === 3 ? 'Publish Book' : 'Continue'}</span>

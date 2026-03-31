@@ -6,17 +6,32 @@ export const EditBookForm = ({ book, onSave, onCancel, isSaving = false, isDelet
     ...book,
     tags: Array.isArray(book?.tags) ? book.tags : [],
   });
+  const [coverError, setCoverError] = React.useState('');
   const coverInputRef = React.useRef(null);
+  const ACCEPTED_COVER_IMAGE_TYPES = ['image/jpeg', 'image/png'];
+  const MAX_COVER_SIZE_BYTES = 5 * 1024 * 1024;
 
   const handleCoverImageSelected = (event) => {
     const [file] = event.target.files ?? [];
     if (!file) {
       return;
     }
+    const fileType = String(file.type || '').toLowerCase();
+    if (!ACCEPTED_COVER_IMAGE_TYPES.includes(fileType)) {
+      setCoverError('Please choose a PNG or JPEG image.');
+      event.target.value = '';
+      return;
+    }
+    if (file.size > MAX_COVER_SIZE_BYTES) {
+      setCoverError('Cover image is too large. Maximum size is 5MB.');
+      event.target.value = '';
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = () => {
       if (typeof reader.result === 'string') {
+        setCoverError('');
         setFormData((prev) => ({ ...prev, coverUrl: reader.result, coverFile: file }));
       }
     };
@@ -49,7 +64,7 @@ export const EditBookForm = ({ book, onSave, onCancel, isSaving = false, isDelet
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
           <div className="md:col-span-1">
             <p className="text-base font-semibold app-text-primary mb-1">Book Cover</p>
-            <p className="text-sm text-slate-400 mb-4">Upload a high-quality JPG or PNG.</p>
+            <p className="text-sm text-slate-400 mb-4">Upload a PNG or JPEG up to 5MB.</p>
             <div
               role="button"
               tabIndex={0}
@@ -74,10 +89,13 @@ export const EditBookForm = ({ book, onSave, onCancel, isSaving = false, isDelet
             <input
               ref={coverInputRef}
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/jpg"
               onChange={handleCoverImageSelected}
               className="sr-only"
             />
+            {coverError && (
+              <p className="mt-3 text-sm text-rose-400">{coverError}</p>
+            )}
           </div>
 
           <div className="md:col-span-2 space-y-6">

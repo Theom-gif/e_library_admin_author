@@ -17,7 +17,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing_extensions import TypedDict
 
 # ── App setup ──────────────────────────────────────────────────────────────────
+<<<<<<< HEAD
 app = FastAPI(title="System Monitoring API", version="2.1.0")
+=======
+app = FastAPI(title="System Monitoring API", version="2.0.0")
+>>>>>>> ya-dev
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -42,13 +46,21 @@ ACTIONS = (
 )
 LogStatus = Literal["success", "warning", "error"]
 
+<<<<<<< HEAD
 # In-memory ring buffer — last 120 points = 10 min at 5 s interval
+=======
+# In-memory ring buffer for history (last 120 points = 10 min at 5s interval)
+>>>>>>> ya-dev
 _history_ring: deque[HistoryPoint] = deque(maxlen=120)
 _previous_network: tuple[int, int] | None = None
 _previous_network_at: float | None = None
 
+<<<<<<< HEAD
 
 # ── WebSocket connection manager ───────────────────────────────────────────────
+=======
+# WebSocket connection manager
+>>>>>>> ya-dev
 class ConnectionManager:
     def __init__(self):
         self.active: list[WebSocket] = []
@@ -58,8 +70,12 @@ class ConnectionManager:
         self.active.append(ws)
 
     def disconnect(self, ws: WebSocket):
+<<<<<<< HEAD
         if ws in self.active:
             self.active.remove(ws)
+=======
+        self.active.remove(ws)
+>>>>>>> ya-dev
 
     async def broadcast(self, data: dict):
         dead = []
@@ -69,8 +85,12 @@ class ConnectionManager:
             except Exception:
                 dead.append(ws)
         for ws in dead:
+<<<<<<< HEAD
             self.disconnect(ws)
 
+=======
+            self.active.remove(ws)
+>>>>>>> ya-dev
 
 ws_manager = ConnectionManager()
 
@@ -135,15 +155,24 @@ class ProcessEntry(TypedDict):
     created: str
 
 
+<<<<<<< HEAD
 # ── FIX: camelCase disk fields to match DisksPage UI ──────────────────────────
 # UI accesses: d.device, d.mountpoint, d.fstype, d.usedGb, d.freeGb, d.totalGb, d.percent
+=======
+>>>>>>> ya-dev
 class DiskPartition(TypedDict):
     device: str
     mountpoint: str
     fstype: str
+<<<<<<< HEAD
     totalGb: float   # was total_gb  — DisksPage uses d.totalGb
     usedGb: float    # was used_gb   — DisksPage uses d.usedGb
     freeGb: float    # was free_gb   — DisksPage uses d.freeGb
+=======
+    total_gb: float
+    used_gb: float
+    free_gb: float
+>>>>>>> ya-dev
     percent: float
 
 
@@ -161,7 +190,10 @@ class NetworkInterface(TypedDict):
 
 
 class HistoryPoint(TypedDict):
+<<<<<<< HEAD
     # PerformancePage / OverviewPage use: .cpu .memory .disk .networkIn .networkOut .timestamp
+=======
+>>>>>>> ya-dev
     timestamp: str
     cpu: float
     memory: float
@@ -281,7 +313,11 @@ def build_alerts(cpu: float, memory: float, disk: float, swap: float) -> list[Al
 
 def get_platform() -> str:
     import platform
+<<<<<<< HEAD
     return platform.system()
+=======
+    return platform.system()  # Windows / Linux / Darwin
+>>>>>>> ya-dev
 
 
 def infer_user(message: str) -> str:
@@ -400,11 +436,15 @@ def health_payload() -> HealthSnapshot:
         "networkTotalOutMb": total_out,
         "activeSessions": len(psutil.users()),
         "processCount": len(psutil.pids()),
+<<<<<<< HEAD
         "threadCount": sum(
             p.num_threads()
             for p in psutil.process_iter(["num_threads"])
             if p.info.get("num_threads")
         ),
+=======
+        "threadCount": sum(p.num_threads() for p in psutil.process_iter(["num_threads"]) if p.info.get("num_threads")),
+>>>>>>> ya-dev
         "loadAverage": get_load_average(cpu),
         "alerts": build_alerts(cpu, memory, disk, swap_pct),
         "updatedAt": datetime.now(UTC).isoformat(),
@@ -412,10 +452,18 @@ def health_payload() -> HealthSnapshot:
 
 
 def history_payload(points: int) -> list[HistoryPoint]:
+<<<<<<< HEAD
+=======
+    # Return from live ring buffer if we have enough points
+>>>>>>> ya-dev
     ring = list(_history_ring)
     if len(ring) >= points:
         return ring[-points:]
 
+<<<<<<< HEAD
+=======
+    # Pad with synthetic data before the ring starts
+>>>>>>> ya-dev
     baseline = health_payload()
     cpu, memory, disk = baseline["cpu"], baseline["memory"], baseline["disk"]
     now = datetime.now(UTC)
@@ -425,20 +473,30 @@ def history_payload(points: int) -> list[HistoryPoint]:
         phase = (needed - i) / 3.2
         history.append({
             "timestamp": (now - timedelta(seconds=(points - i - 1) * 5)).isoformat(),
+<<<<<<< HEAD
             "cpu":    round(clamp(cpu    + math.sin(phase)       * 9 + random.uniform(-3,   3),   2, 99), 1),
             "memory": round(clamp(memory + math.cos(phase / 1.7) * 6 + random.uniform(-2,   2),   5, 99), 1),
             "disk":   round(clamp(disk   + math.sin(phase / 2.4) * 2 + random.uniform(-0.8, 0.8), 10, 99), 1),
             "networkIn":  round(random.uniform(0, 2), 3),
+=======
+            "cpu": round(clamp(cpu + math.sin(phase) * 9 + random.uniform(-3, 3), 2, 99), 1),
+            "memory": round(clamp(memory + math.cos(phase / 1.7) * 6 + random.uniform(-2, 2), 5, 99), 1),
+            "disk": round(clamp(disk + math.sin(phase / 2.4) * 2 + random.uniform(-0.8, 0.8), 10, 99), 1),
+            "networkIn": round(random.uniform(0, 2), 3),
+>>>>>>> ya-dev
             "networkOut": round(random.uniform(0, 1), 3),
         })
     return history + ring
 
 
+<<<<<<< HEAD
 def get_process_rss_bytes(memory_info: object | None) -> int:
     rss = getattr(memory_info, "rss", 0)
     return rss if isinstance(rss, int) else 0
 
 
+=======
+>>>>>>> ya-dev
 def processes_payload(limit: int = 30, sort_by: str = "cpu") -> list[ProcessEntry]:
     procs: list[ProcessEntry] = []
     attrs = ["pid", "name", "status", "cpu_percent", "memory_info", "memory_percent",
@@ -446,6 +504,7 @@ def processes_payload(limit: int = 30, sort_by: str = "cpu") -> list[ProcessEntr
     for p in psutil.process_iter(attrs):
         try:
             info = p.info
+<<<<<<< HEAD
             mem_mb = round(get_process_rss_bytes(info.get("memory_info")) / 1024**2, 2)
             created = datetime.fromtimestamp(info.get("create_time") or 0, UTC).isoformat()
             procs.append({
@@ -469,6 +528,25 @@ def processes_payload(limit: int = 30, sort_by: str = "cpu") -> list[ProcessEntr
         "pid":     "pid",
         "threads": "threads",
     }
+=======
+            mem_mb = round((info.get("memory_info") or psutil._common.pmem(0, 0)).rss / 1024**2, 2)
+            created = datetime.fromtimestamp(info.get("create_time") or 0, UTC).isoformat()
+            procs.append({
+                "pid": info["pid"],
+                "name": info.get("name") or "unknown",
+                "status": info.get("status") or "unknown",
+                "cpu": round(info.get("cpu_percent") or 0.0, 1),
+                "memoryMb": mem_mb,
+                "memoryPercent": round(info.get("memory_percent") or 0.0, 2),
+                "threads": info.get("num_threads") or 1,
+                "user": info.get("username") or "?",
+                "created": created,
+            })
+        except (psutil.NoSuchProcess, psutil.AccessDenied):
+            continue
+
+    key_map = {"cpu": "cpu", "memory": "memoryMb", "name": "name", "pid": "pid", "threads": "threads"}
+>>>>>>> ya-dev
     sort_key = key_map.get(sort_by, "cpu")
     reverse = sort_key not in ("name",)
     procs.sort(key=lambda x: x[sort_key], reverse=reverse)
@@ -476,15 +554,19 @@ def processes_payload(limit: int = 30, sort_by: str = "cpu") -> list[ProcessEntr
 
 
 def disks_payload() -> list[DiskPartition]:
+<<<<<<< HEAD
     """
     Returns camelCase fields matching DisksPage:
       d.totalGb  d.usedGb  d.freeGb  d.percent  d.device  d.mountpoint  d.fstype
     """
+=======
+>>>>>>> ya-dev
     parts: list[DiskPartition] = []
     for part in psutil.disk_partitions(all=False):
         try:
             usage = psutil.disk_usage(part.mountpoint)
             parts.append({
+<<<<<<< HEAD
                 "device":     part.device,
                 "mountpoint": part.mountpoint,
                 "fstype":     part.fstype,
@@ -492,6 +574,15 @@ def disks_payload() -> list[DiskPartition]:
                 "usedGb":     round(usage.used  / 1024**3, 2),   # camelCase ✓
                 "freeGb":     round(usage.free  / 1024**3, 2),   # camelCase ✓
                 "percent":    round(usage.percent, 1),
+=======
+                "device": part.device,
+                "mountpoint": part.mountpoint,
+                "fstype": part.fstype,
+                "total_gb": round(usage.total / 1024**3, 2),
+                "used_gb": round(usage.used / 1024**3, 2),
+                "free_gb": round(usage.free / 1024**3, 2),
+                "percent": round(usage.percent, 1),
+>>>>>>> ya-dev
             })
         except (PermissionError, OSError):
             continue
@@ -500,6 +591,7 @@ def disks_payload() -> list[DiskPartition]:
 
 def network_interfaces_payload() -> list[NetworkInterface]:
     stats = psutil.net_if_stats()
+<<<<<<< HEAD
     io    = psutil.net_io_counters(pernic=True)
     addrs = psutil.net_if_addrs()
     ifaces: list[NetworkInterface] = []
@@ -511,29 +603,60 @@ def network_interfaces_payload() -> list[NetworkInterface]:
             "name":        name,
             "isUp":        stat.isup,
             "speedMbps":   stat.speed,
+=======
+    io = psutil.net_io_counters(pernic=True)
+    addrs = psutil.net_if_addrs()
+    ifaces: list[NetworkInterface] = []
+    for name, stat in stats.items():
+        nic_io = io.get(name)
+        nic_addrs = addrs.get(name, [])
+        addr_list = [a.address for a in nic_addrs if a.address and "%" not in a.address]
+        ifaces.append({
+            "name": name,
+            "isUp": stat.isup,
+            "speedMbps": stat.speed,
+>>>>>>> ya-dev
             "bytesSentMb": round(nic_io.bytes_sent / 1024**2, 2) if nic_io else 0.0,
             "bytesRecvMb": round(nic_io.bytes_recv / 1024**2, 2) if nic_io else 0.0,
             "packetsSent": nic_io.packets_sent if nic_io else 0,
             "packetsRecv": nic_io.packets_recv if nic_io else 0,
+<<<<<<< HEAD
             "errIn":       nic_io.errin  if nic_io else 0,
             "errOut":      nic_io.errout if nic_io else 0,
             "addresses":   addr_list,
+=======
+            "errIn": nic_io.errin if nic_io else 0,
+            "errOut": nic_io.errout if nic_io else 0,
+            "addresses": addr_list,
+>>>>>>> ya-dev
         })
     ifaces.sort(key=lambda x: (not x["isUp"], x["name"]))
     return ifaces
 
 
+<<<<<<< HEAD
 # ── Background collector: ring buffer + WebSocket broadcast ───────────────────
+=======
+# ── Background task: push to ring buffer and WS clients ───────────────────────
+>>>>>>> ya-dev
 async def collector_loop():
     while True:
         try:
             h = health_payload()
             point: HistoryPoint = {
+<<<<<<< HEAD
                 "timestamp":  h["updatedAt"],
                 "cpu":        h["cpu"],
                 "memory":     h["memory"],
                 "disk":       h["disk"],
                 "networkIn":  h["networkIn"],
+=======
+                "timestamp": h["updatedAt"],
+                "cpu": h["cpu"],
+                "memory": h["memory"],
+                "disk": h["disk"],
+                "networkIn": h["networkIn"],
+>>>>>>> ya-dev
                 "networkOut": h["networkOut"],
             }
             _history_ring.append(point)
@@ -548,7 +671,11 @@ async def startup_event():
     asyncio.create_task(collector_loop())
 
 
+<<<<<<< HEAD
 # ── REST endpoints ─────────────────────────────────────────────────────────────
+=======
+# ── REST Endpoints ─────────────────────────────────────────────────────────────
+>>>>>>> ya-dev
 @app.get("/api/health")
 def get_health() -> HealthSnapshot:
     return health_payload()
@@ -561,9 +688,15 @@ def get_history(points: int = Query(48, ge=8, le=120)) -> HistoryResponse:
 
 @app.get("/api/logs")
 def get_logs(
+<<<<<<< HEAD
     limit:   int          = Query(60, ge=10, le=200),
     status:  str | None   = Query(None),
     service: str | None   = Query(None),
+=======
+    limit: int = Query(60, ge=10, le=200),
+    status: str | None = Query(None),
+    service: str | None = Query(None),
+>>>>>>> ya-dev
 ) -> LogsResponse:
     logs = read_access_logs(limit * 2)
     if status:
@@ -575,8 +708,13 @@ def get_logs(
 
 @app.get("/api/processes")
 def get_processes(
+<<<<<<< HEAD
     limit:   int = Query(30, ge=5,  le=100),
     sort_by: str = Query("cpu", pattern="^(cpu|memory|name|pid|threads)$"),
+=======
+    limit: int = Query(30, ge=5, le=100),
+    sort_by: str = Query("cpu", regex="^(cpu|memory|name|pid|threads)$"),
+>>>>>>> ya-dev
 ) -> ProcessesResponse:
     procs = processes_payload(limit, sort_by)
     return {"processes": procs, "total": len(psutil.pids()), "sortBy": sort_by}
@@ -595,7 +733,11 @@ def get_network_interfaces() -> NetworkResponse:
 @app.get("/api/stats")
 def get_stats() -> StatsResponse:
     logs = read_access_logs(200)
+<<<<<<< HEAD
     log_counts:     dict[str, int] = {"success": 0, "warning": 0, "error": 0}
+=======
+    log_counts: dict[str, int] = {"success": 0, "warning": 0, "error": 0}
+>>>>>>> ya-dev
     service_counts: dict[str, int] = {}
     for l in logs:
         log_counts[l["status"]] = log_counts.get(l["status"], 0) + 1
@@ -608,6 +750,7 @@ def get_stats() -> StatsResponse:
 
     return {
         "logStats": {
+<<<<<<< HEAD
             "byStatus":  log_counts,
             "byService": service_counts,
             "total":     len(logs),
@@ -616,6 +759,16 @@ def get_stats() -> StatsResponse:
             "byLevel": alert_by_level,
             "total":   len(h["alerts"]),
             "active":  [a["metric"] for a in h["alerts"]],
+=======
+            "byStatus": log_counts,
+            "byService": service_counts,
+            "total": len(logs),
+        },
+        "alertStats": {
+            "byLevel": alert_by_level,
+            "total": len(h["alerts"]),
+            "active": [a["metric"] for a in h["alerts"]],
+>>>>>>> ya-dev
         },
     }
 
@@ -625,6 +778,7 @@ def get_stats() -> StatsResponse:
 async def websocket_endpoint(websocket: WebSocket):
     await ws_manager.connect(websocket)
     try:
+<<<<<<< HEAD
         # Send initial snapshot immediately on connect
         await websocket.send_json({"type": "health", "data": health_payload()})
         while True:
@@ -634,3 +788,12 @@ async def websocket_endpoint(websocket: WebSocket):
         ws_manager.disconnect(websocket)
     except Exception:
         ws_manager.disconnect(websocket)
+=======
+        # Send initial snapshot immediately
+        await websocket.send_json({"type": "health", "data": health_payload()})
+        while True:
+            # Keep alive — client can send pings
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+>>>>>>> ya-dev

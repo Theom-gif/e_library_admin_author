@@ -81,6 +81,17 @@ const Feedback = () => {
     [feedbackUiState, feedbacks],
   );
 
+  const baseFeedbackById = React.useMemo(
+    () =>
+      new Map(
+        feedbacks.map((item) => {
+          const normalized = normalizeAuthorFeedbackEntry(item);
+          return [normalized.id, normalized];
+        }),
+      ),
+    [feedbacks],
+  );
+
   const uniqueBooks = React.useMemo(
     () => ['All Books', ...Array.from(new Set(normalizedFeedbacks.map((item) => item.book)))],
     [normalizedFeedbacks],
@@ -113,12 +124,56 @@ const Feedback = () => {
     });
   };
 
-  const upvote = (id) => {
-    updateFeedbackUiState(id, (current) => ({ ...current, helpful: Number(current.helpful || 0) + 1 }));
-  };
+  const setReaction = (id, nextReaction) => {
+    const baseEntry = baseFeedbackById.get(id);
+    if (!baseEntry) return;
 
-  const downvote = (id) => {
-    updateFeedbackUiState(id, (current) => ({ ...current, notHelpful: Number(current.notHelpful || 0) + 1 }));
+    updateFeedbackUiState(id, (current) => {
+      const previousReaction = String(current.reaction || '').trim();
+      if (previousReaction === nextReaction) {
+        return current;
+      }
+
+      const baseHelpful = Number(baseEntry.helpful || 0);
+      const baseNotHelpful = Number(baseEntry.notHelpful || 0);
+      let helpfulDelta = Number(current.helpfulDelta);
+      let notHelpfulDelta = Number(current.notHelpfulDelta);
+
+      if (!Number.isFinite(helpfulDelta)) {
+        helpfulDelta = Number.isFinite(Number(current.helpful))
+          ? Number(current.helpful) - baseHelpful
+          : 0;
+      }
+
+      if (!Number.isFinite(notHelpfulDelta)) {
+        notHelpfulDelta = Number.isFinite(Number(current.notHelpful))
+          ? Number(current.notHelpful) - baseNotHelpful
+          : 0;
+      }
+
+      if (previousReaction === 'helpful') {
+        helpfulDelta -= 1;
+      }
+
+      if (previousReaction === 'notHelpful') {
+        notHelpfulDelta -= 1;
+      }
+
+      if (nextReaction === 'helpful') {
+        helpfulDelta += 1;
+      }
+
+      if (nextReaction === 'notHelpful') {
+        notHelpfulDelta += 1;
+      }
+
+      return {
+        ...current,
+        reaction: nextReaction,
+        helpfulDelta: Math.max(-baseHelpful, helpfulDelta),
+        notHelpfulDelta: Math.max(-baseNotHelpful, notHelpfulDelta),
+      };
+    });
   };
 
   const markAsRead = (id) => {
@@ -244,17 +299,31 @@ const Feedback = () => {
                 <div className="flex items-center justify-between pt-4 border-t border-white/5">
                   <div className="flex gap-4">
                     <button
-                      onClick={() => upvote(item.id)}
-                      className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-accent transition-colors"
+                      onClick={() => setReaction(item.id, 'helpful')}
+                      className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
+                        item.reaction === 'helpful'
+                          ? 'text-accent'
+                          : item.reaction === 'notHelpful'
+                            ? 'text-slate-400 hover:text-slate-500'
+                            : 'text-slate-500 hover:text-accent'
+                      }`}
+                      aria-pressed={item.reaction === 'helpful'}
                     >
-                      <ThumbsUp className="size-3.5" />
+                      <ThumbsUp className={`size-3.5 ${item.reaction === 'helpful' ? 'fill-current' : ''}`} />
                       <span>Helpful ({item.helpful})</span>
                     </button>
                     <button
-                      onClick={() => downvote(item.id)}
-                      className="flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-rose-500 transition-colors"
+                      onClick={() => setReaction(item.id, 'notHelpful')}
+                      className={`flex items-center gap-1.5 text-xs font-bold transition-colors ${
+                        item.reaction === 'notHelpful'
+                          ? 'text-rose-500'
+                          : item.reaction === 'helpful'
+                            ? 'text-slate-400 hover:text-slate-500'
+                            : 'text-slate-500 hover:text-rose-500'
+                      }`}
+                      aria-pressed={item.reaction === 'notHelpful'}
                     >
-                      <ThumbsDown className="size-3.5" />
+                      <ThumbsDown className={`size-3.5 ${item.reaction === 'notHelpful' ? 'fill-current' : ''}`} />
                       <span>Not Helpful ({item.notHelpful})</span>
                     </button>
                   </div>

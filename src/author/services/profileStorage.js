@@ -18,6 +18,8 @@ export const DEFAULT_AUTHOR_PROFILE = {
   facebook_url: "",
   photo: "",
   photo_url: "",
+  profile_image: "",
+  profile_image_url: "",
   avatar: "",
   avatar_url: "",
   avatarUrl: "",
@@ -28,27 +30,90 @@ function firstNonEmpty(values = []) {
   return values.find((value) => String(value ?? "").trim() !== "") ?? "";
 }
 
+function uniqueNonEmpty(values = []) {
+  return Array.from(
+    new Set(values.map((value) => String(value || "").trim()).filter(Boolean)),
+  );
+}
+
 function getBackendOrigin() {
   try {
-    return new URL(API_BASE_URL).origin;
+    const parsed = new URL(API_BASE_URL);
+    const normalizedPath = String(parsed.pathname || "").replace(/\/+$/, "");
+    const assetPath = normalizedPath.replace(/\/api(?:\/.*)?$/i, "");
+    return `${parsed.origin}${assetPath}`;
   } catch {
     return "";
   }
 }
 
-export function resolveBackendAssetUrl(value) {
-  const raw = String(value || "").trim();
-  if (!raw) return "";
-  if (/^(?:https?:|data:|blob:)/i.test(raw)) return raw;
+function isLoopbackHost(host = "") {
+  return host === "127.0.0.1" || host === "localhost" || host === "::1";
+}
 
-  const origin = getBackendOrigin();
-  if (!origin) return raw;
+export function resolveBackendAssetUrl(value) {
+  return buildBackendAssetUrlCandidates(value)[0] || String(value || "").trim();
+}
+
+export function buildBackendAssetUrlCandidates(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return [];
+  if (/^(?:https?:|data:|blob:)/i.test(raw)) return [raw];
+
+  const assetBase = getBackendOrigin();
+  if (!assetBase) return [raw];
 
   try {
-    return new URL(raw, `${origin}/`).toString();
+    const cleanPath = raw
+      .replace(/^\/+/, "")
+      .replace(/^storage\/app\/public\//i, "")
+      .replace(/^public\//i, "");
+    const storagePath = cleanPath.startsWith("storage/")
+      ? cleanPath
+      : `storage/${cleanPath}`;
+    const publicStoragePath = cleanPath.startsWith("public/storage/")
+      ? cleanPath
+      : `public/storage/${cleanPath.replace(/^storage\//i, "")}`;
+    const directPath = cleanPath;
+    const publicPath = cleanPath.startsWith("public/")
+      ? cleanPath
+      : `public/${cleanPath}`;
+    const candidatePaths = uniqueNonEmpty([
+      directPath,
+      storagePath,
+      publicStoragePath,
+      publicPath,
+    ]);
+
+    return candidatePaths.map((path) => {
+      const resolvedUrl = new URL(path, `${assetBase}/`);
+
+      if (typeof window !== "undefined" && window.location?.hostname) {
+        const currentHost = window.location.hostname;
+        if (!isLoopbackHost(currentHost) && isLoopbackHost(resolvedUrl.hostname)) {
+          resolvedUrl.hostname = currentHost;
+        }
+      }
+
+      return resolvedUrl.toString();
+    });
   } catch {
-    return raw;
+    return [raw];
   }
+}
+
+export function buildAuthorPhotoCandidates(profile = {}) {
+  return uniqueNonEmpty(
+    [
+      profile?.avatarUrl,
+      profile?.avatar_url,
+      profile?.photo_url,
+      profile?.profile_image_url,
+      profile?.photo,
+      profile?.avatar,
+      profile?.profile_image,
+    ].flatMap((value) => buildBackendAssetUrlCandidates(value)),
+  );
 }
 
 export function resolveProfilePayload(payload) {
@@ -100,16 +165,23 @@ export function normalizeAuthorProfile(payload, currentProfile = {}) {
   const photo = firstNonEmpty([
     source?.photo,
     source?.avatar,
+    source?.profile_image,
     currentProfile?.photo,
     currentProfile?.avatar,
+    currentProfile?.profile_image,
   ]);
   const photoUrl = resolveBackendAssetUrl(
     firstNonEmpty([
       source?.photo_url,
       source?.avatar_url,
+      source?.profile_image_url,
       source?.photoUrl,
       source?.avatarUrl,
+      source?.photo,
+      source?.avatar,
+      source?.profile_image,
       currentProfile?.photo_url,
+      currentProfile?.profile_image_url,
       currentProfile?.avatar_url,
       currentProfile?.avatarUrl,
       photo,
@@ -134,6 +206,8 @@ export function normalizeAuthorProfile(payload, currentProfile = {}) {
     ]),
     photo,
     photo_url: photoUrl,
+    profile_image: photo,
+    profile_image_url: photoUrl,
     avatar: photo,
     avatar_url: photoUrl,
     avatarUrl: photoUrl || buildFallbackAvatar(fullName || email),

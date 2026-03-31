@@ -145,10 +145,10 @@ export default function Authors() {
       )}
 
       <section className={`overflow-hidden rounded-[24px] border ${
-        isDark ? "border-slate-800 bg-slate-900/70" : "border-slate-200 bg-white"
+        isDark ? "border-slate-800 bg-gradient-to-b from-[#15292d] via-slate-950 to-[#101927]" : "border-slate-200 bg-white"
       }`}>
         <div className={`border-b px-6 py-4 ${
-          isDark ? "border-slate-800 bg-slate-900" : "border-slate-200 bg-slate-50"
+          isDark ? "border-slate-800 bg-transparent" : "border-slate-200 bg-slate-50"
         }`}>
           <h3 className={`text-lg font-semibold ${isDark ? "text-white" : "text-slate-900"}`}>
             {t("Author Directory")}
@@ -160,12 +160,12 @@ export default function Authors() {
 
         {selectedAuthor && (
           <div className={`border-b px-6 py-5 ${
-            isDark ? "border-slate-800 bg-slate-950/40" : "border-slate-200 bg-slate-50/80"
+            isDark ? "border-slate-800 bg-slate-900/55" : "border-slate-200 bg-slate-50/80"
           }`}>
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div className="flex items-start gap-4">
                 <div className={`flex h-14 w-14 items-center justify-center rounded-full text-lg font-bold ${
-                  isDark ? "bg-[#214046] text-white" : "bg-[#4a868f] text-white"
+                  isDark ? "bg-[#214046] text-white ring-2 ring-cyan-500/15" : "bg-[#4a868f] text-white"
                 }`}>
                   {String(selectedAuthor.name || "AU")
                     .trim()
@@ -185,7 +185,11 @@ export default function Authors() {
                       <Mail size={15} />
                       {selectedAuthor.email}
                     </span>
-                    <span className="inline-flex items-center gap-2 rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-amber-500">
+                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${
+                      isDark
+                        ? "border border-amber-400/25 bg-amber-400/10 text-amber-200"
+                        : "border border-amber-300 bg-amber-50 text-amber-500"
+                    }`}>
                       <ShieldCheck size={14} />
                       Author
                     </span>
@@ -203,7 +207,7 @@ export default function Authors() {
                 onClick={() => setSelectedAuthor(null)}
                 className={`inline-flex items-center gap-2 self-start rounded-xl border px-4 py-2 text-sm font-semibold transition ${
                   isDark
-                    ? "border-slate-700 bg-slate-900 text-slate-200 hover:bg-slate-800"
+                    ? "border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-800"
                     : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
                 }`}
               >
@@ -217,6 +221,7 @@ export default function Authors() {
         <AuthorsTable
           authors={authors}
           loading={loading}
+          isDark={isDark}
           emptyTitle={t("No authors found")}
           emptyDescription={t("Create a new author to get started")}
           actionLoadingId={actionLoadingId}

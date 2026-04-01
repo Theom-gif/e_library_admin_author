@@ -3,8 +3,11 @@ import { apiClient } from "../../lib/apiClient";
 const AUTHOR_API_PREFIX = String(import.meta.env.VITE_AUTHOR_API_PREFIX || "/authors").replace(/\/+$/, "");
 const buildAuthorUrl = (suffix = "") => `${AUTHOR_API_PREFIX}${suffix}`;
 const AUTHOR_REGISTRATION_URL = String(import.meta.env.VITE_AUTHOR_REGISTRATION_URL || "/auth/author_registration");
-<<<<<<< HEAD
-const AUTHOR_APPROVAL_URL = String(import.meta.env.VITE_AUTHOR_APPROVAL_URL || "/admin/approve-authors").replace(/\/+$/, "");
+const AUTHOR_APPROVAL_URL = String(
+  import.meta.env.VITE_AUTHOR_APPROVAL_URL || "/admin/approve-authors",
+).replace(/\/+$/, "");
+const APPROVE_AUTHOR_REQUEST_URL = String(import.meta.env.VITE_APPROVE_AUTHOR_REQUEST_URL || "/admin/approve-authors");
+const REJECT_AUTHOR_REQUEST_URL = String(import.meta.env.VITE_REJECT_AUTHOR_REQUEST_URL || "/admin/reject-authors");
 
 const toCleanString = (value) => String(value ?? "").trim();
 const toStatusKey = (value) => toCleanString(value).toLowerCase().replace(/\s+/g, "_");
@@ -31,24 +34,20 @@ function resolveAuthorName(author = {}) {
 export function getAuthorRegistrationStatus(author = {}) {
   const candidates = [
     author?.request_status,
+    author?.author_request_status,
     author?.approval_status,
     author?.registration_status,
     author?.account_status,
     author?.status,
+    author?.author_status,
+    author?.user_status,
     author?.state,
   ];
 
   for (const candidate of candidates) {
     const normalized = toStatusKey(candidate);
-
-    if (["approved", "active", "accepted"].includes(normalized)) {
-      return "approved";
-    }
-
-    if (["rejected", "declined", "denied"].includes(normalized)) {
-      return "rejected";
-    }
-
+    if (["approved", "active", "accepted"].includes(normalized)) return "approved";
+    if (["rejected", "declined", "denied"].includes(normalized)) return "rejected";
     if (["pending", "pending_approval", "submitted", "requested", "under_review", "awaiting_approval"].includes(normalized)) {
       return "pending";
     }
@@ -68,33 +67,13 @@ export function getAuthorRegistrationStatus(author = {}) {
 
   return "approved";
 }
-=======
-const APPROVE_AUTHOR_REQUEST_URL = String(import.meta.env.VITE_APPROVE_AUTHOR_REQUEST_URL || "/admin/approve-authors");
-const REJECT_AUTHOR_REQUEST_URL = String(import.meta.env.VITE_REJECT_AUTHOR_REQUEST_URL || "/admin/reject-authors");
 
 const normalizeAuthorStatus = (author = {}) => {
-  const candidates = [
-    author?.request_status,
-    author?.author_request_status,
-    author?.approval_status,
-    author?.status,
-    author?.author_status,
-    author?.user_status,
-  ];
-
-  for (const candidate of candidates) {
-    const text = String(candidate || "").trim().toLowerCase();
-    if (!text) continue;
-    if (text.includes("pending")) return "Pending";
-    if (text.includes("reject")) return "Rejected";
-    if (text.includes("approve") || text.includes("active")) return "Approved";
-  }
-
-  if (author?.is_active === true) return "Approved";
-  if (author?.is_active === false) return "Pending";
+  const status = getAuthorRegistrationStatus(author);
+  if (status === "pending") return "Pending";
+  if (status === "rejected") return "Rejected";
   return "Approved";
 };
->>>>>>> eeddddab386af49983387096a5f399863bf3bb7c
 
 /**
  * Author Management API Service
@@ -113,16 +92,7 @@ const normalizeAuthorStatus = (author = {}) => {
  */
 export const normalizeAuthor = (author = {}) => ({
   id: author?.id ?? "",
-<<<<<<< HEAD
-  first_name: author?.first_name ?? author?.firstname ?? "",
-  last_name: author?.last_name ?? author?.lastname ?? "",
   name: resolveAuthorName(author),
-=======
-  name:
-    author?.name ??
-    [author?.first_name, author?.last_name].filter(Boolean).join(" ").trim() ??
-    "",
->>>>>>> eeddddab386af49983387096a5f399863bf3bb7c
   email: author?.email ?? "",
   bio: author?.bio ?? "",
   first_name: author?.first_name ?? author?.firstname ?? "",
@@ -131,7 +101,7 @@ export const normalizeAuthor = (author = {}) => ({
   profile_image_url: author?.profile_image_url ?? null,
   is_active: author?.is_active ?? false,
   status: normalizeAuthorStatus(author),
-  request_status: normalizeAuthorStatus(author),
+  request_status: getAuthorRegistrationStatus(author),
   motivation:
     author?.motivation ??
     author?.reason ??
@@ -148,9 +118,6 @@ export const normalizeAuthor = (author = {}) => ({
   rejected_at: author?.rejected_at ?? null,
   invitation_sent_at: author?.invitation_sent_at ?? null,
   invitation_accepted_at: author?.invitation_accepted_at ?? null,
-  request_status: getAuthorRegistrationStatus(author),
-  approved_at: author?.approved_at ?? null,
-  rejected_at: author?.rejected_at ?? null,
   rejected_reason: author?.rejected_reason ?? "",
   created_at: author?.created_at ?? null,
   updated_at: author?.updated_at ?? null,
@@ -537,13 +504,7 @@ export default {
   updateAuthor,
   deleteAuthor,
   resendAuthorInvitation,
-<<<<<<< HEAD
-  createAuthorRequestNotification,
-  createAuthorRequestNotifications,
-  getAuthorRegistrationStatus,
-=======
   approveAuthorRequest,
   rejectAuthorRequest,
->>>>>>> eeddddab386af49983387096a5f399863bf3bb7c
   normalizeAuthor,
 };

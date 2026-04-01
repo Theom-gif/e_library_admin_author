@@ -17,12 +17,40 @@ import { useTheme } from "../../theme/ThemeContext";
 import AuthorsTable from "../components/authors/AuthorsTable";
 import { fetchAdminNotifications } from "../services/adminService";
 import {
+  approveAuthorRegistration,
   approveAuthorRequest,
   deleteAuthor,
   fetchAuthors,
+  getAuthorRegistrationStatus,
+  rejectAuthorRegistration,
   rejectAuthorRequest,
   resendAuthorInvitation,
 } from "../services/authorService";
+
+function RequestStatusBadge({ status, isDark, t }) {
+  const normalizedStatus = String(status || "").trim().toLowerCase();
+  const isPending = normalizedStatus === "pending";
+  const isRejected = normalizedStatus === "rejected";
+  const className = isRejected
+    ? isDark
+      ? "border border-red-400/25 bg-red-500/10 text-red-200"
+      : "border border-red-200 bg-red-50 text-red-700"
+    : isPending
+      ? isDark
+        ? "border border-amber-400/25 bg-amber-500/10 text-amber-200"
+        : "border border-amber-200 bg-amber-50 text-amber-700"
+      : isDark
+        ? "border border-emerald-400/25 bg-emerald-500/10 text-emerald-200"
+        : "border border-emerald-200 bg-emerald-50 text-emerald-700";
+  const label = isRejected ? t("Rejected") : isPending ? t("Pending") : t("Approved");
+
+  return (
+    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 ${className}`}>
+      <ShieldCheck size={14} />
+      {label}
+    </span>
+  );
+}
 
 export default function Authors() {
   const location = useLocation();
@@ -38,6 +66,9 @@ export default function Authors() {
   const [requestActionId, setRequestActionId] = useState(null);
   const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [selectedAuthor, setSelectedAuthor] = useState(null);
+  const approvedAuthors = authors.filter(
+    (author) => getAuthorRegistrationStatus(author) !== "pending",
+  );
 
   const getInitials = (name = "", email = "") => {
     const parts = String(name || "").trim().split(/\s+/).filter(Boolean);

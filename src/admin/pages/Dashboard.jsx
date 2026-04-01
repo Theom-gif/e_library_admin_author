@@ -12,6 +12,8 @@ import {
   fetchDashboardHealth,
   fetchDashboardStats,
   fetchTopReaders,
+  normalizeDashboardHealth,
+  probeApiServerHealth,
 } from "../services/adminService";
 import ActivityChartCard from "../components/dashboard/ActivityChartCard";
 import DashboardStatsGrid from "../components/dashboard/DashboardStatsGrid";
@@ -71,6 +73,35 @@ const Dashboard = () => {
   useEffect(() => {
     let mounted = true;
     const controller = new AbortController();
+    let apiServerProbePromise = null;
+
+    const getApiServerProbe = async () => {
+      if (!apiServerProbePromise) {
+        apiServerProbePromise = probeApiServerHealth({ signal: controller.signal });
+      }
+
+      return apiServerProbePromise;
+    };
+
+    const resolveHealth = async (rawHealth) => {
+      const nextHealth = normalizeDashboardHealth(rawHealth);
+      const apiServerStatus = nextHealth?.apiServer?.status;
+      const apiServerLatency = Number(nextHealth?.apiServer?.latencyMs ?? 0);
+
+      if (apiServerStatus !== "online" || apiServerLatency <= 0) {
+        const probe = await getApiServerProbe();
+        if (probe?.status === "online" || probe?.status === "warning") {
+          nextHealth.apiServer = {
+            ...nextHealth.apiServer,
+            status: probe.status,
+            latencyMs: probe.latencyMs,
+          };
+        }
+      }
+
+      return nextHealth;
+    };
+
     const load = async () => {
       setIsLoading(true);
       setError("");
@@ -80,7 +111,9 @@ const Dashboard = () => {
         if (unified?.stats) setStats(unified.stats);
         if (unified?.trends) setTrends(unified.trends);
         if (Array.isArray(unified?.activity)) setActivity(toActivity(unified.activity));
-        if (unified?.health) setHealth(unified.health);
+        if (unified?.health) {
+          setHealth(await resolveHealth(unified.health));
+        }
 
         // 2. Fill stats gap if unified didn't return them
         if (!unified?.stats || !unified?.trends) {
@@ -98,10 +131,8 @@ const Dashboard = () => {
         // 4. Health — response is the health object directly (no wrapper key)
         // Shape: { uptimePercent, apiServer, database, fileStorage, emailService }
         const healthRes = await fetchDashboardHealth({ signal: controller.signal });
-        if (healthRes?.apiServer || healthRes?.uptimePercent !== undefined) {
-          setHealth(healthRes);
-        } else if (healthRes?.health) {
-          setHealth(healthRes.health);
+        if (healthRes && Object.keys(healthRes).length > 0) {
+          setHealth(await resolveHealth(healthRes));
         }
 
         // 5. Top readers

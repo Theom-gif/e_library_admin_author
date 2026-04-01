@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { fetchAuthorFeedback, fetchAuthorNotifications } from "../../admin/services/adminService";
+import { fetchAuthorFeedback } from "../../admin/services/adminService";
 import { getBooksRequest } from "../services/bookService";
 import { normalizeAuthorFeedbackEntry } from "../services/feedbackUtils";
 
@@ -104,16 +104,11 @@ function dedupeNotifications(notifications = []) {
 }
 
 async function loadAuthorNotificationFeed() {
-  const [authorNotificationsResult, feedbackResult, booksResult] = await Promise.allSettled([
-    fetchAuthorNotifications(),
+  const [feedbackResult, booksResult] = await Promise.allSettled([
     fetchAuthorFeedback(10, "all"),
     getBooksRequest({ status: "All" }),
   ]);
 
-  const directNotifications =
-    authorNotificationsResult.status === "fulfilled" && Array.isArray(authorNotificationsResult.value)
-      ? authorNotificationsResult.value
-      : [];
   const feedbackNotifications =
     feedbackResult.status === "fulfilled" && Array.isArray(feedbackResult.value)
       ? createReaderFeedbackNotifications(feedbackResult.value)
@@ -124,7 +119,6 @@ async function loadAuthorNotificationFeed() {
       : [];
 
   const notifications = dedupeNotifications([
-    ...directNotifications,
     ...feedbackNotifications,
     ...bookStatusNotifications,
   ]).sort((left, right) => {
@@ -138,7 +132,7 @@ async function loadAuthorNotificationFeed() {
     };
   }
 
-  const firstFailure = [authorNotificationsResult, feedbackResult, booksResult].find(
+  const firstFailure = [feedbackResult, booksResult].find(
     (result) => result.status === "rejected",
   );
 

@@ -154,6 +154,173 @@ const toNumberOr = (value, fallback) => {
   return Number.isFinite(num) && num >= 0 ? num : fallback;
 };
 
+const isPlainObject = (value) =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
+
+const pickFirstDefined = (...values) =>
+  values.find((value) => value !== undefined && value !== null);
+
+const hasDashboardHealthShape = (value) =>
+  isPlainObject(value) &&
+  [
+    "uptimePercent",
+    "uptime_percent",
+    "apiServer",
+    "api_server",
+    "database",
+    "db",
+    "fileStorage",
+    "file_storage",
+    "emailService",
+    "email_service",
+  ].some((key) => key in value);
+
+const normalizeHealthStatus = (status) => {
+  const value = String(status ?? "").trim().toLowerCase();
+
+  if (!value) return "online";
+  if (["online", "healthy", "ok", "up", "available", "connected", "success", "true"].includes(value)) {
+    return "online";
+  }
+  if (["warning", "warn", "degraded", "slow", "partial"].includes(value)) {
+    return "warning";
+  }
+  if (["offline", "down", "error", "failed", "failure", "unhealthy", "critical", "false"].includes(value)) {
+    return "offline";
+  }
+
+  return "warning";
+};
+
+const pickSection = (source, keys) => {
+  for (const key of keys) {
+    if (isPlainObject(source?.[key])) {
+      return source[key];
+    }
+  }
+
+  return {};
+};
+
+const normalizeMetric = (source, keys) =>
+  toNumberOr(pickFirstDefined(...keys.map((key) => source?.[key])), 0);
+
+export const normalizeDashboardHealth = (payload = {}) => {
+  const raw = hasDashboardHealthShape(payload?.health)
+    ? payload.health
+    : hasDashboardHealthShape(payload?.data?.health)
+      ? payload.data.health
+      : hasDashboardHealthShape(payload?.data)
+        ? payload.data
+        : hasDashboardHealthShape(payload)
+          ? payload
+          : {};
+
+  const apiServer = pickSection(raw, ["apiServer", "api_server", "api"]);
+  const database = pickSection(raw, ["database", "db"]);
+  const fileStorage = pickSection(raw, ["fileStorage", "file_storage", "storage"]);
+  const emailService = pickSection(raw, ["emailService", "email_service", "email", "mailer"]);
+
+  return {
+    uptimePercent: pickFirstDefined(raw?.uptimePercent, raw?.uptime_percent, 0),
+    apiServer: {
+      status: normalizeHealthStatus(
+        pickFirstDefined(apiServer?.status, apiServer?.state, apiServer?.health),
+      ),
+      latencyMs: normalizeMetric(apiServer, ["latencyMs", "latency_ms", "latency", "responseMs", "response_ms"]),
+    },
+    database: {
+      status: normalizeHealthStatus(
+        pickFirstDefined(database?.status, database?.state, database?.health),
+      ),
+      queryTimeMs: normalizeMetric(database, ["queryTimeMs", "query_time_ms", "queryTime", "query_time"]),
+    },
+    fileStorage: {
+      status: normalizeHealthStatus(
+        pickFirstDefined(fileStorage?.status, fileStorage?.state, fileStorage?.health),
+      ),
+      usedPercent: normalizeMetric(fileStorage, ["usedPercent", "used_percent", "usagePercent", "usage_percent"]),
+    },
+    emailService: {
+      status: normalizeHealthStatus(
+        pickFirstDefined(emailService?.status, emailService?.state, emailService?.health),
+      ),
+      responseMs: normalizeMetric(emailService, ["responseMs", "response_ms", "responseTimeMs", "response_time_ms"]),
+    },
+  };
+};
+
+const buildHealthProbeUrls = () => {
+  const apiBase = trimSlash(API_BASE_URL);
+  const siteBase = trimSlash(stripApiSuffix(API_BASE_URL));
+  const candidates = [];
+
+  if (apiBase) {
+    candidates.push(/\/api$/i.test(apiBase) ? `${apiBase}/health` : `${apiBase}/api/health`);
+  }
+
+  if (siteBase) {
+    candidates.push(`${siteBase}/health`);
+  }
+
+  if (!isAbsoluteUrl(apiBase)) {
+    candidates.push("/api/health");
+    candidates.push("/health");
+  }
+
+  return [...new Set(candidates.filter(Boolean))];
+};
+
+export const probeApiServerHealth = async (config = {}) => {
+  const urls = buildHealthProbeUrls();
+  const signal = config?.signal;
+
+  for (const url of urls) {
+    const startedAt = Date.now();
+
+    try {
+      const response = await fetch(url, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+        cache: "no-store",
+        signal,
+      });
+
+      if (!response.ok) {
+        continue;
+      }
+
+      let payload = {};
+      try {
+        payload = await response.json();
+      } catch {
+        payload = {};
+      }
+
+      const latencyMs = Math.max(1, Date.now() - startedAt);
+      const status = normalizeHealthStatus(
+        pickFirstDefined(payload?.status, payload?.state, payload?.health, "online"),
+      );
+
+      return {
+        status,
+        latencyMs,
+        source: url,
+      };
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw error;
+      }
+    }
+  }
+
+  return {
+    status: "offline",
+    latencyMs: 0,
+    source: urls[0] || "",
+  };
+};
+
 const normalizePagination = (meta = {}, fallbackLength = 0) => ({
   page: toNumberOr(meta.page ?? meta.current_page ?? meta.currentPage, 1),
   perPage: toNumberOr(

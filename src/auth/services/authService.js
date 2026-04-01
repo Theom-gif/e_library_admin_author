@@ -88,6 +88,8 @@ export function refreshTokenRequest(token) {
     {
       refresh_token: token || undefined,
       refreshToken: token || undefined,
+      reset_token: token || undefined,
+      resetToken: token || undefined,
       token: token || undefined,
     },
     {

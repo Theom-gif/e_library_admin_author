@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { fetchAuthorFeedback, fetchAuthorNotifications } from "../../admin/services/adminService";
 import { getBooksRequest } from "../services/bookService";
 import { normalizeAuthorFeedbackEntry } from "../services/feedbackUtils";
@@ -103,6 +103,13 @@ function dedupeNotifications(notifications = []) {
   });
 }
 
+function applyNotificationReadState(items = [], readState = {}) {
+  return items.map((notification) => ({
+    ...notification,
+    read: Boolean(notification?.read || readState[notification.id]),
+  }));
+}
+
 async function loadAuthorNotificationFeed() {
   const [authorNotificationsResult, feedbackResult, booksResult] = await Promise.allSettled([
     fetchAuthorNotifications(),
@@ -156,19 +163,12 @@ export function useAuthorNotifications() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [readState, setReadState] = useState(() => readNotificationReadState());
+  const readStateRef = useRef(readState);
 
   useEffect(() => {
+    readStateRef.current = readState;
     writeNotificationReadState(readState);
   }, [readState]);
-
-  const applyReadState = useCallback(
-    (items = []) =>
-      items.map((notification) => ({
-        ...notification,
-        read: Boolean(notification?.read || readState[notification.id]),
-      })),
-    [readState],
-  );
 
   const refreshNotifications = useCallback(async () => {
     setLoading(true);
@@ -176,7 +176,7 @@ export function useAuthorNotifications() {
 
     try {
       const result = await loadAuthorNotificationFeed();
-      setNotifications(applyReadState(result.notifications));
+      setNotifications(applyNotificationReadState(result.notifications, readStateRef.current));
       setError(result.error);
       return result.notifications;
     } catch (requestError) {
@@ -190,27 +190,42 @@ export function useAuthorNotifications() {
     } finally {
       setLoading(false);
     }
-  }, [applyReadState]);
+  }, []);
 
   const markNotificationRead = useCallback((id) => {
     if (!id) return;
 
     setReadState((current) => ({ ...current, [id]: true }));
-    setNotifications((current) =>
-      current.map((notification) =>
-        notification.id === id ? { ...notification, read: true } : notification,
-      ),
-    );
+    setNotifications((current) => {
+      let changed = false;
+      const next = current.map((notification) => {
+        if (notification.id !== id || notification.read) {
+          return notification;
+        }
+
+        changed = true;
+        return { ...notification, read: true };
+      });
+
+      return changed ? next : current;
+    });
   }, []);
 
   const markAllAsRead = useCallback((ids = []) => {
     setNotifications((current) => {
       const targetIds = ids.length > 0 ? new Set(ids) : new Set(current.map((notification) => notification.id));
       if (targetIds.size === 0) return current;
+      const unreadTargetIds = current
+        .filter((notification) => targetIds.has(notification.id) && !notification.read)
+        .map((notification) => notification.id);
+      if (unreadTargetIds.length === 0) {
+        return current;
+      }
+      const unreadTargetIdSet = new Set(unreadTargetIds);
 
       setReadState((existing) => {
         const next = { ...existing };
-        targetIds.forEach((id) => {
+        unreadTargetIds.forEach((id) => {
           if (id) {
             next[id] = true;
           }
@@ -219,7 +234,7 @@ export function useAuthorNotifications() {
       });
 
       return current.map((notification) =>
-        targetIds.has(notification.id) ? { ...notification, read: true } : notification,
+        unreadTargetIdSet.has(notification.id) ? { ...notification, read: true } : notification,
       );
     });
   }, []);

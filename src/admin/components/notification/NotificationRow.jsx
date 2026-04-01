@@ -13,7 +13,7 @@ const NotificationRow = ({ notif, onMarkRead, onDelete }) => {
         "group flex items-start gap-4 rounded-xl border px-5 py-4 transition-all duration-200",
         notif.read
           ? "border-[var(--border)] bg-[var(--surface)]"
-          : "border-indigo-500/20 bg-indigo-500/5",
+          : "border-accent/20 bg-[color:var(--surface-overlay-15)] shadow-[0_14px_34px_rgba(0,0,0,0.08)]",
       )}
     >
       <div className={cn("mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl", meta.color)}>
@@ -37,26 +37,6 @@ const NotificationRow = ({ notif, onMarkRead, onDelete }) => {
         </div>
       </div>
 
-      <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
-        {!notif.read && (
-          <button
-            type="button"
-            onClick={() => onMarkRead(notif.id)}
-            title="Mark as read"
-            className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-indigo-500/10 hover:text-indigo-400"
-          >
-            <CheckCircle size={14} />
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={() => onDelete(notif.id)}
-          title="Delete"
-          className="rounded-lg p-1.5 text-[var(--muted)] hover:bg-rose-500/10 hover:text-rose-400"
-        >
-          <Trash2 size={14} />
-        </button>
-      </div>
       {hasActions && (
         <div className="flex shrink-0 items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
           {!notif.read && onMarkRead && (
@@ -64,7 +44,7 @@ const NotificationRow = ({ notif, onMarkRead, onDelete }) => {
               type="button"
               onClick={() => onMarkRead(notif.id)}
               title="Mark as read"
-              className="rounded-lg p-1.5 text-slate-400 hover:bg-indigo-50 hover:text-indigo-600"
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-[color:var(--surface-overlay-15)] hover:text-accent"
             >
               <CheckCircle size={14} />
             </button>

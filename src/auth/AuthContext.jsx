@@ -43,6 +43,10 @@ function getRefreshTokenFromStorage() {
     sessionStorage.getItem(REFRESH_TOKEN_KEY) ||
     localStorage.getItem("refresh_token") ||
     sessionStorage.getItem("refresh_token") ||
+    localStorage.getItem("reset_token") ||
+    sessionStorage.getItem("reset_token") ||
+    localStorage.getItem("resetToken") ||
+    sessionStorage.getItem("resetToken") ||
     null
   );
 }
@@ -106,8 +110,12 @@ function saveRefreshToken(refreshToken, remember = false) {
   const staleStorage = remember ? sessionStorage : localStorage;
   activeStorage.setItem(REFRESH_TOKEN_KEY, normalizedToken);
   activeStorage.setItem("refresh_token", normalizedToken);
+  activeStorage.setItem("reset_token", normalizedToken);
+  activeStorage.setItem("resetToken", normalizedToken);
   staleStorage.removeItem(REFRESH_TOKEN_KEY);
   staleStorage.removeItem("refresh_token");
+  staleStorage.removeItem("reset_token");
+  staleStorage.removeItem("resetToken");
 }
 
 function clearToken() {
@@ -119,6 +127,10 @@ function clearToken() {
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem("refresh_token");
   sessionStorage.removeItem("refresh_token");
+  localStorage.removeItem("reset_token");
+  sessionStorage.removeItem("reset_token");
+  localStorage.removeItem("resetToken");
+  sessionStorage.removeItem("resetToken");
 }
 
 function clearSession() {

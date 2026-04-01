@@ -20,10 +20,10 @@ const Notifications = () => {
   } = useAuthorNotifications();
 
   useEffect(() => {
-    if (!isLoading && notifications.length > 0) {
-      markAllAsRead();
+    if (!isLoading && unreadCount > 0) {
+      markAllAsRead(notifications.filter((notification) => !notification.read).map((notification) => notification.id));
     }
-  }, [isLoading, markAllAsRead, notifications]);
+  }, [isLoading, markAllAsRead, notifications, unreadCount]);
 
   const filteredNotifications = useMemo(
     () =>
@@ -35,9 +35,18 @@ const Notifications = () => {
     [activeCategory, notifications],
   );
 
+  const heroStyle = {
+    background:
+      "linear-gradient(135deg, color-mix(in srgb, var(--accent) 16%, var(--surface) 84%), color-mix(in srgb, var(--surface) 70%, var(--bg) 30%))",
+    boxShadow: "0 28px 80px color-mix(in srgb, #000 16%, transparent)",
+  };
+
   return (
     <div className="mx-auto max-w-6xl p-6 md:p-8">
-      <div className="mb-6 flex flex-col gap-4 rounded-[30px] border border-white/6 bg-[linear-gradient(135deg,rgba(74,134,143,0.22),rgba(13,18,29,0.96))] p-6 shadow-[0_30px_90px_rgba(0,0,0,0.24)] lg:flex-row lg:items-center lg:justify-between">
+      <div
+        className="mb-6 flex flex-col gap-4 rounded-[30px] border border-white/10 p-6 lg:flex-row lg:items-center lg:justify-between"
+        style={heroStyle}
+      >
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.24em] text-accent/90">
             {t("Notification Center")}
@@ -50,11 +59,11 @@ const Notifications = () => {
 
         <div className="flex items-center gap-3">
           {unreadCount > 0 ? (
-            <span className="rounded-full border border-amber-400/20 bg-amber-400/10 px-3 py-1.5 text-xs font-semibold text-amber-300">
+            <span className="rounded-full border border-accent/20 bg-[color:var(--surface-overlay-15)] px-3 py-1.5 text-xs font-semibold text-accent">
               {unreadCount} {t("unread")}
             </span>
           ) : (
-            <span className="rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5 text-xs font-semibold text-emerald-300">
+            <span className="rounded-full border border-accent/20 bg-[color:var(--surface-overlay-15)] px-3 py-1.5 text-xs font-semibold text-accent">
               {t("All caught up")}
             </span>
           )}
@@ -62,7 +71,7 @@ const Notifications = () => {
             type="button"
             onClick={refreshNotifications}
             disabled={isLoading}
-            className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white px-4 py-3 text-sm font-semibold text-black transition hover:bg-slate-200 disabled:cursor-not-allowed disabled:opacity-60"
+            className="author-cta-secondary inline-flex items-center gap-2 rounded-2xl px-4 py-3 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw size={15} className={cn(isLoading && "animate-spin")} />
             {t("Refresh")}
@@ -87,8 +96,8 @@ const Notifications = () => {
                   className={cn(
                     "inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold transition",
                     activeCategory === key
-                      ? "border-accent/40 bg-accent text-white"
-                      : "border-white/10 bg-card-dark text-slate-300 hover:bg-primary/10",
+                      ? "border-accent/40 bg-[color:var(--surface-overlay-15)] text-accent"
+                      : "border-white/10 bg-card-dark text-[color:var(--text)] hover:bg-[color:var(--surface-overlay-10)]",
                   )}
                 >
                   <Icon size={15} />
@@ -96,7 +105,9 @@ const Notifications = () => {
                   <span
                     className={cn(
                       "rounded-full px-2 py-0.5 text-[10px] font-bold",
-                      activeCategory === key ? "bg-white/20 text-white" : "bg-white/10 text-slate-400",
+                      activeCategory === key
+                        ? "bg-accent text-white"
+                        : "bg-[color:var(--surface-overlay-10)] text-slate-500",
                     )}
                   >
                     {count}
@@ -106,8 +117,8 @@ const Notifications = () => {
             })}
           </div>
 
-          <div className="rounded-[28px] border border-white/6 bg-card-dark shadow-[0_20px_70px_rgba(0,0,0,0.16)]">
-            <div className="flex items-center justify-between border-b border-white/6 px-5 py-4">
+          <div className="rounded-[28px] border border-white/10 bg-card-dark shadow-[0_20px_70px_rgba(0,0,0,0.16)]">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
               <h2 className="font-bold text-[color:var(--text)]">
                 {t(CATEGORIES.find((item) => item.key === activeCategory)?.label || "All")}
               </h2>
@@ -149,16 +160,16 @@ const Notifications = () => {
         </div>
 
         <div className="space-y-5">
-          <div className="rounded-[28px] border border-white/6 bg-card-dark p-6 shadow-[0_20px_70px_rgba(0,0,0,0.16)]">
+          <div className="rounded-[28px] border border-white/10 bg-card-dark p-6 shadow-[0_20px_70px_rgba(0,0,0,0.16)]">
             <h3 className="text-lg font-bold">{t("At a glance")}</h3>
             <div className="mt-5 grid gap-3">
-              <div className="rounded-2xl border border-white/8 bg-primary/5 p-4">
+              <div className="rounded-2xl border border-white/10 bg-[var(--surface-2)] p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                   {t("Total")}
                 </p>
                 <p className="mt-2 text-2xl font-bold">{notifications.length}</p>
               </div>
-              <div className="rounded-2xl border border-white/8 bg-primary/5 p-4">
+              <div className="rounded-2xl border border-white/10 bg-[var(--surface-2)] p-4">
                 <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
                   {t("Unread")}
                 </p>

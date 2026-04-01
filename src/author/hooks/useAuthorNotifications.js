@@ -111,11 +111,16 @@ function applyNotificationReadState(items = [], readState = {}) {
 }
 
 async function loadAuthorNotificationFeed() {
-  const [feedbackResult, booksResult] = await Promise.allSettled([
+  const [apiNotificationsResult, feedbackResult, booksResult] = await Promise.allSettled([
+    fetchAuthorNotifications(),
     fetchAuthorFeedback(10, "all"),
     getBooksRequest({ status: "All" }),
   ]);
 
+  const apiNotifications =
+    apiNotificationsResult.status === "fulfilled" && Array.isArray(apiNotificationsResult.value)
+      ? apiNotificationsResult.value
+      : [];
   const feedbackNotifications =
     feedbackResult.status === "fulfilled" && Array.isArray(feedbackResult.value)
       ? createReaderFeedbackNotifications(feedbackResult.value)
@@ -126,6 +131,7 @@ async function loadAuthorNotificationFeed() {
       : [];
 
   const notifications = dedupeNotifications([
+    ...apiNotifications,
     ...feedbackNotifications,
     ...bookStatusNotifications,
   ]).sort((left, right) => {
@@ -139,7 +145,7 @@ async function loadAuthorNotificationFeed() {
     };
   }
 
-  const firstFailure = [feedbackResult, booksResult].find(
+  const firstFailure = [apiNotificationsResult, feedbackResult, booksResult].find(
     (result) => result.status === "rejected",
   );
 

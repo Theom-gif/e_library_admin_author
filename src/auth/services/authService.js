@@ -82,6 +82,10 @@ export function registerRequest(payload, options = {}) {
   return post("/api/auth/register", payload, options);
 }
 
+export function authorRegistrationRequest(payload, options = {}) {
+  return post("/api/auth/author_registration", payload, options);
+}
+
 export function refreshTokenRequest(token) {
   return axios.post(
     joinBaseAndPath(resolveBase(), "/api/auth/refresh"),

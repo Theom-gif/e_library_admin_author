@@ -1,6 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { DEMO_AUTH_USERS } from "../admin/data/mockData";
-import { loginRequest, refreshTokenRequest, registerRequest } from "./services/authService";
+import {
+  authorRegistrationRequest,
+  loginRequest,
+  refreshTokenRequest,
+  registerRequest,
+} from "./services/authService";
 import { API_BASE_URL } from "../lib/apiClient";
 import { getRoleName } from "./roleUtils";
 import { AuthContext } from "./authContextStore";
@@ -526,6 +531,42 @@ async function registerWithRoleFallbacks({
   throw lastSpecificRoleError || lastRoleError;
 }
 
+async function requestAuthorRegistrationWithFallbacks({
+  firstname,
+  lastname,
+  email,
+  password,
+  password_confirmation,
+  bio,
+}) {
+  const cleanEmail = String(email || "").trim().toLowerCase();
+  const basePayload = {
+    firstname,
+    lastname,
+    first_name: firstname,
+    last_name: lastname,
+    email: cleanEmail,
+    password,
+    password_confirmation,
+    role: "Author",
+    role_id: 2,
+    ...(String(bio || "").trim() ? { bio: String(bio).trim() } : {}),
+  };
+
+  const requestModes = ["urlencoded", "multipart", "json"];
+  let lastError = null;
+
+  for (const mode of requestModes) {
+    try {
+      return await authorRegistrationRequest(basePayload, { mode });
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError || new Error("Unable to submit author registration.");
+}
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [isReady, setIsReady] = useState(false);
@@ -640,6 +681,39 @@ export function AuthProvider({ children }) {
           return { ok: true };
         } catch (error) {
           return { ok: false, error: toErrorMessage(error, "Registration failed. Please try again.") };
+        }
+      },
+      requestAuthorRegistration: async ({
+        firstname,
+        lastname,
+        email,
+        password,
+        password_confirmation,
+        bio,
+      }) => {
+        try {
+          const response = await requestAuthorRegistrationWithFallbacks({
+            firstname,
+            lastname,
+            email,
+            password,
+            password_confirmation,
+            bio,
+          });
+          const data = response?.data || {};
+          return {
+            ok: true,
+            message:
+              data?.message ||
+              "Your author registration request has been submitted for admin review.",
+            data: data?.data || data?.user || data,
+          };
+        } catch (error) {
+          return {
+            ok: false,
+            error: toErrorMessage(error, "Author registration failed. Please try again."),
+            errors: error?.response?.data?.errors,
+          };
         }
       },
       logout: () => {

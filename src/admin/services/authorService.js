@@ -3,6 +3,70 @@ import { apiClient } from "../../lib/apiClient";
 const AUTHOR_API_PREFIX = String(import.meta.env.VITE_AUTHOR_API_PREFIX || "/authors").replace(/\/+$/, "");
 const buildAuthorUrl = (suffix = "") => `${AUTHOR_API_PREFIX}${suffix}`;
 const AUTHOR_REGISTRATION_URL = String(import.meta.env.VITE_AUTHOR_REGISTRATION_URL || "/auth/author_registration");
+const AUTHOR_APPROVAL_URL = String(import.meta.env.VITE_AUTHOR_APPROVAL_URL || "/admin/approve-authors").replace(/\/+$/, "");
+
+const toCleanString = (value) => String(value ?? "").trim();
+const toStatusKey = (value) => toCleanString(value).toLowerCase().replace(/\s+/g, "_");
+const toTimestamp = (value) => {
+  const parsed = new Date(value || "").getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+function resolveAuthorName(author = {}) {
+  const firstName = toCleanString(author?.first_name ?? author?.firstname);
+  const lastName = toCleanString(author?.last_name ?? author?.lastname);
+  const fullName = [firstName, lastName].filter(Boolean).join(" ");
+
+  return (
+    toCleanString(author?.name) ||
+    toCleanString(author?.full_name) ||
+    toCleanString(author?.fullName) ||
+    fullName ||
+    toCleanString(author?.username) ||
+    toCleanString(author?.email)
+  );
+}
+
+export function getAuthorRegistrationStatus(author = {}) {
+  const candidates = [
+    author?.request_status,
+    author?.approval_status,
+    author?.registration_status,
+    author?.account_status,
+    author?.status,
+    author?.state,
+  ];
+
+  for (const candidate of candidates) {
+    const normalized = toStatusKey(candidate);
+
+    if (["approved", "active", "accepted"].includes(normalized)) {
+      return "approved";
+    }
+
+    if (["rejected", "declined", "denied"].includes(normalized)) {
+      return "rejected";
+    }
+
+    if (["pending", "pending_approval", "submitted", "requested", "under_review", "awaiting_approval"].includes(normalized)) {
+      return "pending";
+    }
+  }
+
+  if (author?.approved_at || author?.invitation_accepted_at || author?.is_active === true) {
+    return "approved";
+  }
+
+  if (author?.rejected_at || author?.rejected_reason) {
+    return "rejected";
+  }
+
+  if (author?.is_active === false) {
+    return "pending";
+  }
+
+  return "approved";
+}
 
 /**
  * Author Management API Service
@@ -21,7 +85,9 @@ const AUTHOR_REGISTRATION_URL = String(import.meta.env.VITE_AUTHOR_REGISTRATION_
  */
 export const normalizeAuthor = (author = {}) => ({
   id: author?.id ?? "",
-  name: author?.name ?? "",
+  first_name: author?.first_name ?? author?.firstname ?? "",
+  last_name: author?.last_name ?? author?.lastname ?? "",
+  name: resolveAuthorName(author),
   email: author?.email ?? "",
   bio: author?.bio ?? "",
   profile_image: author?.profile_image ?? null,
@@ -29,9 +95,36 @@ export const normalizeAuthor = (author = {}) => ({
   is_active: author?.is_active ?? false,
   invitation_sent_at: author?.invitation_sent_at ?? null,
   invitation_accepted_at: author?.invitation_accepted_at ?? null,
+  request_status: getAuthorRegistrationStatus(author),
+  approved_at: author?.approved_at ?? null,
+  rejected_at: author?.rejected_at ?? null,
+  rejected_reason: author?.rejected_reason ?? "",
   created_at: author?.created_at ?? null,
   updated_at: author?.updated_at ?? null,
 });
+
+export const createAuthorRequestNotification = (author = {}) => {
+  const normalizedAuthor = normalizeAuthor(author);
+
+  return {
+    id: `author-request-${normalizedAuthor.id}`,
+    type: "author_request",
+    message: `${normalizedAuthor.name || normalizedAuthor.email || "Author applicant"} requested author access`,
+    description:
+      toCleanString(normalizedAuthor.bio) ||
+      `${normalizedAuthor.email || "No email address"} is waiting for review.`,
+    read: false,
+    created_at: normalizedAuthor.created_at || normalizedAuthor.updated_at || "",
+    author: normalizedAuthor,
+  };
+};
+
+export const createAuthorRequestNotifications = (authors = []) =>
+  authors
+    .map(normalizeAuthor)
+    .filter((author) => author.request_status === "pending")
+    .sort((left, right) => toTimestamp(right.created_at || right.updated_at) - toTimestamp(left.created_at || left.updated_at))
+    .map(createAuthorRequestNotification);
 
 /**
  * Fetch all authors with optional search and filtering
@@ -171,6 +264,53 @@ export const createAuthor = async (authorData = {}, config = {}) => {
   }
 };
 
+export const reviewAuthorRegistration = async (id, decision = "approve", config = {}) => {
+  const normalizedDecision = String(decision || "approve").trim().toLowerCase() === "reject"
+    ? "reject"
+    : "approve";
+
+  try {
+    const response = await apiClient.post(
+      `${AUTHOR_APPROVAL_URL}/${id}`,
+      {
+        action: normalizedDecision,
+        decision: normalizedDecision,
+        status: normalizedDecision === "approve" ? "approved" : "rejected",
+        approved: normalizedDecision === "approve",
+      },
+      config,
+    );
+
+    return {
+      data: normalizeAuthor(response?.data?.data || response?.data?.user || response?.data),
+      message:
+        response?.data?.message ||
+        (normalizedDecision === "approve"
+          ? "Author request approved successfully"
+          : "Author request rejected successfully"),
+      success: response?.data?.success ?? true,
+    };
+  } catch (error) {
+    console.error("reviewAuthorRegistration error:", error);
+    throw {
+      message:
+        error?.response?.data?.message ||
+        (normalizedDecision === "approve"
+          ? "Failed to approve author request"
+          : "Failed to reject author request"),
+      status: error?.response?.status,
+      errors: error?.response?.data?.errors,
+      data: error?.response?.data,
+    };
+  }
+};
+
+export const approveAuthorRegistration = async (id, config = {}) =>
+  reviewAuthorRegistration(id, "approve", config);
+
+export const rejectAuthorRegistration = async (id, config = {}) =>
+  reviewAuthorRegistration(id, "reject", config);
+
 /**
  * Update author
  * PUT /api/admin/authors/{id}
@@ -298,8 +438,14 @@ export default {
   fetchAuthors,
   getAuthor,
   createAuthor,
+  approveAuthorRegistration,
+  rejectAuthorRegistration,
+  reviewAuthorRegistration,
   updateAuthor,
   deleteAuthor,
   resendAuthorInvitation,
+  createAuthorRequestNotification,
+  createAuthorRequestNotifications,
+  getAuthorRegistrationStatus,
   normalizeAuthor,
 };

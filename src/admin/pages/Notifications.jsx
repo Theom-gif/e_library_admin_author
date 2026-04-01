@@ -7,6 +7,31 @@ import { CATEGORIES, getMeta } from "../components/notification/constants";
 import NotificationRow from "../components/notification/NotificationRow";
 import NotificationTypesLegend from "../components/notification/NotificationTypesLegend";
 import SendPanel from "../components/notification/SendPanel";
+import { createAuthorRequestNotifications, fetchAuthors } from "../services/authorService";
+
+function toNotificationTimestamp(value) {
+  const parsed = new Date(value || "").getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
+function dedupeNotifications(items = []) {
+  const seen = new Set();
+
+  return items.filter((item) => {
+    const key = [
+      String(item?.type || "").trim().toLowerCase(),
+      String(item?.message || "").trim().toLowerCase(),
+      String(item?.created_at || "").trim(),
+    ].join("|");
+
+    if (seen.has(key)) {
+      return false;
+    }
+
+    seen.add(key);
+    return true;
+  });
+}
 
 const Notifications = () => {
   const { t } = useLanguage();
@@ -19,8 +44,33 @@ const Notifications = () => {
     setIsLoading(true);
     setError("");
     try {
-      const data = await fetchAdminNotifications();
-      setNotifications(Array.isArray(data) ? data : []);
+      const [notificationsResult, authorsResult] = await Promise.allSettled([
+        fetchAdminNotifications(),
+        fetchAuthors({ status: "pending", page: 1, per_page: 12 }),
+      ]);
+
+      const apiNotifications =
+        notificationsResult.status === "fulfilled" && Array.isArray(notificationsResult.value)
+          ? notificationsResult.value
+          : [];
+      const authorRequestNotifications =
+        authorsResult.status === "fulfilled"
+          ? createAuthorRequestNotifications(authorsResult.value?.data || [])
+          : [];
+
+      const mergedNotifications = dedupeNotifications([
+        ...authorRequestNotifications,
+        ...apiNotifications,
+      ]).sort((left, right) => toNotificationTimestamp(right.created_at) - toNotificationTimestamp(left.created_at));
+
+      setNotifications(mergedNotifications);
+
+      if (mergedNotifications.length === 0) {
+        const firstFailure = [notificationsResult, authorsResult].find((result) => result.status === "rejected");
+        if (firstFailure?.status === "rejected") {
+          throw firstFailure.reason;
+        }
+      }
     } catch (err) {
       setError(err?.response?.data?.message || err?.message || t("Failed to load notifications."));
     } finally {

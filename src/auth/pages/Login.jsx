@@ -194,14 +194,14 @@ export default function Login() {
                   {isSubmitting ? "Signing in..." : "Sign In to Library"}
                   <ArrowRight size={16} />
                 </button>
-                <button
+                {/* <button
                   type="button"
                   onClick={onLoginAsAuthor}
                   className="flex h-12 w-full items-center justify-center gap-3 rounded-[14px] bg-[#6b7280] px-5 text-[16px] font-semibold text-white shadow-[0_12px_24px_rgba(107,114,128,0.32)] transition hover:bg-[#5a627d]"
                 >
                   Login as Author (Static Data)
                   <ArrowRight size={16} />
-                </button>
+                </button> */}
                 <p className="text-center text-[15px] text-[#7d8793]">
                   Not a member yet? <button type="button" className="font-semibold text-[#0b6a86] hover:text-[#084d63]">Apply for Library Card</button>
                 </p>

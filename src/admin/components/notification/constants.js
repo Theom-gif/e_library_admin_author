@@ -8,25 +8,25 @@ export const CATEGORIES = [
 ];
 
 export const TYPE_META = {
-  info:            { icon: Bell,          color: "bg-sky-100 text-sky-600",       label: "Info",             category: "system" },
-  success:         { icon: Bell,          color: "bg-emerald-100 text-emerald-600",label: "Success",          category: "system" },
-  warning:         { icon: AlertTriangle, color: "bg-amber-100 text-amber-600",    label: "Warning",          category: "system" },
-  error:           { icon: AlertTriangle, color: "bg-rose-100 text-rose-600",      label: "Error",            category: "system" },
-  user_registered: { icon: User,          color: "bg-indigo-100 text-indigo-600",  label: "New User",         category: "user" },
-  user_login:      { icon: User,          color: "bg-blue-100 text-blue-600",      label: "User Login",       category: "user" },
-  user_milestone:  { icon: Users,         color: "bg-violet-100 text-violet-600",  label: "Milestone",        category: "user" },
-  book_added:      { icon: BookOpen,      color: "bg-emerald-100 text-emerald-600",label: "Book Added",       category: "book" },
-  book_approved:   { icon: BookOpen,      color: "bg-emerald-100 text-emerald-600",label: "Book Approved",    category: "book" },
-  book_rejected:   { icon: AlertTriangle, color: "bg-rose-100 text-rose-600",      label: "Book Rejected",    category: "book" },
-  book_updated:    { icon: BookOpen,      color: "bg-cyan-100 text-cyan-600",      label: "Book Updated",     category: "book" },
-  book_deleted:    { icon: BookOpen,      color: "bg-rose-100 text-rose-600",      label: "Book Deleted",     category: "book" },
-  book_reported:   { icon: AlertTriangle, color: "bg-orange-100 text-orange-600",  label: "Book Reported",    category: "book" },
-  book_pending:    { icon: BookOpen,      color: "bg-amber-100 text-amber-600",    label: "Pending Approval", category: "book" },
-  reader_feedback: { icon: Users,         color: "bg-indigo-100 text-indigo-600",  label: "Reader Feedback",  category: "user" },
-  server_error:    { icon: AlertTriangle, color: "bg-red-100 text-red-600",        label: "Server Error",     category: "system" },
-  failed_login:    { icon: Shield,        color: "bg-rose-100 text-rose-600",      label: "Failed Login",     category: "system" },
-  auth_issue:      { icon: Shield,        color: "bg-orange-100 text-orange-600",  label: "Auth Issue",       category: "system" },
-  system_alert:    { icon: AlertTriangle, color: "bg-red-100 text-red-600",        label: "System Alert",     category: "system" },
+  info:            { icon: Bell,          color: "bg-[color:var(--surface-overlay-15)] text-accent",           label: "Info",             category: "system" },
+  success:         { icon: Bell,          color: "bg-emerald-500/12 text-emerald-500",                         label: "Success",          category: "system" },
+  warning:         { icon: AlertTriangle, color: "bg-amber-500/12 text-amber-500",                             label: "Warning",          category: "system" },
+  error:           { icon: AlertTriangle, color: "bg-rose-500/12 text-rose-500",                               label: "Error",            category: "system" },
+  user_registered: { icon: User,          color: "bg-[color:var(--surface-overlay-15)] text-accent",           label: "New User",         category: "user" },
+  user_login:      { icon: User,          color: "bg-[color:var(--surface-overlay-10)] text-accent",           label: "User Login",       category: "user" },
+  user_milestone:  { icon: Users,         color: "bg-[color:var(--surface-overlay-20)] text-accent",           label: "Milestone",        category: "user" },
+  book_added:      { icon: BookOpen,      color: "bg-emerald-500/12 text-emerald-500",                         label: "Book Added",       category: "book" },
+  book_approved:   { icon: BookOpen,      color: "bg-emerald-500/12 text-emerald-500",                         label: "Book Approved",    category: "book" },
+  book_rejected:   { icon: AlertTriangle, color: "bg-rose-500/12 text-rose-500",                               label: "Book Rejected",    category: "book" },
+  book_updated:    { icon: BookOpen,      color: "bg-[color:var(--surface-overlay-15)] text-accent",           label: "Book Updated",     category: "book" },
+  book_deleted:    { icon: BookOpen,      color: "bg-rose-500/12 text-rose-500",                               label: "Book Deleted",     category: "book" },
+  book_reported:   { icon: AlertTriangle, color: "bg-amber-500/12 text-amber-500",                             label: "Book Reported",    category: "book" },
+  book_pending:    { icon: BookOpen,      color: "bg-amber-500/12 text-amber-500",                             label: "Pending Approval", category: "book" },
+  reader_feedback: { icon: Users,         color: "bg-[color:var(--surface-overlay-15)] text-accent",           label: "Reader Feedback",  category: "user" },
+  server_error:    { icon: AlertTriangle, color: "bg-rose-500/12 text-rose-500",                               label: "Server Error",     category: "system" },
+  failed_login:    { icon: Shield,        color: "bg-rose-500/12 text-rose-500",                               label: "Failed Login",     category: "system" },
+  auth_issue:      { icon: Shield,        color: "bg-amber-500/12 text-amber-500",                             label: "Auth Issue",       category: "system" },
+  system_alert:    { icon: AlertTriangle, color: "bg-rose-500/12 text-rose-500",                               label: "System Alert",     category: "system" },
 };
 
 export const SEND_TARGETS = [
@@ -55,7 +55,7 @@ export function getMeta(type) {
   const normalizedType = String(type || "").trim().toLowerCase();
   return TYPE_META[normalizedType] || TYPE_META[type] || {
     icon: Bell,
-    color: "bg-slate-100 text-slate-600",
+    color: "bg-[color:var(--surface-overlay-10)] text-[color:var(--text)]",
     label: type,
     category: "system",
   };

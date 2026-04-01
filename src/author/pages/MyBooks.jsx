@@ -3,7 +3,6 @@ import { motion } from 'motion/react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import {
   Search,
-  Filter, 
   Plus, 
   Eye, 
   Edit3,
@@ -316,8 +315,8 @@ const MyBooks = () => {
         </button>
       </div>
 
-      <div className="flex flex-col md:flex-row gap-4 mb-8">
-        <div className="flex-1 relative">
+      <div className="mb-8 max-w-2xl">
+        <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-500" />
           <input 
             type="text" 
@@ -326,20 +325,6 @@ const MyBooks = () => {
             placeholder="Search your uploaded books..." 
             className="w-full bg-card-dark border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
           />
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => window.alert('Filter options coming soon.')}
-            className="flex items-center gap-2 px-4 py-3 bg-card-dark border border-white/5 rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
-          >
-            <Filter className="size-4" />
-            <span>Filter</span>
-          </button>
-          <select className="bg-card-dark border border-white/5 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all">
-            <option>Sort by: Newest</option>
-            <option>Sort by: Popularity</option>
-            <option>Sort by: Rating</option>
-          </select>
         </div>
       </div>
 
@@ -411,11 +396,11 @@ const MyBooks = () => {
                   </div>
                   <div className="flex items-center gap-1 shrink-0 pt-1">
                     <Star className="size-4 text-yellow-500 fill-yellow-500" />
-                    <span className="text-sm font-bold">
+                    {/* <span className="text-sm font-bold">
                       {Number.isFinite(Number(book.rating)) && Number(book.rating) > 0
                         ? Number(book.rating).toFixed(1)
                         : 'N/A'}
-                    </span>
+                    </span> */}
                   </div>
                 </div>
 

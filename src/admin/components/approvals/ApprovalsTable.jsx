@@ -122,7 +122,7 @@ const ApprovalsTable = ({
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex justify-end items-center gap-2">
-                      <button
+                      {/* <button
                         disabled={previewDisabled}
                         onClick={() => {
                           if (previewDisabled) return;
@@ -137,7 +137,7 @@ const ApprovalsTable = ({
                       >
                         <Eye size={16} />
                         {t("Preview")}
-                      </button>
+                      </button> */}
                       <button
                         disabled={disabled}
                         onClick={() => onModerate(book, "Approved")}

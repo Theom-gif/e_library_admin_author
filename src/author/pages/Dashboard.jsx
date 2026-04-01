@@ -4,7 +4,6 @@ import {
   TrendingUp, 
   Users, 
   BookOpen, 
-  Star,
   ArrowUpRight,
   ArrowDownRight
 } from 'lucide-react';
@@ -252,13 +251,6 @@ const buildDashboardStats = (bookMetrics = [], feedbackSummary, overviewSeries =
   const totalReads =
     bookMetrics.reduce((sum, book) => sum + (Number(book.totalReads) || 0), 0) ||
     Array.from(feedbackSummary.timelineReaders.values()).reduce((sum, value) => sum + value, 0);
-  const averageRating =
-    feedbackSummary.ratingsCount > 0
-      ? feedbackSummary.ratingsTotal / feedbackSummary.ratingsCount
-      : (
-          bookMetrics.reduce((sum, book) => sum + (Number(book.rating) || 0), 0) /
-          Math.max(1, bookMetrics.filter((book) => Number(book.rating) > 0).length)
-        ) || 0;
 
   const midpoint = Math.max(1, Math.floor(overviewSeries.length / 2));
   const previousHalf = overviewSeries.slice(0, midpoint);
@@ -272,11 +264,9 @@ const buildDashboardStats = (bookMetrics = [], feedbackSummary, overviewSeries =
     totalBooks,
     totalReaders,
     totalReads,
-    averageRating,
     booksTrend: calculateChange(recentBookAdds, previousBookAdds),
     readersTrend: calculateChange(recentReaders, previousReaders),
     readsTrend: calculateChange(totalReads, Math.max(0, totalReads - recentReaders)),
-    ratingTrend: calculateChange(averageRating, 0, { digits: 1, suffix: '' }),
   };
 };
 
@@ -412,11 +402,9 @@ const Dashboard = () => {
           totalBooks: 0,
           totalReaders: 0,
           totalReads: 0,
-          averageRating: 0,
           booksTrend: '+0%',
           readersTrend: '+0%',
           readsTrend: '+0%',
-          ratingTrend: '+0.0',
         });
         setPerformanceData([]);
         setTopBooks([]);
@@ -463,7 +451,7 @@ const Dashboard = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
         <StatCard 
           title="Total Books" 
           value={stats ? (stats.totalBooks?.toLocaleString() || '0') : '0'} 
@@ -484,13 +472,6 @@ const Dashboard = () => {
           change={stats?.readsTrend || '+0%'} 
           icon={BookOpen} 
           isPositive={!stats?.readsTrend?.startsWith('-')}
-        />
-        <StatCard 
-          title="Avg. Rating" 
-          value={stats ? (stats.averageRating?.toFixed(1) || '0.0') : '0.0'} 
-          change={stats?.ratingTrend || '+0.0'} 
-          icon={Star} 
-          isPositive={!stats?.ratingTrend?.startsWith('-')}
         />
       </div>
 

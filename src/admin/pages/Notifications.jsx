@@ -5,6 +5,7 @@ import { useLanguage } from "../../i18n/LanguageContext";
 import {
   addHandledAdminAuthorRequestId,
   addUserAuthorRequestNotification,
+  clearHandledAdminAuthorRequestId,
   getAdminAuthorRequestKey,
   getHandledAdminAuthorRequestIds,
 } from "../../lib/authorRequestNotifications";
@@ -15,6 +16,17 @@ import NotificationTypesLegend from "../components/notification/NotificationType
 import SendPanel from "../components/notification/SendPanel";
 import { fetchAdminNotifications } from "../services/adminService";
 import { approveAuthorRequest, rejectAuthorRequest } from "../services/authorService";
+
+const isLaravelUserNotFoundError = (err) => {
+  const message = String(err?.response?.data?.message || err?.message || "");
+  const normalizedMessage = message.replace(/\\\\/g, "\\").trim();
+
+  return (
+    err?.status === 404 ||
+    err?.response?.status === 404 ||
+    /No query results for model \[App(?:\\|\.)Models(?:\\|\.)User\]/i.test(normalizedMessage)
+  );
+};
 
 const Notifications = () => {
   const { t } = useLanguage();
@@ -119,8 +131,17 @@ const Notifications = () => {
     }
 
     const actionKey = `${action}:${authorId}`;
+    const notificationKey = getAdminAuthorRequestKey(notification) || `author:${authorId}`;
     setRequestActionKey(actionKey);
     setFlash(null);
+
+    // Ensure the item stays hidden even if the admin refreshes while the request is in-flight.
+    addHandledAdminAuthorRequestId(notification);
+
+    // Optimistically hide the request card immediately after the admin clicks approve/reject.
+    setNotifications((current) =>
+      current.filter((item) => getAdminAuthorRequestKey(item) !== notificationKey),
+    );
 
     try {
       const response =
@@ -137,14 +158,6 @@ const Notifications = () => {
             },
         action === "approve" ? "approved" : "rejected",
       );
-      addHandledAdminAuthorRequestId(notification);
-
-      setNotifications((current) =>
-        current.filter(
-          (item) => getAdminAuthorRequestKey(item) !== getAdminAuthorRequestKey(notification),
-        ),
-      );
-
       setFlash({
         type: "success",
         message:
@@ -154,14 +167,30 @@ const Notifications = () => {
             : t("Author request rejected successfully.")),
       });
     } catch (err) {
+      const userMissing = isLaravelUserNotFoundError(err);
+
+      if (!userMissing) {
+        clearHandledAdminAuthorRequestId(notification);
+
+        // Restore the card if the request fails (except for missing/deleted users).
+        setNotifications((current) => {
+          const alreadyVisible = current.some(
+            (item) => getAdminAuthorRequestKey(item) === notificationKey,
+          );
+          return alreadyVisible ? current : [notification, ...current];
+        });
+      }
+
       setFlash({
-        type: "error",
+        type: userMissing ? "success" : "error",
         message:
-          err?.response?.data?.message ||
-          err?.message ||
-          (action === "approve"
-            ? t("Failed to approve author request.")
-            : t("Failed to reject author request.")),
+          userMissing
+            ? t("This author request no longer exists (user already removed).")
+            : err?.response?.data?.message ||
+              err?.message ||
+              (action === "approve"
+                ? t("Failed to approve author request.")
+                : t("Failed to reject author request.")),
       });
     } finally {
       setRequestActionKey("");

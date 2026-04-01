@@ -12,7 +12,13 @@ import {
 } from "lucide-react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { useLanguage } from "../../i18n/LanguageContext";
-import { addUserAuthorRequestNotification } from "../../lib/authorRequestNotifications";
+import {
+  addHandledAdminAuthorRequestId,
+  addUserAuthorRequestNotification,
+  clearHandledAdminAuthorRequestId,
+  getAdminAuthorRequestKey,
+  getHandledAdminAuthorRequestIds,
+} from "../../lib/authorRequestNotifications";
 import { useTheme } from "../../theme/ThemeContext";
 import AuthorsTable from "../components/authors/AuthorsTable";
 import { fetchAdminNotifications } from "../services/adminService";
@@ -26,6 +32,17 @@ import {
   rejectAuthorRequest,
   resendAuthorInvitation,
 } from "../services/authorService";
+
+const isLaravelUserNotFoundError = (err) => {
+  const message = String(err?.response?.data?.message || err?.message || "");
+  const normalizedMessage = message.replace(/\\\\/g, "\\").trim();
+
+  return (
+    err?.status === 404 ||
+    err?.response?.status === 404 ||
+    /No query results for model \[App(?:\\|\.)Models(?:\\|\.)User\]/i.test(normalizedMessage)
+  );
+};
 
 function RequestStatusBadge({ status, isDark, t }) {
   const normalizedStatus = String(status || "").trim().toLowerCase();
@@ -179,9 +196,13 @@ export default function Authors() {
         const rightTime = new Date(right?.requested_at || 0).getTime() || 0;
         return rightTime - leftTime;
       });
-      const pendingIds = new Set(pending.map((author) => String(author.id)));
+      const handledIds = new Set(getHandledAdminAuthorRequestIds());
+      const visiblePending = pending.filter(
+        (request) => !handledIds.has(getAdminAuthorRequestKey(request)),
+      );
+      const pendingIds = new Set(visiblePending.map((author) => String(author.id)));
 
-      setPendingRequests(pending);
+      setPendingRequests(visiblePending);
       setAuthors(allAuthors.filter((author) => !pendingIds.has(String(author.id))));
     } catch (err) {
       setPageError(err?.message || t("Failed to fetch authors"));
@@ -281,7 +302,20 @@ export default function Authors() {
   };
 
   const handleAuthorRequest = async (requestId, action) => {
+    const removedRequest = pendingRequests.find((request) => String(request.id) === String(requestId)) || null;
+    const handledKeySource = removedRequest || { id: requestId };
     setRequestActionId(`${action}:${requestId}`);
+
+    addHandledAdminAuthorRequestId(handledKeySource);
+
+    // Optimistically hide the request card immediately after the admin clicks approve/reject.
+    if (removedRequest) {
+      setPendingRequests((current) => current.filter((request) => String(request.id) !== String(requestId)));
+    }
+
+    if (selectedAuthor?.id === requestId) {
+      setSelectedAuthor(null);
+    }
 
     try {
       const response =
@@ -298,25 +332,40 @@ export default function Authors() {
             : t("Author request rejected. Email notification should be sent by the backend.")),
       });
 
-      if (selectedAuthor?.id === requestId) {
-        setSelectedAuthor(null);
-      }
-
       addUserAuthorRequestNotification(
-        response?.data?.id ? response.data : pendingRequests.find((request) => String(request.id) === String(requestId)) || { id: requestId },
+        response?.data?.id ? response.data : removedRequest || { id: requestId },
         action === "approve" ? "approved" : "rejected",
       );
 
       await fetchAuthorsData();
     } catch (err) {
+      const userMissing = isLaravelUserNotFoundError(err);
+
+      if (!userMissing) {
+        clearHandledAdminAuthorRequestId(handledKeySource);
+
+        if (removedRequest) {
+          setPendingRequests((current) => {
+            const alreadyVisible = current.some((request) => String(request.id) === String(requestId));
+            return alreadyVisible ? current : [removedRequest, ...current];
+          });
+        }
+      }
+
       setFlash({
-        type: "error",
+        type: userMissing ? "success" : "error",
         message:
-          err?.message ||
-          (action === "approve"
-            ? t("Failed to approve author request")
-            : t("Failed to reject author request")),
+          userMissing
+            ? t("This author request no longer exists (user already removed).")
+            : err?.message ||
+              (action === "approve"
+                ? t("Failed to approve author request")
+                : t("Failed to reject author request")),
       });
+
+      if (userMissing) {
+        await fetchAuthorsData().catch(() => {});
+      }
     } finally {
       setRequestActionId(null);
     }

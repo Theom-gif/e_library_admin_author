@@ -39,6 +39,10 @@ function getStoredRefreshToken() {
     sessionStorage.getItem(REFRESH_TOKEN_KEY) ||
     localStorage.getItem("refresh_token") ||
     sessionStorage.getItem("refresh_token") ||
+    localStorage.getItem("reset_token") ||
+    sessionStorage.getItem("reset_token") ||
+    localStorage.getItem("resetToken") ||
+    sessionStorage.getItem("resetToken") ||
     null
   );
 }
@@ -70,8 +74,12 @@ function persistRefreshToken(token) {
 
   activeStorage.setItem(REFRESH_TOKEN_KEY, token);
   activeStorage.setItem("refresh_token", token);
+  activeStorage.setItem("reset_token", token);
+  activeStorage.setItem("resetToken", token);
   staleStorage.removeItem(REFRESH_TOKEN_KEY);
   staleStorage.removeItem("refresh_token");
+  staleStorage.removeItem("reset_token");
+  staleStorage.removeItem("resetToken");
 }
 
 function clearStoredAuth() {
@@ -83,6 +91,10 @@ function clearStoredAuth() {
   sessionStorage.removeItem(REFRESH_TOKEN_KEY);
   localStorage.removeItem("refresh_token");
   sessionStorage.removeItem("refresh_token");
+  localStorage.removeItem("reset_token");
+  sessionStorage.removeItem("reset_token");
+  localStorage.removeItem("resetToken");
+  sessionStorage.removeItem("resetToken");
   localStorage.removeItem(SESSION_KEY);
   sessionStorage.removeItem(SESSION_KEY);
   localStorage.removeItem(REMEMBER_KEY);
@@ -186,9 +198,11 @@ async function requestTokenRefresh() {
     .post(
       normalizeApiUrl("/auth/refresh"),
       {
-        refresh_token: refreshToken,
-        refreshToken: refreshToken,
-        token: refreshToken,
+        refresh_token: refreshToken || undefined,
+        refreshToken: refreshToken || undefined,
+        reset_token: refreshToken || undefined,
+        resetToken: refreshToken || undefined,
+        token: refreshToken || currentToken || undefined,
       },
       {
         baseURL: API_BASE_URL,

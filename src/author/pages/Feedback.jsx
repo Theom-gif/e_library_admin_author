@@ -1,12 +1,10 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import {
-  MessageSquare,
   Star,
   ThumbsUp,
   ThumbsDown,
   MoreHorizontal,
-  Filter,
   Search,
   Send,
   Loader2,
@@ -40,7 +38,6 @@ const Feedback = () => {
   const [error, setError] = React.useState('');
   const [searchText, setSearchText] = React.useState('');
   const [bookFilter, setBookFilter] = React.useState('All Books');
-  const [statusFilter, setStatusFilter] = React.useState('All');
   const [openReplyId, setOpenReplyId] = React.useState(null);
   const [replyDrafts, setReplyDrafts] = React.useState({});
   const [visibleCount, setVisibleCount] = React.useState(6);
@@ -104,18 +101,11 @@ const Feedback = () => {
         item.book.toLowerCase().includes(searchText.toLowerCase()) ||
         item.comment.toLowerCase().includes(searchText.toLowerCase());
       const matchesBook = bookFilter === 'All Books' || item.book === bookFilter;
-      const matchesStatus = statusFilter === 'All' || item.status === statusFilter;
-      return matchesSearch && matchesBook && matchesStatus;
+      return matchesSearch && matchesBook;
     });
-  }, [bookFilter, normalizedFeedbacks, searchText, statusFilter]);
+  }, [bookFilter, normalizedFeedbacks, searchText]);
 
   const visibleFeedbacks = filteredFeedbacks.slice(0, visibleCount);
-  const averageRating = normalizedFeedbacks.length
-    ? (
-        normalizedFeedbacks.reduce((sum, item) => sum + (Number(item.rating) || 0), 0) /
-        normalizedFeedbacks.length
-      ).toFixed(1)
-    : '0.0';
 
   const updateFeedbackUiState = (id, updater) => {
     setFeedbackUiState((current) => {
@@ -203,16 +193,6 @@ const Feedback = () => {
           <h1 className="text-3xl font-bold tracking-tight">Reader Feedback</h1>
           <p className="text-slate-400 mt-1">Engage with your readers and see what they're saying about your stories.</p>
         </div>
-        <div className="flex gap-4">
-          <div className="bg-card-dark border border-white/5 rounded-xl px-4 py-2 flex items-center gap-2">
-            <Star className="size-4 text-yellow-500 fill-yellow-500" />
-            <span className="text-sm font-bold">{averageRating} Avg Rating</span>
-          </div>
-          <div className="bg-card-dark border border-white/5 rounded-xl px-4 py-2 flex items-center gap-2">
-            <MessageSquare className="size-4 text-accent" />
-            <span className="text-sm font-bold">{normalizedFeedbacks.length.toLocaleString()} Reviews</span>
-          </div>
-        </div>
       </div>
 
       <div className="flex flex-col md:flex-row gap-4 mb-8">
@@ -226,22 +206,11 @@ const Feedback = () => {
             className="w-full bg-card-dark border border-white/5 rounded-xl pl-10 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
           />
         </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() =>
-              setStatusFilter((prev) =>
-                prev === 'All' ? 'Unread' : prev === 'Unread' ? 'Read' : prev === 'Read' ? 'Replied' : 'All',
-              )
-            }
-            className="flex items-center gap-2 px-4 py-3 bg-card-dark border border-white/5 rounded-xl text-sm font-medium hover:bg-primary/20 transition-colors"
-          >
-            <Filter className="size-4" />
-            <span>{statusFilter === 'All' ? 'Filter' : statusFilter}</span>
-          </button>
+        <div className="md:w-72">
           <select
             value={bookFilter}
             onChange={(e) => setBookFilter(e.target.value)}
-            className="bg-card-dark border border-white/5 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
+            className="w-full bg-card-dark border border-white/5 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-accent/50 transition-all"
           >
             {uniqueBooks.map((book) => (
               <option key={book}>{book}</option>

@@ -438,42 +438,50 @@ const UploadBook = () => {
       </div>
 
       <div className="relative mb-12">
-        <div className="absolute left-[12%] right-[12%] top-7 hidden h-0.5 bg-[var(--border)] md:block" />
+        <div
+          className="absolute left-[12%] right-[12%] top-7 hidden h-px md:block"
+          style={{ background: 'color-mix(in srgb, var(--text) 14%, transparent)' }}
+        />
         <div className="grid gap-4 md:grid-cols-3">
           {UPLOAD_STEPS.map((item) => {
             const isCompleted = step > item.id;
             const isCurrent = step === item.id;
+            const circleStyle = isCompleted || isCurrent
+              ? {
+                  background: 'var(--surface)',
+                  borderColor: 'color-mix(in srgb, var(--accent) 38%, transparent)',
+                  color: 'var(--accent)',
+                  boxShadow: isCurrent
+                    ? '0 0 0 4px color-mix(in srgb, var(--accent) 14%, transparent)'
+                    : '0 6px 18px color-mix(in srgb, var(--accent) 10%, transparent)',
+                }
+              : {
+                  background: 'var(--surface)',
+                  borderColor: 'color-mix(in srgb, var(--text) 14%, transparent)',
+                  color: 'var(--muted)',
+                };
 
             return (
               <div
                 key={item.id}
-                className={`relative rounded-3xl border p-4 text-center transition-all duration-300 ${
-                  isCompleted
-                    ? 'border-accent/30 bg-[color:var(--surface-overlay-15)] shadow-glow'
-                    : isCurrent
-                      ? 'border-accent/40 bg-[color:var(--surface-overlay-10)] shadow-[0_20px_55px_rgba(0,0,0,0.12)]'
-                      : 'border-white/10 bg-[var(--surface-2)]'
-                }`}
+                className="relative px-4 pt-1 text-center transition-all duration-300"
               >
                 <div
-                  className={`mx-auto flex size-14 items-center justify-center rounded-full border text-base font-bold transition-all ${
-                    isCompleted
-                      ? 'border-accent bg-accent text-white'
-                      : isCurrent
-                        ? 'border-accent bg-accent text-white ring-4 ring-accent/15'
-                        : 'border-white/15 bg-[var(--surface)] text-slate-500'
-                  }`}
+                  className="mx-auto flex size-14 items-center justify-center rounded-full border text-base font-bold transition-all"
+                  style={circleStyle}
                 >
                   {isCompleted ? <CheckCircle2 className="size-6" /> : item.id}
                 </div>
                 <p
-                  className={`mt-4 text-xs font-bold uppercase tracking-[0.18em] ${
-                    isCompleted || isCurrent ? 'text-accent' : 'text-slate-500'
-                  }`}
+                  className="mt-4 text-xs font-bold uppercase tracking-[0.18em]"
+                  style={{ color: isCompleted || isCurrent ? 'var(--accent)' : 'var(--muted)' }}
                 >
                   {item.label}
                 </p>
-                <p className="mt-2 text-sm font-medium text-[color:var(--text)]">
+                <p
+                  className="mt-2 text-sm font-medium"
+                  style={{ color: 'color-mix(in srgb, var(--text) 82%, var(--bg) 18%)' }}
+                >
                   {item.note}
                 </p>
               </div>
@@ -679,7 +687,7 @@ const UploadBook = () => {
                       <div className="text-center px-6">
                         <p className="text-sm font-bold">Upload Cover</p>
                         <p className="text-[10px] text-slate-500 mt-1">
-                          {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. PNG or JPEG up to 5MB'}
+                          {/* {coverFile ? `Selected: ${coverFile.name}` : 'Drag/drop or click. PNG or JPEG up to 5MB'} */}
                         </p>
                       </div>
                     </>

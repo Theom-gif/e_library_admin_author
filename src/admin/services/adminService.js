@@ -439,6 +439,66 @@ const unwrapArrayPayload = (payload) => {
   return Array.isArray(value) ? value : [];
 };
 
+const parseMaybeJsonObject = (value) => {
+  if (!value) return {};
+  if (typeof value === "object" && !Array.isArray(value)) return value;
+  if (typeof value !== "string") return {};
+
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+};
+
+const firstNonEmptyValue = (...values) =>
+  values.find((value) => value !== undefined && value !== null && String(value).trim() !== "");
+
+const buildAuthorRequestName = (sources = []) => {
+  for (const source of sources) {
+    if (!source || typeof source !== "object") continue;
+
+    const directName = String(source.name ?? source.full_name ?? "").trim();
+    if (directName) {
+      return directName;
+    }
+
+    const firstName = String(source.first_name ?? source.firstname ?? "").trim();
+    const lastName = String(source.last_name ?? source.lastname ?? "").trim();
+    const joined = [firstName, lastName].filter(Boolean).join(" ").trim();
+    if (joined) {
+      return joined;
+    }
+  }
+
+  return "";
+};
+
+const toTimestamp = (value) => {
+  const parsed = new Date(value || "").getTime();
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const mergeNotificationEntries = (current = {}, next = {}) => ({
+  ...current,
+  ...next,
+  title: firstNonEmptyValue(next.title, current.title) || "",
+  message: firstNonEmptyValue(next.message, current.message) || "",
+  description: firstNonEmptyValue(next.description, current.description) || "",
+  email: firstNonEmptyValue(next.email, current.email) || "",
+  author_id: firstNonEmptyValue(next.author_id, current.author_id) || "",
+  status: firstNonEmptyValue(next.status, current.status) || "",
+  applicant_name: firstNonEmptyValue(next.applicant_name, current.applicant_name) || "",
+  bio: firstNonEmptyValue(next.bio, current.bio) || "",
+  reason: firstNonEmptyValue(next.reason, current.reason) || "",
+  created_at:
+    toTimestamp(next.created_at) >= toTimestamp(current.created_at)
+      ? next.created_at || current.created_at || ""
+      : current.created_at || next.created_at || "",
+  read: Boolean(current.read && next.read),
+});
+
 const isRequestConfig = (value) =>
   Boolean(
     value &&
@@ -492,14 +552,101 @@ const unwrapNotifications = (res) => {
     (Array.isArray(raw?.notifications) && raw.notifications) ||
     (Array.isArray(raw) && raw) ||
     [];
-  return rows.map((n) => ({
-    id:          n.id ?? n._id ?? "",
-    type:        n.type ?? n.notification_type ?? "",
-    message:     n.message ?? n.title ?? n.body ?? "",
-    description: n.description ?? n.body ?? "",
-    read:        Boolean(n.read ?? n.is_read ?? n.read_at),
-    created_at:  n.created_at ?? n.createdAt ?? "",
-  }));
+  const mapped = rows.map((item) => {
+    const payload = {
+      ...parseMaybeJsonObject(item?.payload),
+      ...parseMaybeJsonObject(item?.data),
+      ...parseMaybeJsonObject(item?.meta),
+    };
+    const type = String(
+      firstNonEmptyValue(item.type, item.notification_type, payload.type, payload.notification_type) || "",
+    ).trim();
+    const authorId =
+      firstNonEmptyValue(
+        item.author_id,
+        item.authorId,
+        payload.author_id,
+        payload.authorId,
+        payload.user_id,
+        payload.userId,
+      ) || "";
+    const email = firstNonEmptyValue(item.email, payload.email, payload.user_email, payload.reader_email) || "";
+    const isPendingAuthorApproval = type === "author.pending_approval";
+    const rawStatus = firstNonEmptyValue(item.status, payload.status, payload.request_status) || "";
+    const status = isPendingAuthorApproval
+      ? String(rawStatus || "in_review").trim().toLowerCase() || "in_review"
+      : rawStatus;
+    const requestName = buildAuthorRequestName([item, payload]);
+    const requestReason = firstNonEmptyValue(
+      payload.reason,
+      payload.motivation,
+      payload.request_reason,
+      payload.request_message,
+      payload.message,
+      item.reason,
+      item.motivation,
+    ) || "";
+    const requestBio = firstNonEmptyValue(payload.bio, payload.author_bio, item.bio) || "";
+    const requestMessage =
+      firstNonEmptyValue(item.message, payload.message, payload.title, item.title, item.body) ||
+      (requestName
+        ? `${requestName} requested to become an author.`
+        : "New author request pending approval");
+
+    return {
+      id: item.id ?? item._id ?? "",
+      type,
+      title: isPendingAuthorApproval
+        ? "New author request pending approval"
+        : firstNonEmptyValue(item.title, payload.title, payload.subject) ?? "",
+      message: isPendingAuthorApproval
+        ? requestMessage
+        : firstNonEmptyValue(item.message, item.title, item.body, payload.message, payload.title) ?? "",
+      description:
+        firstNonEmptyValue(item.description, payload.description, item.body) ??
+        (isPendingAuthorApproval
+          ? [email, status].filter(Boolean).join(" - ")
+          : ""),
+      read: Boolean(item.read ?? item.is_read ?? item.read_at),
+      created_at: item.created_at ?? item.createdAt ?? "",
+      author_id: authorId,
+      email,
+      status,
+      applicant_name: requestName,
+      bio: requestBio,
+      reason: requestReason,
+      payload,
+      targetPath: isPendingAuthorApproval ? "/admin/notifications" : "",
+      targetState: isPendingAuthorApproval
+        ? {
+            activeCategory: "user",
+          }
+        : null,
+    };
+  });
+
+  const deduped = new Map();
+
+  mapped.forEach((notification) => {
+    const key = notification.type === "author.pending_approval"
+      ? [
+          notification.type,
+          String(notification.email || "").trim().toLowerCase() || String(notification.author_id || "").trim(),
+          notification.status || "",
+        ].join("|")
+      : String(notification.id || [
+          notification.type,
+          notification.message || "",
+          notification.created_at || "",
+        ].join("|"));
+
+    const current = deduped.get(key);
+    deduped.set(key, current ? mergeNotificationEntries(current, notification) : notification);
+  });
+
+  return Array.from(deduped.values()).sort(
+    (left, right) => toTimestamp(right?.created_at) - toTimestamp(left?.created_at),
+  );
 };
 
 // GET /api/admin/notifications

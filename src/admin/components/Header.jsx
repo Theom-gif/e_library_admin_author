@@ -13,6 +13,10 @@ import {
 import { useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../../auth/useAuth";
 import { useLanguage } from "../../i18n/LanguageContext";
+import {
+  getAdminAuthorRequestKey,
+  getHandledAdminAuthorRequestIds,
+} from "../../lib/authorRequestNotifications";
 import ThemeToggle from "../../theme/ThemeToggle";
 import { fetchAdminBooks, fetchAdminNotifications } from "../services/adminService";
 import { createAuthorRequestNotifications, fetchAuthors } from "../services/authorService";
@@ -34,16 +38,13 @@ const TYPE_META = {
   user_registered: { icon: User, color: "text-indigo-400", bg: "bg-indigo-500/10" },
   user_login: { icon: User, color: "text-blue-400", bg: "bg-blue-500/10" },
   user_milestone: { icon: User, color: "text-violet-400", bg: "bg-violet-500/10" },
-  author_request: { icon: PenTool, color: "text-amber-400", bg: "bg-amber-500/10" },
-  author_registration: { icon: PenTool, color: "text-amber-400", bg: "bg-amber-500/10" },
-  author_registration_pending: { icon: PenTool, color: "text-amber-400", bg: "bg-amber-500/10" },
-  author_approved: { icon: CheckCircle2, color: "text-emerald-400", bg: "bg-emerald-500/10" },
-  author_rejected: { icon: XCircle, color: "text-rose-400", bg: "bg-rose-500/10" },
   book_added: { icon: BookOpen, color: "text-emerald-400", bg: "bg-emerald-500/10" },
   book_updated: { icon: BookOpen, color: "text-cyan-400", bg: "bg-cyan-500/10" },
   book_deleted: { icon: BookOpen, color: "text-rose-400", bg: "bg-rose-500/10" },
   book_reported: { icon: AlertTriangle, color: "text-orange-400", bg: "bg-orange-500/10" },
   book_pending: { icon: BookOpen, color: "text-amber-400", bg: "bg-amber-500/10" },
+  "author.pending_approval": { icon: User, color: "text-amber-400", bg: "bg-amber-500/10" },
+  author_request_pending: { icon: User, color: "text-amber-400", bg: "bg-amber-500/10" },
   server_error: { icon: AlertTriangle, color: "text-red-400", bg: "bg-red-500/10" },
   failed_login: { icon: Shield, color: "text-rose-400", bg: "bg-rose-500/10" },
   auth_issue: { icon: Shield, color: "text-orange-400", bg: "bg-orange-500/10" },
@@ -102,48 +103,44 @@ export default function Header() {
 
   const loadNotifications = useCallback(async () => {
     setIsLoading(true);
+    let loadedNotifications = [];
+    let unreadFallback = 0;
 
     try {
-      const [notificationsResult, authorsResult, booksResult] = await Promise.allSettled([
-        fetchAdminNotifications(),
-        fetchAuthors({ status: "pending", page: 1, per_page: 6 }),
-        fetchAdminBooks({ status: "Pending", page: 1, perPage: 6 }),
-      ]);
-
-      const apiNotifications =
-        notificationsResult.status === "fulfilled" && Array.isArray(notificationsResult.value)
-          ? notificationsResult.value
-          : [];
-      const authorRequestNotifications =
-        authorsResult.status === "fulfilled"
-          ? createAuthorRequestNotifications(authorsResult.value?.data || []).slice(0, 6)
-          : [];
-      const pendingBookNotifications =
-        booksResult.status === "fulfilled"
-          ? (Array.isArray(booksResult.value?.data) ? booksResult.value.data : []).map((book) => ({
-              id: `book-pending-${book.id}`,
-              type: "book_pending",
-              message: book.title,
-              description: `${book.author} · ${book.date || t("New submission")}`,
-              read: false,
-              created_at: book.date,
-            }))
-          : [];
-
-      const mergedNotifications = dedupeNotifications([
-        ...authorRequestNotifications,
-        ...apiNotifications,
-        ...pendingBookNotifications,
-      ]).sort((left, right) => toNotificationTimestamp(right.created_at) - toNotificationTimestamp(left.created_at));
-
-      setNotifications(mergedNotifications.slice(0, 6));
-      setPendingCount(mergedNotifications.filter((item) => !item.read).length);
+      const data = await fetchAdminNotifications();
+      if (Array.isArray(data) && data.length > 0) {
+        const handledIds = new Set(getHandledAdminAuthorRequestIds());
+        loadedNotifications = data.filter(
+          (item) => !handledIds.has(getAdminAuthorRequestKey(item)),
+        );
+        unreadFallback = loadedNotifications.filter((item) => !item.read).length;
+      }
     } catch {
-      setNotifications([]);
-      setPendingCount(0);
-    } finally {
-      setIsLoading(false);
+      // Ignore and fall back below.
     }
+
+    if (loadedNotifications.length === 0) {
+      try {
+        const { data, meta } = await fetchAdminBooks({ status: "Pending", page: 1, perPage: 6 });
+        const mapped = (Array.isArray(data) ? data : []).map((book) => ({
+          id: book.id,
+          type: "book_pending",
+          message: book.title,
+          description: `${book.author} · ${book.date || t("New submission")}`,
+          read: false,
+          created_at: book.date,
+        }));
+        loadedNotifications = mapped;
+        unreadFallback = Number(meta?.total || mapped.length || 0);
+      } catch {
+        loadedNotifications = [];
+        unreadFallback = 0;
+      }
+    }
+
+    setNotifications(loadedNotifications.slice(0, 6));
+    setPendingCount(loadedNotifications.filter((item) => !item.read).length || unreadFallback);
+    setIsLoading(false);
   }, [t]);
 
   useEffect(() => {
@@ -177,6 +174,15 @@ export default function Header() {
 
   const handleViewAll = () => {
     setIsOpen(false);
+    navigate("/admin/notifications");
+  };
+
+  const handleNotificationClick = (notification) => {
+    setIsOpen(false);
+    if (notification?.targetPath) {
+      navigate(notification.targetPath, { state: notification.targetState || null });
+      return;
+    }
     navigate("/admin/notifications");
   };
 
@@ -231,35 +237,33 @@ export default function Header() {
                     {t("No notifications right now.")}
                   </p>
                 )}
-                {!isLoading &&
-                  notifications.map((notif) => {
-                    const meta = getMeta(notif.type);
-                    const Icon = meta.icon;
-
-                    return (
-                      <button
-                        key={notif.id}
-                        type="button"
-                        onClick={handleViewAll}
-                        className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/5"
-                      >
-                        <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${meta.bg}`}>
-                          <Icon size={13} className={meta.color} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className={`truncate text-sm font-medium ${notif.read ? "text-slate-400" : "text-slate-100"}`}>
-                            {notif.message || notif.title}
-                          </p>
-                          {notif.description && (
-                            <p className="truncate text-xs text-slate-500">{notif.description}</p>
-                          )}
-                        </div>
-                        <span className="shrink-0 text-[10px] text-slate-500">
-                          {timeAgo(notif.created_at)}
-                        </span>
-                      </button>
-                    );
-                  })}
+                {!isLoading && notifications.map((notif) => {
+                  const meta = getMeta(notif.type);
+                  const Icon = meta.icon;
+                  return (
+                    <button
+                      key={notif.id}
+                      type="button"
+                      onClick={() => handleNotificationClick(notif)}
+                      className="flex w-full items-start gap-3 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/5"
+                    >
+                      <div className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${meta.bg}`}>
+                        <Icon size={13} className={meta.color} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className={`truncate text-sm font-medium ${notif.read ? "text-slate-400" : "text-slate-100"}`}>
+                          {notif.message || notif.title}
+                        </p>
+                        {notif.description && (
+                          <p className="truncate text-xs text-slate-500">{notif.description}</p>
+                        )}
+                      </div>
+                      <span className="shrink-0 text-[10px] text-slate-500">
+                        {timeAgo(notif.created_at)}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
 
               <div className="border-t border-white/5 p-2">

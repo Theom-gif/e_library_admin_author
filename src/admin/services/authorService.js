@@ -3,6 +3,7 @@ import { apiClient } from "../../lib/apiClient";
 const AUTHOR_API_PREFIX = String(import.meta.env.VITE_AUTHOR_API_PREFIX || "/authors").replace(/\/+$/, "");
 const buildAuthorUrl = (suffix = "") => `${AUTHOR_API_PREFIX}${suffix}`;
 const AUTHOR_REGISTRATION_URL = String(import.meta.env.VITE_AUTHOR_REGISTRATION_URL || "/auth/author_registration");
+<<<<<<< HEAD
 const AUTHOR_APPROVAL_URL = String(import.meta.env.VITE_AUTHOR_APPROVAL_URL || "/admin/approve-authors").replace(/\/+$/, "");
 
 const toCleanString = (value) => String(value ?? "").trim();
@@ -67,6 +68,33 @@ export function getAuthorRegistrationStatus(author = {}) {
 
   return "approved";
 }
+=======
+const APPROVE_AUTHOR_REQUEST_URL = String(import.meta.env.VITE_APPROVE_AUTHOR_REQUEST_URL || "/admin/approve-authors");
+const REJECT_AUTHOR_REQUEST_URL = String(import.meta.env.VITE_REJECT_AUTHOR_REQUEST_URL || "/admin/reject-authors");
+
+const normalizeAuthorStatus = (author = {}) => {
+  const candidates = [
+    author?.request_status,
+    author?.author_request_status,
+    author?.approval_status,
+    author?.status,
+    author?.author_status,
+    author?.user_status,
+  ];
+
+  for (const candidate of candidates) {
+    const text = String(candidate || "").trim().toLowerCase();
+    if (!text) continue;
+    if (text.includes("pending")) return "Pending";
+    if (text.includes("reject")) return "Rejected";
+    if (text.includes("approve") || text.includes("active")) return "Approved";
+  }
+
+  if (author?.is_active === true) return "Approved";
+  if (author?.is_active === false) return "Pending";
+  return "Approved";
+};
+>>>>>>> eeddddab386af49983387096a5f399863bf3bb7c
 
 /**
  * Author Management API Service
@@ -85,14 +113,39 @@ export function getAuthorRegistrationStatus(author = {}) {
  */
 export const normalizeAuthor = (author = {}) => ({
   id: author?.id ?? "",
+<<<<<<< HEAD
   first_name: author?.first_name ?? author?.firstname ?? "",
   last_name: author?.last_name ?? author?.lastname ?? "",
   name: resolveAuthorName(author),
+=======
+  name:
+    author?.name ??
+    [author?.first_name, author?.last_name].filter(Boolean).join(" ").trim() ??
+    "",
+>>>>>>> eeddddab386af49983387096a5f399863bf3bb7c
   email: author?.email ?? "",
   bio: author?.bio ?? "",
+  first_name: author?.first_name ?? author?.firstname ?? "",
+  last_name: author?.last_name ?? author?.lastname ?? "",
   profile_image: author?.profile_image ?? null,
   profile_image_url: author?.profile_image_url ?? null,
   is_active: author?.is_active ?? false,
+  status: normalizeAuthorStatus(author),
+  request_status: normalizeAuthorStatus(author),
+  motivation:
+    author?.motivation ??
+    author?.reason ??
+    author?.message ??
+    author?.request_message ??
+    "",
+  requested_at:
+    author?.requested_at ??
+    author?.request_date ??
+    author?.submitted_at ??
+    author?.created_at ??
+    null,
+  approved_at: author?.approved_at ?? null,
+  rejected_at: author?.rejected_at ?? null,
   invitation_sent_at: author?.invitation_sent_at ?? null,
   invitation_accepted_at: author?.invitation_accepted_at ?? null,
   request_status: getAuthorRegistrationStatus(author),
@@ -431,6 +484,46 @@ export const resendAuthorInvitation = async (id, config = {}) => {
   }
 };
 
+export const approveAuthorRequest = async (id, config = {}) => {
+  try {
+    const response = await apiClient.post(`${APPROVE_AUTHOR_REQUEST_URL}/${id}`, null, config);
+
+    return {
+      data: normalizeAuthor(response?.data?.data || response?.data?.user || response?.data || {}),
+      message: response?.data?.message || "Author request approved successfully",
+      success: response?.data?.success ?? true,
+    };
+  } catch (error) {
+    console.error("approveAuthorRequest error:", error);
+    throw {
+      message: error?.response?.data?.message || "Failed to approve author request",
+      status: error?.response?.status,
+      errors: error?.response?.data?.errors,
+      data: error?.response?.data,
+    };
+  }
+};
+
+export const rejectAuthorRequest = async (id, config = {}) => {
+  try {
+    const response = await apiClient.post(`${REJECT_AUTHOR_REQUEST_URL}/${id}`, null, config);
+
+    return {
+      data: normalizeAuthor(response?.data?.data || response?.data?.user || response?.data || {}),
+      message: response?.data?.message || "Author request rejected successfully",
+      success: response?.data?.success ?? true,
+    };
+  } catch (error) {
+    console.error("rejectAuthorRequest error:", error);
+    throw {
+      message: error?.response?.data?.message || "Failed to reject author request",
+      status: error?.response?.status,
+      errors: error?.response?.data?.errors,
+      data: error?.response?.data,
+    };
+  }
+};
+
 /**
  * Export all author API services
  */
@@ -444,8 +537,13 @@ export default {
   updateAuthor,
   deleteAuthor,
   resendAuthorInvitation,
+<<<<<<< HEAD
   createAuthorRequestNotification,
   createAuthorRequestNotifications,
   getAuthorRegistrationStatus,
+=======
+  approveAuthorRequest,
+  rejectAuthorRequest,
+>>>>>>> eeddddab386af49983387096a5f399863bf3bb7c
   normalizeAuthor,
 };

@@ -1,5 +1,5 @@
 import axios from "axios";
-import { API_BASE_URL, API_TIMEOUT_MS, DEFAULT_API_BASE_URL } from "./apiClient";
+import { API_BASE_URL, API_TIMEOUT_MS, DEFAULT_API_BASE_URL, authApiClient } from "./apiClient";
 
 const trimTrailingSlash = (value) => String(value || "").replace(/\/+$/, "");
 const trimLeadingSlash = (value) => String(value || "").replace(/^\/+/, "");
@@ -105,4 +105,34 @@ export function refreshTokenRequest(token) {
       },
     },
   );
+}
+
+export async function requestAuthorRegistration(payload = {}, options = {}) {
+  const requestModes = Array.isArray(options?.modes) && options.modes.length > 0
+    ? options.modes
+    : ["urlencoded", "multipart", "json"];
+  let lastError = null;
+
+  for (const mode of requestModes) {
+    try {
+      return await authApiClient.post(
+        "/auth/author_registration",
+        createRequestBody(payload, mode),
+        {
+          timeout: API_TIMEOUT_MS,
+          headers: createHeaders(mode),
+          ...options,
+        },
+      );
+    } catch (error) {
+      lastError = error;
+      const status = Number(error?.response?.status || 0);
+      const shouldRetry = status === 404 || status === 405 || status === 415 || status === 422;
+      if (!shouldRetry) {
+        break;
+      }
+    }
+  }
+
+  throw lastError;
 }
